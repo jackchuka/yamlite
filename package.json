@@ -1,0 +1,64 @@
+{
+  "name": "@jackchuka/yamlite",
+  "version": "0.0.0",
+  "description": "Sync YAML files and SQLite in both directions",
+  "keywords": [
+    "cli",
+    "database",
+    "git",
+    "sqlite",
+    "sync",
+    "watch",
+    "yaml"
+  ],
+  "homepage": "https://github.com/jackchuka/yamlite#readme",
+  "bugs": "https://github.com/jackchuka/yamlite/issues",
+  "license": "MIT",
+  "author": "jackchuka",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jackchuka/yamlite.git"
+  },
+  "bin": {
+    "yamlite": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "typecheck": "tsc -p .",
+    "lint": "oxlint --deny-warnings && oxfmt --check",
+    "lint:fix": "oxlint --fix && oxfmt",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm check"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "commander": "^15.0.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "oxfmt": "^0.71.0",
+    "oxlint": "^1.86.0",
+    "tsdown": "^0.23.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=24.16"
+  },
+  "packageManager": "pnpm@12.6.0"
+}

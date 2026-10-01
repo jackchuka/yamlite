@@ -1,0 +1,44 @@
+import { type Document, isMap, isNode, isScalar, parseDocument, type YAMLMap } from "yaml";
+import { canonical } from "../hash.ts";
+import type { Rec } from "../types.ts";
+
+export const PARSE_OPTIONS = { intAsBigInt: true } as const;
+export const STRINGIFY_OPTIONS = { flowCollectionPadding: false } as const;
+export const YAML_EXT = /\.ya?ml$/i;
+
+// the yaml library appends a multi-line excerpt of the source; keep the first line ("… at line L, column C:")
+export function firstError(doc: { errors: Array<{ message: string }> }): string {
+  return (doc.errors[0]?.message ?? "invalid YAML").split("\n")[0]?.replace(/:$/, "") ?? "invalid YAML";
+}
+
+export type Parsed = { ok: true; doc: Document.Parsed; record: Rec } | { ok: false; error: string };
+
+export function parseRecordFile(content: string): Parsed {
+  const doc = parseDocument(content, PARSE_OPTIONS);
+  if (doc.errors.length > 0) return { ok: false, error: firstError(doc) };
+  if (doc.contents === null) return { ok: true, doc, record: {} };
+  if (!isMap(doc.contents)) return { ok: false, error: "top-level value must be a mapping" };
+  return { ok: true, doc, record: doc.toJS() as Rec };
+}
+
+export function updateMap(doc: Document, map: YAMLMap, record: Rec, keep: (field: string) => boolean): void {
+  for (const pair of map.items.slice()) {
+    const field = String(isScalar(pair.key) ? pair.key.value : pair.key);
+    if (keep(field)) continue;
+    const next = record[field];
+    if (next !== null && next !== undefined) continue;
+    const explicitNull = pair.value === null || (isScalar(pair.value) && pair.value.value === null);
+    if (!explicitNull) map.delete(field);
+  }
+  for (const [field, value] of Object.entries(record)) {
+    if (value === null || value === undefined) continue;
+    const current: unknown = map.get(field, true);
+    const currentJs = isNode(current) ? current.toJS(doc) : current;
+    if (current !== undefined && canonical(currentJs) === canonical(value)) continue;
+    map.set(field, doc.createNode(value));
+  }
+}
+
+export function stripNulls(record: Rec): Rec {
+  return Object.fromEntries(Object.entries(record).filter(([, v]) => v !== null && v !== undefined));
+}

@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>yamlite demo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --tomato: #e5484d;
+        --cream: #fff7ed;
+        --ink: #1c1b29;
+        --mute: #8a8796;
+        --line: #eadfd0;
+        --soft: #fde3d6;
+        --ok: #2f9e6e;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        width: 960px;
+        height: 500px;
+        overflow: hidden;
+      }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 15px;
+        position: relative;
+      }
+      .top {
+        position: absolute;
+        left: 40px;
+        top: 26px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+      }
+      .chip {
+        position: absolute;
+        right: 40px;
+        top: 30px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ok);
+        background: #e3f4ea;
+        border-radius: 99px;
+        padding: 6px 14px;
+        opacity: 0;
+        transition: none;
+      }
+      .card {
+        position: absolute;
+        top: 92px;
+        width: 380px;
+        height: 300px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px -18px rgba(60, 30, 10, 0.35);
+        overflow: hidden;
+      }
+      .left {
+        left: 40px;
+      }
+      .right {
+        right: 40px;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 42px;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--mute);
+      }
+      .bar b {
+        color: var(--ink);
+        font-weight: 700;
+      }
+      .code {
+        padding: 14px 0;
+      }
+      .ln {
+        display: flex;
+        align-items: center;
+        height: 30px;
+        padding-right: 16px;
+        position: relative;
+      }
+      .ln .no {
+        width: 44px;
+        text-align: right;
+        padding-right: 14px;
+        color: #c9c1b6;
+        font-size: 13px;
+      }
+      .ln .gut {
+        position: absolute;
+        left: 0;
+        top: 4px;
+        bottom: 4px;
+        width: 4px;
+        border-radius: 0 3px 3px 0;
+        background: var(--tomato);
+        opacity: 0;
+      }
+      .ln.hl {
+        background: var(--soft);
+      }
+      .k {
+        color: var(--tomato);
+        font-weight: 700;
+      }
+      .c {
+        color: var(--mute);
+        font-style: italic;
+      }
+      .badge {
+        margin-left: 10px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--ok);
+        background: #e3f4ea;
+        border-radius: 99px;
+        padding: 2px 9px;
+        opacity: 0;
+      }
+      .caret {
+        display: inline-block;
+        width: 2px;
+        height: 18px;
+        background: var(--ink);
+        vertical-align: -3px;
+        margin-left: 1px;
+        opacity: 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 6px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0 12px;
+        height: 34px;
+        border-bottom: 1px solid #f3ebe0;
+        white-space: nowrap;
+      }
+      th {
+        font-size: 12px;
+        color: var(--mute);
+        font-weight: 400;
+        height: 30px;
+      }
+      td.hl {
+        background: var(--soft);
+        font-weight: 700;
+        color: var(--tomato);
+      }
+      .sql {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--ink);
+        color: #f4efe6;
+        padding: 14px 16px;
+        font-size: 13px;
+        line-height: 20px;
+        height: 82px;
+      }
+      .sql .p {
+        color: var(--tomato);
+        font-weight: 700;
+      }
+      .sql .caret {
+        background: #f4efe6;
+        height: 15px;
+      }
+      .sql .res {
+        color: #7ad3a4;
+        opacity: 0;
+      }
+      .mid {
+        position: absolute;
+        left: 420px;
+        width: 120px;
+        top: 92px;
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .wire {
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 50%;
+        height: 2px;
+        background: repeating-linear-gradient(90deg, #e7c9b8 0 6px, transparent 6px 12px);
+      }
+      .logo {
+        position: relative;
+        z-index: 1;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        box-shadow: 0 0 0 6px var(--cream);
+      }
+      .dot {
+        position: absolute;
+        top: 50%;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border-radius: 50%;
+        background: var(--tomato);
+        box-shadow: 0 0 0 5px rgba(229, 72, 77, 0.18);
+        opacity: 0;
+        z-index: 2;
+      }
+      .dir {
+        position: absolute;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--tomato);
+        opacity: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+      }
+      .dir.a {
+        top: calc(50% - 76px);
+      }
+      .dir.b {
+        top: calc(50% + 60px);
+      }
+      .cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 432px;
+        height: 40px;
+        text-align: center;
+        font-family: Outfit, sans-serif;
+        font-weight: 600;
+        font-size: 24px;
+      }
+      .cap span {
+        position: absolute;
+        left: 0;
+        right: 0;
+        opacity: 0;
+      }
+      .cap em {
+        font-style: normal;
+        color: var(--tomato);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <svg width="34" height="34" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="15" fill="#e5484d" />
+        <path d="M15 19L27 38M39 19L22 50" stroke="#fff7ed" stroke-width="7" stroke-linecap="round" fill="none" />
+        <circle cx="48" cy="29" r="4.5" fill="#1c1b29" />
+        <circle cx="48" cy="44" r="4.5" fill="#fff7ed" />
+      </svg>
+      yamlite
+    </div>
+    <div class="chip" id="chip">✓ in sync</div>
+
+    <div class="card left">
+      <div class="bar">📄 <b>tasks/buy-milk.yaml</b></div>
+      <div class="code">
+        <div class="ln" id="l1">
+          <span class="gut"></span><span class="no">1</span><span class="c"># weekend groceries</span
+          ><span class="badge" id="badge">comment kept</span>
+        </div>
+        <div class="ln" id="l2">
+          <span class="gut"></span><span class="no">2</span><span class="k">title</span>: Buy milk
+        </div>
+        <div class="ln" id="l3">
+          <span class="gut"></span><span class="no">3</span><span class="k">done</span>:&nbsp;<span id="done"
+            >false</span
+          >
+        </div>
+        <div class="ln" id="l4">
+          <span class="gut"></span><span class="no">4</span><span class="k">priority</span>:&nbsp;<span id="prio"
+            >2</span
+          ><span class="caret" id="caret1"></span>
+        </div>
+        <div class="ln" id="l5">
+          <span class="gut"></span><span class="no">5</span><span class="k">tags</span>: [errand, home]
+        </div>
+      </div>
+    </div>
+
+    <div class="mid">
+      <div class="wire"></div>
+      <svg class="logo" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="15" fill="#e5484d" />
+        <path d="M15 19L27 38M39 19L22 50" stroke="#fff7ed" stroke-width="7" stroke-linecap="round" fill="none" />
+        <circle cx="48" cy="29" r="4.5" fill="#1c1b29" />
+        <circle cx="48" cy="44" r="4.5" fill="#fff7ed" />
+      </svg>
+      <div class="dot" id="dot"></div>
+      <div class="dir a" id="dirA">→ db</div>
+      <div class="dir b" id="dirB">file ←</div>
+    </div>
+
+    <div class="card right">
+      <div class="bar">🗄️ <b>tasks</b> · SQLite</div>
+      <table>
+        <tr>
+          <th>id</th>
+          <th>title</th>
+          <th>done</th>
+          <th>priority</th>
+        </tr>
+        <tr>
+          <td>buy-milk</td>
+          <td>Buy milk</td>
+          <td id="cDone">0</td>
+          <td id="cPrio">2</td>
+        </tr>
+        <tr>
+          <td>write-blog</td>
+          <td>Write blog</td>
+          <td>0</td>
+          <td>1</td>
+        </tr>
+      </table>
+      <div class="sql">
+        <div><span class="p">sqlite&gt;</span> <span id="sql"></span><span class="caret" id="caret2"></span></div>
+        <div class="res" id="res">1 row updated</div>
+      </div>
+    </div>
+
+    <div class="cap">
+      <span id="cap1">Edit the YAML file <em>→</em> the row updates</span>
+      <span id="cap2">Run SQL <em>→</em> the file updates, comments kept</span>
+      <span id="cap3">Always in sync — every change is a <em>git diff</em></span>
+    </div>
+
+    <script>
+      const SQL = "UPDATE tasks SET done = 1 WHERE id = 'buy-milk';";
+      const T = {
+        caret1: [500, 1500],
+        del: 900,
+        typed: 1150,
+        hlFile1: [1150, 2100],
+        push1: [1500, 2200],
+        cell1: 2200,
+        hlCell1: [2200, 3300],
+        sql: 4300,
+        sqlSpeed: 42,
+        enter: 6700,
+        cell2: 6900,
+        hlCell2: [6900, 8000],
+        push2: [7200, 7900],
+        file2: 7900,
+        hlFile2: [7900, 9000],
+        badge: 8300,
+        final: 9800,
+        end: 12800,
+      };
+      const $ = (id) => document.getElementById(id);
+      const within = (t, [a, b]) => t >= a && t < b;
+      const fade = (t, a, b, d = 250) => Math.max(0, Math.min(1, (t - a) / d, (b - t) / d));
+      const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+
+      function pulse(t, [a, b], from, to) {
+        const p = (t - a) / (b - a);
+        if (p < 0 || p > 1) return null;
+        return { x: from + (to - from) * ease(p), o: fade(t, a, b, 120) };
+      }
+
+      window.render = (t) => {
+        $("prio").textContent = t < T.del ? "2" : t < T.typed ? "" : "1";
+        $("caret1").style.opacity = within(t, T.caret1) && Math.floor(t / 400) % 2 === 0 ? 1 : 0;
+        $("l4").classList.toggle("hl", within(t, T.hlFile1));
+        $("cPrio").textContent = t < T.cell1 ? "2" : "1";
+        $("cPrio").classList.toggle("hl", within(t, T.hlCell1));
+
+        const n = Math.max(0, Math.min(SQL.length, Math.floor((t - T.sql) / T.sqlSpeed)));
+        $("sql").textContent = SQL.slice(0, n);
+        $("caret2").style.opacity = t >= T.sql - 300 && t < T.enter && Math.floor(t / 400) % 2 === 0 ? 1 : 0;
+        $("res").style.opacity = t >= T.enter ? 1 : 0;
+        $("cDone").textContent = t < T.cell2 ? "0" : "1";
+        $("cDone").classList.toggle("hl", within(t, T.hlCell2));
+        $("done").textContent = t < T.file2 ? "false" : "true";
+        $("l3").classList.toggle("hl", within(t, T.hlFile2));
+        $("badge").style.opacity = fade(t, T.badge, T.end + 1000, 300);
+
+        const p = pulse(t, T.push1, 0, 120) || pulse(t, T.push2, 120, 0);
+        $("dot").style.opacity = p ? p.o : 0;
+        if (p) {
+          $("dot").style.left = p.x + "px";
+          $("dot").style.top = within(t, T.push1) ? "calc(50% - 46px)" : "calc(50% + 46px)";
+        }
+        $("dirA").style.opacity = fade(t, T.push1[0] - 200, T.push1[1] + 300, 150);
+        $("dirB").style.opacity = fade(t, T.push2[0] - 200, T.push2[1] + 300, 150);
+
+        const final = t >= T.final;
+        for (const id of ["l3", "l4"]) $(id).querySelector(".gut").style.opacity = final ? 1 : 0;
+        $("chip").style.opacity = fade(t, T.final, T.end + 1000, 300);
+
+        $("cap1").style.opacity = fade(t, -1000, 3900, 300);
+        $("cap2").style.opacity = fade(t, 3900, T.final - 100, 300);
+        $("cap3").style.opacity = fade(t, T.final, T.end + 1000, 300);
+      };
+      window.DURATION = T.end;
+      render(Number(new URLSearchParams(location.search).get("t") ?? 0));
+    </script>
+  </body>
+</html>

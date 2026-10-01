@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.yamlite/
+docs/superpowers/
+.superpowers/
+*.tgz
+*.log
+coverage/
+.DS_Store
+.idea/
