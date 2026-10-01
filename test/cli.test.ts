@@ -1,4 +1,5 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { sql, dataRoot, tmpRoot, write } from "./helpers.ts";
@@ -35,7 +36,8 @@ test("sync exits 1 when a table fails", () => {
 });
 
 test("prints the version", () => {
-  expect(run("--version").stdout.trim()).toBe("0.0.0");
+  const { version } = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
+  expect(run("--version").stdout.trim()).toBe(version);
 });
 
 test("init creates yamlite.yaml and refuses to overwrite it", () => {
