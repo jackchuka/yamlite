@@ -31,10 +31,8 @@ jobs:
       - name: Set version from tag
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version
 
-      # Build before publishing: npm validates `bin` before prepublishOnly runs,
-      # and drops it when dist/cli.mjs does not exist yet.
-      - run: pnpm check
-      - run: npm publish --ignore-scripts
+      # prepublishOnly runs `pnpm check` (typecheck, lint, test, build).
+      - run: npm publish
 
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:

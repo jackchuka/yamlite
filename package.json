@@ -20,7 +20,7 @@
     "url": "git+https://github.com/jackchuka/yamlite.git"
   },
   "bin": {
-    "yamlite": "./dist/cli.mjs"
+    "yamlite": "dist/cli.mjs"
   },
   "files": [
     "dist"
