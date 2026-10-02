@@ -19,6 +19,24 @@ export interface Reference {
   target?: string;
 }
 
+export interface ExpandSpec {
+  // the parent table's column, or below the first level the parent view's element field
+  field: string;
+  // <parent name>__<field>
+  name: string;
+  columns: Record<string, ColumnType>;
+  references: Reference[];
+  expand: ExpandSpec[];
+}
+
+export interface ViewRecord {
+  name: string;
+  table: string;
+  parent: string;
+  columns: Record<string, ColumnType>;
+  identity: string[];
+}
+
 export interface TableSpec {
   name: string;
   path: string;
@@ -31,4 +49,5 @@ export interface TableSpec {
   persisted: boolean;
   // paths of other tables inside this directory table's folder; never read or written by it
   exclude: string[];
+  expand: ExpandSpec[];
 }

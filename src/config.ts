@@ -3,7 +3,16 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { parse } from "yaml";
 import { YAML_EXT } from "./source/yamldoc.ts";
-import { COLUMN_TYPES, type ColumnType, type IndexSpec, type Mode, type Reference, type TableSpec } from "./types.ts";
+import {
+  COLUMN_TYPES,
+  type ColumnType,
+  type ExpandSpec,
+  type IndexSpec,
+  type Mode,
+  type Reference,
+  type TableSpec,
+} from "./types.ts";
+import { declaredViews } from "./views.ts";
 
 export interface TableInput {
   name: string;
@@ -12,6 +21,7 @@ export interface TableInput {
   columns?: Record<string, string>;
   indexes?: unknown[];
   references?: Record<string, unknown>;
+  expand?: Record<string, unknown>;
 }
 
 export interface OpenOptions {
@@ -65,6 +75,7 @@ interface RawTable {
   columns?: Record<string, string>;
   indexes?: unknown[];
   references?: Record<string, unknown>;
+  expand?: Record<string, unknown>;
 }
 
 export function configPath(root: string): string | null {
@@ -105,23 +116,19 @@ function toSpec(t: TableInput, persisted: boolean): TableSpec {
   if (!t.name || t.name.startsWith("_yamlite") || /[/\\\0]/.test(t.name) || t.name === "." || t.name.includes("..")) {
     throw new Error(`invalid table name: "${t.name}"`);
   }
-  const columns: Record<string, ColumnType> = {};
-  for (const [column, type] of Object.entries(t.columns ?? {})) {
-    const upper = String(type).toUpperCase() as ColumnType;
-    if (!COLUMN_TYPES.includes(upper))
-      throw new Error(`table "${t.name}": unknown column type ${type} for "${column}"`);
-    columns[column] = upper;
-  }
   return {
     name: t.name,
     path: t.path,
     mode: detectMode(t.path),
     key: t.key ?? "id",
-    columns,
+    columns: toColumns(`table "${t.name}": `, t.columns),
     indexes: (t.indexes ?? []).map((raw, i) => toIndex(t.name, raw, i)),
-    references: Object.entries(t.references ?? {}).map(([column, raw]) => toReference(t.name, column, raw)),
+    references: Object.entries(t.references ?? {}).map(([column, raw]) =>
+      toReference(`table "${t.name}": `, column, raw),
+    ),
     persisted,
     exclude: [],
+    expand: toExpand(t.name, t.name, t.expand, "expand"),
   };
 }
 
@@ -133,11 +140,84 @@ function withExcludes(tables: TableSpec[]): TableSpec[] {
 
 const REFERENCE = /^([^.\s]+)(?:\.([^.\s]+))?$/;
 
+function toColumns(where: string, raw: Record<string, string> | undefined): Record<string, ColumnType> {
+  const columns: Record<string, ColumnType> = {};
+  for (const [column, type] of Object.entries(raw ?? {})) {
+    const upper = String(type).toUpperCase() as ColumnType;
+    if (!COLUMN_TYPES.includes(upper)) throw new Error(`${where}unknown column type ${type} for "${column}"`);
+    columns[column] = upper;
+  }
+  return columns;
+}
+
 // `table` (its key column) or `table.column`
-function toReference(table: string, column: string, raw: unknown): Reference {
+function toReference(where: string, column: string, raw: unknown): Reference {
   const m = typeof raw === "string" ? REFERENCE.exec(raw.trim()) : null;
-  if (!m?.[1]) throw new Error(`table "${table}": references.${column} must be "table" or "table.column"`);
+  if (!m?.[1]) throw new Error(`${where}references.${column} must be "table" or "table.column"`);
   return m[2] ? { column, table: m[1], target: m[2] } : { column, table: m[1] };
+}
+
+export const referenceToRaw = (r: Reference): string => (r.target ? `${r.table}.${r.target}` : r.table);
+
+const EXPAND_KEYS = ["columns", "references", "expand"];
+
+// `expand: { <field>: { columns?, references?, expand? } | null }`: one view per field, named <parent>__<field>
+function toExpand(table: string, parent: string, raw: unknown, path: string): ExpandSpec[] {
+  if (raw === undefined || raw === null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw))
+    throw new Error(`table "${table}": ${path} must be a map of fields`);
+  return Object.entries(raw).map(([field, value]) => {
+    const where = `${path}.${field}`;
+    if (field === "" || field.includes("\0"))
+      throw new Error(`table "${table}": invalid field name in ${path}: "${field}"`);
+    if (value !== null && value !== undefined && (typeof value !== "object" || Array.isArray(value))) {
+      throw new Error(`table "${table}": ${where} must be a map of columns, references and expand`);
+    }
+    const v = (value ?? {}) as {
+      columns?: Record<string, string>;
+      references?: Record<string, unknown>;
+      expand?: unknown;
+    };
+    const unknown = Object.keys(v).find((k) => !EXPAND_KEYS.includes(k));
+    if (unknown !== undefined) throw new Error(`table "${table}": ${where} has an unknown key "${unknown}"`);
+    const name = `${parent}__${field}`;
+    return {
+      field,
+      name,
+      columns: toColumns(`table "${table}": ${where}: `, v.columns),
+      references: Object.entries(v.references ?? {}).map(([column, r]) =>
+        toReference(`table "${table}": ${where}.`, column, r),
+      ),
+      expand: toExpand(table, name, v.expand, `${where}.expand`),
+    };
+  });
+}
+
+export function expandToRaw(list: ExpandSpec[]): Record<string, unknown> {
+  return Object.fromEntries(
+    list.map((e) => [
+      e.field,
+      {
+        ...(Object.keys(e.columns).length > 0 ? { columns: e.columns } : {}),
+        ...(e.references.length > 0
+          ? { references: Object.fromEntries(e.references.map((r) => [r.column, referenceToRaw(r)])) }
+          : {}),
+        ...(e.expand.length > 0 ? { expand: expandToRaw(e.expand) } : {}),
+      },
+    ]),
+  );
+}
+
+function checkViewNames(tables: TableSpec[]): TableSpec[] {
+  const used = new Map(tables.map((t) => [t.name, `table "${t.name}"`]));
+  for (const t of tables) {
+    for (const { spec } of declaredViews(t)) {
+      const other = used.get(spec.name);
+      if (other) throw new Error(`table "${t.name}": view name "${spec.name}" is already used by ${other}`);
+      used.set(spec.name, `a view of table "${t.name}"`);
+    }
+  }
+  return tables;
 }
 
 const isStringList = (v: unknown): v is string[] =>
@@ -178,6 +258,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         columns: { ...prev?.columns, ...o.columns },
         indexes: o.indexes ?? prev?.indexes,
         references: o.references ?? prev?.references,
+        expand: o.expand ?? prev?.expand,
       });
     }
     const inCode = new Set<string>();
@@ -188,7 +269,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     return {
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
       stateDir: join(root, ".yamlite"),
-      tables: withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name)))),
+      tables: checkViewNames(withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))))),
     };
   }
   if (!opts.db) throw new Error("either root or db is required");
@@ -196,8 +277,8 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
   return {
     db,
     stateDir: join(dirname(db), ".yamlite"),
-    tables: withExcludes(
-      (opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false)),
+    tables: checkViewNames(
+      withExcludes((opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false))),
     ),
   };
 }

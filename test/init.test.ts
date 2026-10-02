@@ -11,6 +11,28 @@ const HEADER = [
 ];
 
 describe("generateConfig", () => {
+  test("keeps expand declarations when it rewrites yamlite.yaml", () => {
+    const root = tmpRoot();
+    write(join(root, "projects/website.yaml"), "title: Website\nmilestones:\n  - title: Design\n");
+    write(
+      join(root, "yamlite.yaml"),
+      "tables:\n  projects:\n    expand:\n      milestones:\n        columns: { points: INTEGER }\n        expand: { tasks: { references: { owner: people } } }\n",
+    );
+    expect(generateConfig({ root, force: true })).toContain(
+      [
+        "    expand:",
+        "      milestones:",
+        "        columns:",
+        "          points: INTEGER",
+        "        expand:",
+        "          tasks:",
+        "            references:",
+        "              owner: people",
+        "",
+      ].join("\n"),
+    );
+  });
+
   test("infers from YAML when there is no database", () => {
     const root = tmpRoot();
     write(join(root, "tasks/a.yaml"), "title: A\ndone: false\ntags: [x]\n");
