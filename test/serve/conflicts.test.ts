@@ -55,8 +55,32 @@ test("a restore backs up the winner it replaces, and that backup can be restored
   expect(detail.body).toMatchObject({ deleted: false, saved: { title: "A", note: "n" } });
   await t.api(`/api/conflicts/${encodeURIComponent(swap.id)}/restore`, { method: "POST" });
   await waitFor(() => read(join(t!.root, "tasks/a.yaml")) === "title: A\nnote: n\n");
-  // the second swap kept the version it replaced
-  expect((await t.api("/api/conflicts")).body.conflicts).toHaveLength(1);
+  // the second swap kept the version it replaced, and the database won it
+  const [again, ...others] = (await t.api("/api/conflicts")).body.conflicts;
+  expect(others).toEqual([]);
+  expect(again).toMatchObject({ key: "a", winner: "file" });
+});
+
+test("the swap backup names the side that lost, so its button restores the right side", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  // the database won the conflict; the file's version was backed up
+  const path = saveConflict(t.stateDir, "tasks", "a", { title: "FILE" }, "db");
+  await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
+  await waitFor(() => read(join(t!.root, "tasks/a.yaml")) === "title: FILE\n");
+  const [swap] = (await t.api("/api/conflicts")).body.conflicts;
+  // the swap holds the old database version, so restoring it means the DB side comes back
+  expect(swap).toMatchObject({ key: "a", winner: "file" });
+});
+
+test("a restore that fails leaves no swap backup behind", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  sql(t.db, "CREATE TRIGGER no_updates BEFORE UPDATE ON tasks BEGIN SELECT RAISE(ABORT, 'locked by test'); END");
+  const path = saveConflict(t.stateDir, "tasks", "a", { title: "OLD" }, "file");
+  const res = await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
+  expect(res.status).toBe(400);
+  const list = (await t.api("/api/conflicts")).body.conflicts;
+  expect(list).toHaveLength(1);
+  expect(list[0].file).toBe(path.split("/").pop());
 });
 
 test("a restore over a missing record backs up a deleted marker", async () => {
