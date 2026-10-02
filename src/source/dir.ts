@@ -58,12 +58,12 @@ function removeEmptyParents(dir: string, root: string): void {
 
 // an entry that cannot be read or stat-ed (a locked folder, a dangling link) throws,
 // so the table stops instead of reading its records as deleted
-function walk(root: string, warnings: string[]): RecordFile[] {
+function walk(root: string, exclude: ReadonlySet<string>, warnings: string[]): RecordFile[] {
   const out: RecordFile[] = [];
   const visit = (dir: string, prefix: string, ancestors: ReadonlySet<string>) => {
     for (const name of readdirSync(dir).sort()) {
-      if (skipName(name)) continue;
       const path = join(dir, name);
+      if (skipName(name) || exclude.has(path)) continue;
       const st = statSync(path);
       if (st.isDirectory()) {
         const real = realpathSync(path);
@@ -88,6 +88,7 @@ export class DirSource implements Source {
   constructor(
     private readonly dir: string,
     private readonly keyField: string,
+    private readonly exclude: readonly string[] = [],
   ) {}
 
   read(): SourceRead {
@@ -98,7 +99,7 @@ export class DirSource implements Source {
     res.exists = true;
     let files: RecordFile[];
     try {
-      files = walk(this.dir, res.warnings);
+      files = walk(this.dir, new Set(this.exclude), res.warnings);
     } catch (e) {
       res.tableError = e instanceof Error ? e.message : String(e);
       return res;
@@ -172,6 +173,9 @@ export class DirSource implements Source {
       }
     }
     const path = existing ?? join(this.dir, `${op.key}.yaml`);
+    if (this.exclude.some((e) => path === e || path.startsWith(e + sep))) {
+      return "key is inside the path of another table";
+    }
     if (!sameStamp(stamps.get(path) ?? null, stamp(path))) return "file changed during sync; will retry";
     if (op.kind === "delete") {
       if (existsSync(path)) unlinkSync(path);

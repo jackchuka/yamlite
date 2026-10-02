@@ -29,4 +29,6 @@ export interface TableSpec {
   references: Reference[];
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)
   persisted: boolean;
+  // paths of other tables inside this directory table's folder; never read or written by it
+  exclude: string[];
 }

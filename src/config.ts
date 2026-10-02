@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { parse } from "yaml";
 import { YAML_EXT } from "./source/yamldoc.ts";
 import { COLUMN_TYPES, type ColumnType, type IndexSpec, type Mode, type Reference, type TableSpec } from "./types.ts";
@@ -121,7 +121,14 @@ function toSpec(t: TableInput, persisted: boolean): TableSpec {
     indexes: (t.indexes ?? []).map((raw, i) => toIndex(t.name, raw, i)),
     references: Object.entries(t.references ?? {}).map(([column, raw]) => toReference(t.name, column, raw)),
     persisted,
+    exclude: [],
   };
+}
+
+function withExcludes(tables: TableSpec[]): TableSpec[] {
+  return tables.map((t) =>
+    t.mode === "dir" ? { ...t, exclude: tables.filter((o) => o.path.startsWith(t.path + sep)).map((o) => o.path) } : t,
+  );
 }
 
 const REFERENCE = /^([^.\s]+)(?:\.([^.\s]+))?$/;
@@ -181,7 +188,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     return {
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
       stateDir: join(root, ".yamlite"),
-      tables: [...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))),
+      tables: withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name)))),
     };
   }
   if (!opts.db) throw new Error("either root or db is required");
@@ -189,6 +196,8 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
   return {
     db,
     stateDir: join(dirname(db), ".yamlite"),
-    tables: (opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false)),
+    tables: withExcludes(
+      (opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false)),
+    ),
   };
 }

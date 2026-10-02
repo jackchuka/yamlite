@@ -30,6 +30,7 @@ test("discovers tables by convention", () => {
     indexes: [],
     references: [],
     persisted: true,
+    exclude: [],
   });
   expect(cfg.db).toBe(join(root, ".yamlite", "db.sqlite"));
   expect(cfg.stateDir).toBe(join(root, ".yamlite"));
@@ -189,4 +190,19 @@ test("tables passed in code are not persisted, the ones from the root are", () =
   expect(
     resolveConfig({ db: join(root, "x.db"), tables: [{ name: "inbox", path: outside }] }).tables[0]?.persisted,
   ).toBe(false);
+});
+
+test("a directory table excludes the paths of tables nested inside it", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "tasks/archive/b.yaml"), "x: 1\n");
+  write(join(root, "tasks/people.yaml"), "- id: 1\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks: {}\n  archive:\n    path: tasks/archive\n  people:\n    path: tasks/people.yaml\n",
+  );
+  const byName = new Map(resolveConfig({ root }).tables.map((t) => [t.name, t.exclude]));
+  expect(byName.get("tasks")).toEqual([join(root, "tasks/archive"), join(root, "tasks/people.yaml")]);
+  expect(byName.get("archive")).toEqual([]);
+  expect(byName.get("people")).toEqual([]);
 });

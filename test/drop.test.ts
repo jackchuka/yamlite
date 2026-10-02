@@ -161,6 +161,7 @@ describe("dropping columns", () => {
       indexes: [],
       references: [],
       persisted: true,
+      exclude: [],
     };
     syncTable(ctx, spec);
     sql(db, "ALTER TABLE tasks ADD COLUMN note TEXT");
