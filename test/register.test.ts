@@ -1,5 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { parse } from "yaml";
+import { registerInConfig } from "../src/configfile.ts";
 import { open } from "../src/index.ts";
 import { read, sql, tmpRoot, waitFor, write } from "./helpers.ts";
 
@@ -78,5 +80,28 @@ describe("auto-registration", () => {
     await new Promise((r) => setTimeout(r, 500));
     expect(syncs - settled).toBeLessThanOrEqual(1);
     await y.close();
+  });
+});
+
+describe("registerInConfig with path and key", () => {
+  test("a new table is written with its path and key", () => {
+    const root = tmpRoot();
+    const file = join(root, "yamlite.yaml");
+    write(file, "# schema\ntables: {}\n");
+    expect(
+      registerInConfig(file, [{ table: "people", path: "./people.yaml", key: "slug", columns: { name: "TEXT" } }]),
+    ).toBe(true);
+    expect(parse(read(file))).toEqual({
+      tables: { people: { path: "./people.yaml", key: "slug", columns: { name: "TEXT" } } },
+    });
+    expect(read(file).startsWith("# schema\n")).toBe(true);
+  });
+
+  test("path and key are ignored for a table that is already listed", () => {
+    const root = tmpRoot();
+    const file = join(root, "yamlite.yaml");
+    write(file, "tables:\n  people:\n    path: ./a.yaml\n");
+    expect(registerInConfig(file, [{ table: "people", path: "./b.yaml", key: "slug" }])).toBe(false);
+    expect(read(file)).toBe("tables:\n  people:\n    path: ./a.yaml\n");
   });
 });
