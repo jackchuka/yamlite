@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, lstatSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test, vi } from "vitest";
@@ -53,6 +53,30 @@ describe("dir mode", () => {
       }
     },
   );
+
+  test("moving a file between folders deletes the old row and adds the new one", () => {
+    const t = setup();
+    write(join(t.path, "a/x.yaml"), "n: 1\n");
+    write(join(t.path, "b/y.yaml"), "n: 2\n");
+    t.sync();
+    mkdirSync(join(t.path, "c"));
+    renameSync(join(t.path, "a/x.yaml"), join(t.path, "c/x.yaml"));
+    const r = t.sync();
+    expect(r).toMatchObject({ ok: true, deletedDb: 1, conflicts: [] });
+    expect(sql(t.db, "SELECT id FROM tasks ORDER BY id")).toEqual([{ id: "b/y" }, { id: "c/x" }]);
+  });
+
+  test("rows inserted and deleted in SQL create and remove nested files", () => {
+    const t = setup();
+    write(join(t.path, "a.yaml"), "n: 1\n");
+    t.sync();
+    sql(t.db, "INSERT INTO tasks (id, n) VALUES ('g/h/b', 2)");
+    expect(t.sync()).toMatchObject({ ok: true });
+    expect(read(join(t.path, "g/h/b.yaml"))).toBe("n: 2\n");
+    sql(t.db, "DELETE FROM tasks WHERE id = 'g/h/b'");
+    expect(t.sync()).toMatchObject({ ok: true });
+    expect(existsSync(join(t.path, "g"))).toBe(false);
+  });
 
   test.skipIf(process.getuid?.() === 0)("an unreadable subfolder fails the table and keeps every row", () => {
     const t = setup();
@@ -257,6 +281,17 @@ describe("dir mode", () => {
       return t;
     }
     const count = (db: string) => sql(db, "SELECT count(*) AS n FROM tasks");
+
+    test("renaming a folder of twelve records is refused and force overrides", () => {
+      const t = setup();
+      for (let i = 0; i < 12; i++) write(join(t.path, `auto/k${i}.yaml`), `n: ${i}\n`);
+      t.sync();
+      renameSync(join(t.path, "auto"), join(t.path, "automation"));
+      expect(t.sync()).toMatchObject({ ok: false, error: expect.stringMatching(/refusing/) });
+      expect(count(t.db)).toEqual([{ n: 12 }]);
+      expect(t.sync({ force: true })).toMatchObject({ ok: true, deletedDb: 12 });
+      expect(sql(t.db, "SELECT id FROM tasks WHERE id LIKE 'automation/%'")).toHaveLength(12);
+    });
 
     test("is refused through the engine and force overrides", () => {
       const t = twelve();

@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { DirSource, invalidKey } from "../src/source/dir.ts";
@@ -176,19 +176,82 @@ describe("DirSource.apply", () => {
   test("skips keys that cannot be file names or clash by case", () => {
     const { dir, src } = setup();
     write(join(dir, "Foo.yaml"), "x: 1\n");
+    write(join(dir, "Auto/y.yaml"), "x: 1\n");
     const r = src.read();
+    const keys = ["a/../b", ".x", "a/.x", "", "foo", "/a", "a/", "a//b", "a\\b", "node_modules/a", "auto/z"];
     const out = src.apply(
-      ["a/b", ".x", "", "foo"].map((key) => ({ kind: "put" as const, key, record: {} })),
+      keys.map((key) => ({ kind: "put" as const, key, record: {} })),
       r.stamps,
     );
-    expect(out.skipped.map((s) => s.key)).toEqual(["a/b", ".x", "", "foo"]);
+    expect(out.skipped.map((s) => s.key)).toEqual(keys);
+    expect(out.skipped.at(-1)?.reason).toBe('file name clashes with "Auto/" on case-insensitive file systems');
     expect(out.written.size).toBe(0);
+  });
+
+  test("valid nested keys", () => {
+    for (const key of ["a/b", "a/b/c", "タスク/a", "a.b/c"]) expect(invalidKey(key)).toBeNull();
+    expect(invalidKey("a/..")).toMatch(/dot/);
+    expect(invalidKey("a//b")).toMatch(/empty path segment/);
+    expect(invalidKey("a/")).toMatch(/slash/);
   });
 
   test("rejects keys too long for a file name", () => {
     expect(invalidKey("k".repeat(250))).toBeNull();
     expect(invalidKey("k".repeat(251))).toMatch(/too long/);
     expect(invalidKey("あ".repeat(84))).toMatch(/too long/);
+    expect(invalidKey(`${"k".repeat(250)}/${"k".repeat(250)}`)).toBeNull();
+    expect(invalidKey(`a/${"k".repeat(251)}`)).toMatch(/too long/);
+  });
+
+  test("creates parent folders for a new nested key", () => {
+    const { dir, src } = setup();
+    const r = src.read();
+    const out = src.apply([{ kind: "put", key: "auto/deep/a", record: { x: 1n } }], r.stamps);
+    expect(out.skipped).toEqual([]);
+    expect(read(join(dir, "auto/deep/a.yaml"))).toBe("x: 1\n");
+    expect([...src.read().records.keys()]).toEqual(["auto/deep/a"]);
+  });
+
+  test("a delete removes emptied folders up to, not including, the table folder", () => {
+    const { dir, src } = setup();
+    write(join(dir, "auto/deep/a.yaml"), "x: 1\n");
+    write(join(dir, "kept/b.yaml"), "x: 1\n");
+    write(join(dir, "kept/.DS_Store"), "");
+    const r = src.read();
+    const out = src.apply(
+      [
+        { kind: "delete", key: "auto/deep/a" },
+        { kind: "delete", key: "kept/b" },
+      ],
+      r.stamps,
+    );
+    expect(out.skipped).toEqual([]);
+    expect(existsSync(join(dir, "auto"))).toBe(false);
+    expect(readdirSync(dir)).toEqual(["kept"]);
+    expect(readdirSync(join(dir, "kept"))).toEqual([".DS_Store"]);
+  });
+
+  test("deleting the only record keeps the table folder", () => {
+    const { dir, src } = setup();
+    write(join(dir, "a.yaml"), "x: 1\n");
+    const r = src.read();
+    src.apply([{ kind: "delete", key: "a" }], r.stamps);
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  test("a key whose parent is a file is skipped and others proceed", () => {
+    const { dir, src } = setup();
+    write(join(dir, "notes"), "plain file");
+    const r = src.read();
+    const out = src.apply(
+      [
+        { kind: "put", key: "notes/x", record: { v: 1n } },
+        { kind: "put", key: "y", record: { v: 2n } },
+      ],
+      r.stamps,
+    );
+    expect(out.skipped).toEqual([{ key: "notes/x", reason: expect.stringMatching(/ENOTDIR|EEXIST/) }]);
+    expect(read(join(dir, "y.yaml"))).toBe("v: 2\n");
   });
 
   test("a failing write is skipped and other keys proceed", () => {
