@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { TableMeta } from "@/lib/types";
@@ -126,4 +126,78 @@ test("unsaved edits keep the drawer open on Escape or a click outside", async ()
   fireEvent.keyDown(document, { key: "Escape" });
   fireEvent.click(screen.getByText("outside"));
   expect(navigate).not.toHaveBeenCalled();
+});
+
+const drawer = () => screen.getByRole("complementary", { name: "record" });
+const handle = () => screen.getByRole("separator", { name: "Resize record panel" });
+const drag = (from: number, to: number) => {
+  fireEvent.pointerDown(handle(), { clientX: from, button: 0 });
+  fireEvent.pointerMove(document, { clientX: to });
+  fireEvent.pointerUp(document, { clientX: to });
+};
+
+test("dragging the left edge widens the panel and the width is remembered", async () => {
+  localStorage.clear();
+  await openDrawer();
+  expect(drawer().style.width).toBe("360px");
+  drag(600, 500);
+  expect(drawer().style.width).toBe("460px");
+  expect(localStorage.getItem("yamlite-drawer-width")).toBe("460");
+  cleanup();
+  await openDrawer();
+  expect(drawer().style.width).toBe("460px");
+});
+
+test("the width stays between 320px and 70% of the window", async () => {
+  localStorage.clear();
+  window.innerWidth = 1000;
+  await openDrawer();
+  drag(600, 900);
+  expect(drawer().style.width).toBe("320px");
+  drag(600, -400);
+  expect(drawer().style.width).toBe("700px");
+});
+
+test("a remembered width out of range or unreadable falls back into range", async () => {
+  window.innerWidth = 1000;
+  localStorage.setItem("yamlite-drawer-width", "5000");
+  await openDrawer();
+  expect(drawer().style.width).toBe("700px");
+  cleanup();
+  localStorage.setItem("yamlite-drawer-width", "wide");
+  await openDrawer();
+  expect(drawer().style.width).toBe("360px");
+});
+
+test("double-clicking the edge restores the default width", async () => {
+  localStorage.clear();
+  await openDrawer();
+  drag(600, 500);
+  fireEvent.doubleClick(handle());
+  expect(drawer().style.width).toBe("360px");
+  expect(localStorage.getItem("yamlite-drawer-width")).toBeNull();
+});
+
+test("arrow keys on the edge resize the panel", async () => {
+  localStorage.clear();
+  window.innerWidth = 1000;
+  await openDrawer();
+  fireEvent.keyDown(handle(), { key: "ArrowLeft" });
+  expect(drawer().style.width).toBe("376px");
+  fireEvent.keyDown(handle(), { key: "ArrowRight" });
+  fireEvent.keyDown(handle(), { key: "ArrowRight" });
+  expect(drawer().style.width).toBe("344px");
+  expect(handle().getAttribute("aria-valuenow")).toBe("344");
+});
+
+test("the click that ends a drag outside the panel does not close it", async () => {
+  localStorage.clear();
+  await openDrawer();
+  drag(600, 300);
+  // a browser fires click on the common ancestor of where the drag started and ended
+  fireEvent.click(document.body);
+  expect(navigate).not.toHaveBeenCalled();
+  await new Promise((r) => setTimeout(r, 0));
+  fireEvent.click(screen.getByText("outside"));
+  expect(navigate).toHaveBeenCalledTimes(1);
 });

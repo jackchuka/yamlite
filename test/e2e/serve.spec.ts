@@ -208,3 +208,25 @@ test("the record drawer closes on Escape and on a click outside it", async ({ pa
   await page.getByRole("heading", { name: "tasks", exact: true }).click();
   await expect(drawer).toHaveCount(0);
 });
+
+test("dragging the drawer's edge resizes it, keeps it open and survives a reload", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "title: A\n" });
+  await page.goto(app.url);
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await page.getByRole("row", { name: /\ba\b/ }).click();
+  await expect(drawer).toBeVisible();
+  const edge = await page.getByRole("separator", { name: "Resize record panel" }).boundingBox();
+  if (!edge) throw new Error("no resize handle");
+  const x = edge.x + edge.width / 2;
+  const y = edge.y + edge.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // released over the grid, outside the drawer
+  await page.mouse.move(x - 200, y, { steps: 5 });
+  await page.mouse.up();
+  await expect(drawer).toBeVisible();
+  expect(Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(560);
+  await page.reload();
+  await page.getByRole("row", { name: /\ba\b/ }).click();
+  expect(Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(560);
+});

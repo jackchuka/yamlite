@@ -4,13 +4,20 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import CodeMirror from "@uiw/react-codemirror";
 import { Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
 import { cn } from "@/lib/utils";
+import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
 import type { ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
@@ -22,7 +29,8 @@ const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
   Object.hasOwn(table.columns, field) ? table.columns[field] : undefined;
 
 // laid over the table, so opening a record does not reflow the page under it
-const panel = "absolute inset-y-0 right-0 z-20 w-[360px] border-l bg-background shadow-xl";
+const panel = "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl";
+const RESIZE_STEP = 16;
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
@@ -54,6 +62,7 @@ export function RecordDrawer({
   // bumped when the form is reloaded from outside, so every field remounts with fresh state
   const [version, setVersion] = useState(0);
   const dirty = base !== null && draft !== null && changedFields(base, draft).length > 0;
+  const [width, setWidth] = useDrawerWidth();
 
   // a refetch (the file changed, or our own save came back) replaces the form only when nothing is being edited
   useEffect(() => {
@@ -150,19 +159,20 @@ export function RecordDrawer({
 
   if (error) {
     return (
-      <aside aria-label="record" className={cn(panel, "p-4 text-err")}>
+      <aside aria-label="record" className={cn(panel, "p-4 text-err")} style={{ width }}>
         {error.message}
       </aside>
     );
   }
-  if (!draft || !base || !data) return <aside aria-label="record" className={panel} />;
+  if (!draft || !base || !data) return <aside aria-label="record" className={panel} style={{ width }} />;
 
   const fields = Object.keys(table.columns).filter((c) => c !== table.key);
   const extra = Object.keys(draft).filter((c) => c !== table.key && !fields.includes(c));
   const changes = changedFields(base, draft).length;
 
   return (
-    <aside aria-label="record" className={cn(panel, "flex flex-col")}>
+    <aside aria-label="record" className={cn(panel, "flex flex-col")} style={{ width }}>
+      <ResizeHandle width={width} onResize={setWidth} />
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -338,5 +348,45 @@ export function RecordDrawer({
         </Dialog>
       )}
     </aside>
+  );
+}
+
+function ResizeHandle({ width, onResize }: { width: number; onResize: (w: number | null) => void }) {
+  const onPointerDown = (e: ReactPointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const move = (ev: PointerEvent) => onResize(width + startX - ev.clientX);
+    const up = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", up);
+      // a drag released outside the panel ends in a click there, which would otherwise close it
+      const swallow = (ev: MouseEvent) => ev.stopPropagation();
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", up);
+  };
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    const delta = e.key === "ArrowLeft" ? RESIZE_STEP : e.key === "ArrowRight" ? -RESIZE_STEP : 0;
+    if (delta === 0) return;
+    e.preventDefault();
+    onResize(width + delta);
+  };
+  return (
+    <div
+      role="separator"
+      aria-label="Resize record panel"
+      aria-orientation="vertical"
+      aria-valuenow={width}
+      aria-valuemin={MIN_WIDTH}
+      aria-valuemax={maxWidth()}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => onResize(null)}
+      onKeyDown={onKeyDown}
+      className="absolute inset-y-0 -left-0.5 z-10 w-1 cursor-col-resize outline-none hover:bg-primary/40 focus-visible:bg-primary/40"
+    />
   );
 }
