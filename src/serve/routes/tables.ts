@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { registerInConfig } from "../../configfile.ts";
 import { COLUMN_TYPES, type ColumnType } from "../../types.ts";
+import { findView } from "../context.ts";
 import { HttpError, Reply } from "../http.ts";
 import { objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
@@ -31,6 +32,7 @@ export const tableRoutes: Routes = (router, ctx) => {
     if (ctx.y.tables.some((t) => t.name === name) || onDisk) {
       throw new HttpError(409, `a table or file named "${name}" already exists`, { field: "name" });
     }
+    if (findView(ctx, name)) throw new HttpError(409, `a view named "${name}" already exists`, { field: "name" });
     const adopt = ctx.store.tableExists(name);
     if (adopt && !ctx.store.columns(name).has(key)) {
       throw new HttpError(400, `${name} has no column "${key}" to use as the key`, { field: "key" });

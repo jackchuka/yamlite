@@ -97,8 +97,9 @@ export function buildWhere(
   return { where: parts.length > 0 ? `WHERE ${parts.join(" AND ")}` : "", params };
 }
 
-export function orderBy(query: RowQuery, columns: Map<string, ColumnType>, keyCol: string): string {
-  if (!query.sort) return `ORDER BY ${q(keyCol)}`;
+export function orderBy(query: RowQuery, columns: Map<string, ColumnType>, keyCols: readonly string[]): string {
+  const keys = keyCols.map(q).join(", ");
+  if (!query.sort) return `ORDER BY ${keys}`;
   if (!columns.has(query.sort.col)) throw new HttpError(400, `unknown column: ${query.sort.col}`);
-  return `ORDER BY ${q(query.sort.col)} ${query.sort.dir.toUpperCase()}, ${q(keyCol)}`;
+  return `ORDER BY ${q(query.sort.col)} ${query.sort.dir.toUpperCase()}, ${keys}`;
 }

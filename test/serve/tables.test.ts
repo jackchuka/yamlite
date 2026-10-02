@@ -69,3 +69,14 @@ test("a broken yamlite.yaml is reported instead of overwritten", async () => {
   expect(res.body.error).toMatch(/invalid/);
   expect(read(join(t.root, "yamlite.yaml"))).toBe("tables: [\n");
 });
+
+test("a name taken by a declared view is refused before yamlite.yaml changes", async () => {
+  t = await startServe({}, "tables:\n  projects:\n    expand:\n      milestones: {}\n");
+  const before = read(join(t.root, "yamlite.yaml"));
+  const res = await t.api("/api/tables", { method: "POST", body: { name: "projects__milestones" } });
+  expect(res).toMatchObject({
+    status: 409,
+    body: { error: 'a view named "projects__milestones" already exists', field: "name" },
+  });
+  expect(read(join(t.root, "yamlite.yaml"))).toBe(before);
+});
