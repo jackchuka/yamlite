@@ -122,16 +122,19 @@ test("a conflict is announced and its losing side can be restored", async ({ pag
   const loser = sides.find((side) => side !== winner);
   await page.getByRole("link", { name: /^Sync/ }).click();
   const entry = page.getByRole("button", { name: /tasks \/ fix-ci/ });
+  await expect(entry).toHaveCount(1);
+  const original = (await entry.textContent())?.includes("db を採用") ? "db" : "file";
   await entry.click();
   await page.getByRole("button", { name: /側に戻す/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("現在の版は新しい退避として残る")).toBeVisible();
   await dialog.getByRole("button", { name: /側に戻す/ }).click();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe(loser);
-  // the replaced winner is kept as a new backup, so the list is not empty: the original entry is gone,
-  // and the one that remains holds the previous winner
-  await expect(page.getByText("コンフリクトはありません")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /tasks \/ fix-ci.*db を採用/ })).toHaveCount(1);
+  // the replaced winner is kept as a new backup: the original entry is gone, and the only one left
+  // names the other side as the winner
+  const swapped = original === "db" ? "file" : "db";
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText(`${swapped} を採用`);
 });
 
 test("an UPDATE in the SQL console lists the files it changed", async ({ page }) => {
