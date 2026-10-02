@@ -184,3 +184,18 @@ test("tables passed in code in root mode are not written to yamlite.yaml", async
   expect((await y.sync()).map((r) => [r.table, r.ok, r.error])).toEqual([["tasks", true, undefined]]);
   await y.close();
 });
+
+test("a table nested inside another table's folder is not read twice", async () => {
+  const root = dataRoot();
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "tasks/archive/old.yaml"), "title: Old\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks: {}\n  archive:\n    path: tasks/archive\n");
+  const y = await open({ root });
+  expect((await y.sync()).every((r) => r.ok)).toBe(true);
+  expect(sql(dbOf(root), "SELECT id FROM tasks")).toEqual([{ id: "a" }]);
+  expect(sql(dbOf(root), "SELECT id FROM archive")).toEqual([{ id: "old" }]);
+  sql(dbOf(root), "DELETE FROM archive WHERE id = 'old'");
+  await y.sync();
+  expect(sql(dbOf(root), "SELECT id FROM tasks")).toEqual([{ id: "a" }]);
+  await y.close();
+});

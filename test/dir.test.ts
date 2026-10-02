@@ -333,3 +333,34 @@ test("parse errors are reported on one line", () => {
   expect(r.warnings[0]).not.toContain("\n");
   expect(r.warnings[0]).toMatch(/bad\.yaml: .+ at line \d+, column \d+; skipped$/);
 });
+
+describe("DirSource with tables nested inside", () => {
+  const nested = () => {
+    const dir = join(tmpRoot(), "tasks");
+    return { dir, src: new DirSource(dir, "id", [join(dir, "archive"), join(dir, "people.yaml")]) };
+  };
+
+  test("never reads the folders and files of other tables", () => {
+    const { dir, src } = nested();
+    write(join(dir, "a.yaml"), "x: 1\n");
+    write(join(dir, "archive/old.yaml"), "x: 2\n");
+    write(join(dir, "people.yaml"), "- id: 1\n");
+    write(join(dir, "archived/c.yaml"), "x: 3\n");
+    expect([...src.read().records.keys()]).toEqual(["a", "archived/c"]);
+  });
+
+  test("never writes into them", () => {
+    const { dir, src } = nested();
+    const r = src.read();
+    const out = src.apply(
+      ["archive/x", "people", "archived/y"].map((key) => ({ kind: "put" as const, key, record: { v: 1n } })),
+      r.stamps,
+    );
+    expect(out.skipped).toEqual([
+      { key: "archive/x", reason: "key is inside the path of another table" },
+      { key: "people", reason: "key is inside the path of another table" },
+    ]);
+    expect(existsSync(join(dir, "archive"))).toBe(false);
+    expect(read(join(dir, "archived/y.yaml"))).toBe("v: 1\n");
+  });
+});

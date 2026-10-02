@@ -22,6 +22,7 @@ function setup(mode: Mode = "dir") {
     indexes: [],
     references: [],
     persisted: false,
+    exclude: [],
   };
   return {
     db,

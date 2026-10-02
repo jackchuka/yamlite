@@ -60,7 +60,7 @@ export interface TableResult {
 }
 
 export function makeSource(spec: TableSpec): Source {
-  return spec.mode === "dir" ? new DirSource(spec.path, spec.key) : new ListSource(spec.path, spec.key);
+  return spec.mode === "dir" ? new DirSource(spec.path, spec.key, spec.exclude) : new ListSource(spec.path, spec.key);
 }
 
 function emptyResult(table: string): TableResult {
