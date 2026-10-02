@@ -3,9 +3,25 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { BaseHashes } from "./reconcile.ts";
 import { logicalType } from "./schema.ts";
-import type { ColumnType, DbRow, DbValue } from "./types.ts";
+import type { ColumnType, DbRow, DbValue, ViewRecord } from "./types.ts";
 
 export const q = (id: string): string => `"${id.replaceAll('"', '""')}"`;
+
+interface RawView {
+  name: string;
+  tbl: string;
+  parent: string;
+  columns: string;
+  identity: string;
+}
+
+const toViewRecord = (r: RawView): ViewRecord => ({
+  name: r.name,
+  table: r.tbl,
+  parent: r.parent,
+  columns: JSON.parse(r.columns) as ViewRecord["columns"],
+  identity: JSON.parse(r.identity) as string[],
+});
 
 export class BusyError extends Error {}
 
@@ -52,6 +68,44 @@ export class Store {
     this.db.exec(
       "CREATE TABLE IF NOT EXISTS _yamlite_columns (tbl TEXT NOT NULL, col TEXT NOT NULL, PRIMARY KEY (tbl, col))",
     );
+    // views yamlite created from expand declarations, with the column types it inferred for them
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS _yamlite_views (name TEXT PRIMARY KEY, tbl TEXT NOT NULL, parent TEXT NOT NULL, columns TEXT NOT NULL, identity TEXT NOT NULL)",
+    );
+  }
+
+  registeredViews(table: string): ViewRecord[] {
+    const rows = this.db.prepare("SELECT * FROM _yamlite_views WHERE tbl = ? ORDER BY rowid").all(table);
+    return (rows as unknown as RawView[]).map(toViewRecord);
+  }
+
+  registeredView(name: string): ViewRecord | undefined {
+    const row = this.db.prepare("SELECT * FROM _yamlite_views WHERE name = ?").get(name);
+    return row ? toViewRecord(row as unknown as RawView) : undefined;
+  }
+
+  registerView(v: ViewRecord): void {
+    this.db
+      .prepare(
+        "INSERT INTO _yamlite_views (name, tbl, parent, columns, identity) VALUES (?, ?, ?, ?, ?) ON CONFLICT (name) DO UPDATE SET tbl = excluded.tbl, parent = excluded.parent, columns = excluded.columns, identity = excluded.identity",
+      )
+      .run(v.name, v.table, v.parent, JSON.stringify(v.columns), JSON.stringify(v.identity));
+  }
+
+  unregisterView(name: string): void {
+    this.db.prepare("DELETE FROM _yamlite_views WHERE name = ?").run(name);
+  }
+
+  objectType(name: string): "table" | "view" | null {
+    const row = this.db
+      .prepare("SELECT type FROM sqlite_schema WHERE name = ? AND type IN ('table', 'view')")
+      .get(name);
+    return (row as { type: "table" | "view" } | undefined)?.type ?? null;
+  }
+
+  viewSql(name: string): string | null {
+    const row = this.db.prepare("SELECT sql FROM sqlite_schema WHERE type = 'view' AND name = ?").get(name);
+    return (row as { sql: string } | undefined)?.sql ?? null;
   }
 
   recordedColumns(table: string): Set<string> {
