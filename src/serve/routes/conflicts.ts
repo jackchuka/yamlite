@@ -1,3 +1,4 @@
+import { rmSync } from "node:fs";
 import { encode, rowToRecord } from "../../codec.ts";
 import { saveConflict } from "../../conflicts.ts";
 import { canonical } from "../../hash.ts";
@@ -42,31 +43,40 @@ export const conflictRoutes: Routes = (router, ctx) => {
     const key = entry.key;
     const { store } = ctx;
     const expected = body && typeof body === "object" ? (body as { expected?: unknown }).expected : undefined;
-    writeTx(store, () => {
-      const exists = store.tableExists(spec.name);
-      const before = exists ? store.columns(spec.name) : new Map();
-      const keyValue = encode(fromWire(key, before.get(spec.key)));
-      const row = exists ? store.readRow(spec.name, spec.key, keyValue) : undefined;
-      if (expected !== undefined) {
-        const current = row ? toWire(row, before) : null;
-        if (canonical(current) !== canonical(expected)) {
-          throw new HttpError(409, "the record changed since it was loaded", { current });
+    let swapPath: string | undefined;
+    try {
+      writeTx(store, () => {
+        const exists = store.tableExists(spec.name);
+        const before = exists ? store.columns(spec.name) : new Map();
+        const keyValue = encode(fromWire(key, before.get(spec.key)));
+        const row = exists ? store.readRow(spec.name, spec.key, keyValue) : undefined;
+        if (expected !== undefined) {
+          const current = row ? toWire(row, before) : null;
+          if (canonical(current) !== canonical(expected)) {
+            throw new HttpError(409, "the record changed since it was loaded", { current });
+          }
         }
-      }
-      // same shape as the engine's backup of a database side
-      const winner = row ? rowToRecord(row, before, spec.mode === "dir" ? spec.key : undefined) : null;
-      saveConflict(ctx.stateDir, spec.name, key, winner, "db");
-      if (backup.record === null) {
-        if (exists) store.delete(spec.name, spec.key, keyValue);
-        return;
-      }
-      const { [spec.key]: _key, ...record } = backup.record;
-      const types = ensureColumns(store, spec, record);
-      // every column is written, so fields the backup lacks are cleared rather than kept from the winner
-      const next: DbRow = {};
-      for (const column of types.keys()) next[column] = column === spec.key ? keyValue : encode(record[column] ?? null);
-      store.upsert(spec.name, spec.key, next, Object.keys(next));
-    });
+        // same shape as the engine's backup of a database side
+        const current = row ? rowToRecord(row, before, spec.mode === "dir" ? spec.key : undefined) : null;
+        // the restored side wins now, so the saved version belongs to the side that won the original conflict
+        swapPath = saveConflict(ctx.stateDir, spec.name, key, current, entry.winner === "db" ? "file" : "db");
+        if (backup.record === null) {
+          if (exists) store.delete(spec.name, spec.key, keyValue);
+          return;
+        }
+        const { [spec.key]: _key, ...record } = backup.record;
+        const types = ensureColumns(store, spec, record);
+        // every column is written, so fields the backup lacks are cleared rather than kept from the winner
+        const next: DbRow = {};
+        for (const column of types.keys())
+          next[column] = column === spec.key ? keyValue : encode(record[column] ?? null);
+        store.upsert(spec.name, spec.key, next, Object.keys(next));
+      });
+    } catch (e) {
+      // the backup file is not part of the transaction; without this a failed or retried restore leaves duplicates
+      if (swapPath) rmSync(swapPath, { force: true });
+      throw e;
+    }
     dismissConflict(ctx.stateDir, id);
     return { ok: true };
   });
