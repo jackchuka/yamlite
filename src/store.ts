@@ -15,6 +15,13 @@ export function isConstraintError(e: unknown): e is Error {
   return typeof errcode === "number" && (errcode & 0xff) === 19;
 }
 
+export interface ExecResult {
+  columns: string[] | null;
+  rows: DbRow[];
+  changes: number;
+  truncated: boolean;
+}
+
 export interface DbRead {
   rows: Map<string, DbRow>;
   skip: Set<string>;
@@ -127,6 +134,32 @@ export class Store {
 
   run(sql: string, ...params: DbValue[]): void {
     this.db.prepare(sql).run(...params);
+  }
+
+  // one statement of any kind, for the SQL console
+  execute(sql: string, limit: number): ExecResult {
+    try {
+      const stmt = this.db.prepare(sql);
+      stmt.setReadBigInts(true);
+      const columns = stmt.columns().map((c) => c.name);
+      if (columns.length === 0) {
+        const result = stmt.run();
+        return { columns: null, rows: [], changes: Number(result.changes), truncated: false };
+      }
+      const rows: DbRow[] = [];
+      let truncated = false;
+      for (const row of stmt.iterate()) {
+        if (rows.length === limit) {
+          truncated = true;
+          break;
+        }
+        rows.push({ ...row } as DbRow);
+      }
+      return { columns, rows, changes: 0, truncated };
+    } catch (e) {
+      if (isBusy(e)) throw new BusyError("database is locked");
+      throw e;
+    }
   }
 
   columns(table: string): Map<string, ColumnType> {

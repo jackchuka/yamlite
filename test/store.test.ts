@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { BusyError, Store } from "../src/store.ts";
 import type { ColumnType } from "../src/types.ts";
 import { sql, tmpRoot } from "./helpers.ts";
@@ -107,4 +107,48 @@ test("busy detection and data_version", () => {
   store.begin();
   store.rollback();
   store.rollback();
+});
+
+describe("execute", () => {
+  test("a query returns columns and rows up to the limit", () => {
+    const s = new Store(join(tmpRoot(), "db.sqlite"));
+    s.exec("CREATE TABLE t (id TEXT, n INTEGER)");
+    s.exec("INSERT INTO t VALUES ('a', 1), ('b', 2), ('c', 3)");
+    expect(s.execute("SELECT id, n FROM t ORDER BY id", 2)).toEqual({
+      columns: ["id", "n"],
+      rows: [
+        { id: "a", n: 1n },
+        { id: "b", n: 2n },
+      ],
+      changes: 0,
+      truncated: true,
+    });
+    expect(s.execute("SELECT id FROM t WHERE id = 'a'", 10).truncated).toBe(false);
+    s.close();
+  });
+
+  test("a write returns the number of changed rows", () => {
+    const s = new Store(join(tmpRoot(), "db.sqlite"));
+    s.exec("CREATE TABLE t (id TEXT)");
+    expect(s.execute("INSERT INTO t VALUES ('a'), ('b')", 10)).toEqual({
+      columns: null,
+      rows: [],
+      changes: 2,
+      truncated: false,
+    });
+    s.close();
+  });
+
+  test("a locked database raises BusyError", () => {
+    const path = join(tmpRoot(), "db.sqlite");
+    const a = new Store(path, { busyTimeoutMs: 0 });
+    const b = new Store(path, { busyTimeoutMs: 0 });
+    a.exec("CREATE TABLE t (id TEXT)");
+    a.begin();
+    a.exec("INSERT INTO t VALUES ('x')");
+    expect(() => b.execute("INSERT INTO t VALUES ('y')", 10)).toThrow(BusyError);
+    a.rollback();
+    a.close();
+    b.close();
+  });
 });
