@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, expect, test } from "vitest";
@@ -51,4 +51,36 @@ test("init creates yamlite.yaml and refuses to overwrite it", () => {
   expect(created.stdout).toContain("wrote");
   expect(run("init", root).stderr).toContain("already exists");
   expect(run("sync", root).status).toBe(0);
+});
+
+test("serve prints a URL that answers, and stops on SIGINT", async () => {
+  const root = dataRoot();
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], { stdio: ["ignore", "pipe", "pipe"] });
+  const url = await new Promise<string>((resolve, reject) => {
+    let out = "";
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      out += chunk;
+      const m = /(http:\/\/127\.0\.0\.1:\d+\/\?token=[0-9a-f]+)/.exec(out);
+      if (m?.[1]) resolve(m[1]);
+    });
+    child.once("exit", (code) => reject(new Error(`serve exited with ${code}: ${out}`)));
+  });
+  const token = new URL(url).searchParams.get("token");
+  const res = await fetch(new URL("/api/meta", url), { headers: { authorization: `Bearer ${token}` } });
+  expect(res.status).toBe(200);
+  expect((await res.json()).tables.map((x: { name: string }) => x.name)).toEqual(["tasks"]);
+  const page = await fetch(new URL("/", url), { headers: { authorization: `Bearer ${token}` } });
+  expect(page.status).toBe(200);
+  expect(await page.text()).toContain('<div id="root">');
+  child.kill("SIGINT");
+  const code = await new Promise((resolve) => child.once("exit", resolve));
+  expect(code).toBe(0);
+}, 30_000);
+
+test("serve rejects a bad port", () => {
+  const r = run("serve", dataRoot(), "--port", "nope");
+  expect(r.status).toBe(1);
+  expect(r.stderr).toContain("invalid port: nope");
 });

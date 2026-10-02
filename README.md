@@ -23,6 +23,12 @@ yamlite keeps a folder of YAML files and a local SQLite database in sync, in bot
   <img src="assets/demo.gif" width="800" alt="yamlite demo: editing the YAML file updates the SQLite row, and an SQL UPDATE rewrites the file with its comment intact">
 </p>
 
+<p align="center">
+  <img src="assets/ui.png" width="880" alt="yamlite serve: the web UI with a table of tasks and a record open in a form, saved back to tasks/release-notes.yaml">
+  <br>
+  <sub>The web UI: <code>yamlite serve</code></sub>
+</p>
+
 ## Why
 
 YAML is great for data humans write: readable, diffable, comment-friendly, git-native. It is terrible to query. SQLite is the opposite. yamlite lets you keep both without choosing:
@@ -148,6 +154,7 @@ npx @jackchuka/yamlite status ./notes
 | `yamlite status [root]` | `--db`, `--table <name>`, `--json`                               | Show what `sync` would change, without writing            |
 | `yamlite sync [root]`   | `--db`, `--table <name>`, `--force`, `--force-convert`, `--json` | Sync once; exits 1 if any table fails                     |
 | `yamlite watch [root]`  | `--db`, `--quiet`                                                | Sync on every file save, database commit or config change |
+| `yamlite serve [root]`  | `--db`, `--port` (4610), `--host` (127.0.0.1), `--open`          | Open the web UI and sync continuously                     |
 
 - `root` defaults to the current directory.
 - `--db <path>` overrides the default `<root>/.yamlite/db.sqlite`.
@@ -156,6 +163,18 @@ npx @jackchuka/yamlite status ./notes
 - `--force-convert` clears values that cannot be converted when a column type changes (see [Column types](#column-types)).
 - `--json` prints the raw results (per table: counts, `changes` per key, `conflicts`, `warnings`) for scripting.
 - Output is colored on a terminal; set `NO_COLOR=1` to disable it.
+
+## Web UI
+
+```bash
+yamlite serve notes --open
+```
+
+`serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
+
+- It listens on `127.0.0.1:4610` and prints a URL with an access token (new for each run, reusable until the process stops); open that URL (or pass `--open`). Requests without the token, from other sites, or with an unexpected `Host` are refused.
+- `serve` and `watch` cannot run on the same folder at the same time.
+- `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
 
 ## Working with your data
 
