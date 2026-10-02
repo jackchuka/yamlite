@@ -72,7 +72,7 @@ npx @jackchuka/yamlite status ./notes
 
    ```
    notes/
-   ├── tasks/              # directory → one record per file, key = file name
+   ├── tasks/              # directory → one record per file, key = path (subfolders too)
    │   ├── buy-milk.yaml
    │   └── write-blog.yaml
    └── people.yaml         # file → a list of records, key = `id`
@@ -178,12 +178,14 @@ yamlite serve notes --open
 
 ### Tables
 
-| Under the root       | Table    | Records                         | Key                  |
-| -------------------- | -------- | ------------------------------- | -------------------- |
-| `tasks/` (directory) | `tasks`  | one per `*.yaml` / `*.yml` file | the file name (`id`) |
-| `people.yaml` (file) | `people` | each item of the top-level list | the `id` field       |
+| Under the root       | Table    | Records                                                          | Key                                                               |
+| -------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `tasks/` (directory) | `tasks`  | one per `*.yaml` / `*.yml` file in the folder and its subfolders | the path without extension (`id`): `buy-milk`, `archive/buy-milk` |
+| `people.yaml` (file) | `people` | each item of the top-level list                                  | the `id` field                                                    |
 
-Dotfiles, `node_modules` and `yamlite.yaml` are ignored. Symlinked files and directories are followed.
+Dotfiles, dot-folders and `node_modules` are ignored at every level, and `yamlite.yaml` at the root. Symlinked files and directories are followed.
+
+In a directory table, a file's own `id` field may hold the full key (`archive/buy-milk`) or just the file name (`buy-milk`); anything else is a warning and the path wins. Inserting a row with a nested key creates its folders, and deleting the last record in a folder removes the emptied folder. A folder or file that another table is configured at (`archive: { path: tasks/archive }`) is left to that table. Renaming a folder deletes and re-adds its records, so renaming a large folder can trip the mass-deletion guard and need `--force` (see [Safety](#safety)).
 
 ### Types
 
@@ -273,7 +275,7 @@ Values are compared as text (`"1"` matches `1`). While watching, a change to `pe
 
 yamlite is built so that a sync never silently loses data:
 
-- **Unreadable files are untouchable.** A YAML file with a syntax error, several documents, or the wrong top-level shape is never overwritten and never treated as a deletion: a record file is skipped, and a broken list file stops its table with an error. Fix it and the next sync picks it up.
+- **Unreadable files are untouchable.** A YAML file with a syntax error, several documents, or the wrong top-level shape is never overwritten and never treated as a deletion: a record file is skipped, and a broken list file stops its table with an error. A subfolder that can't be read and a symlink whose target is gone also stop their table, since they may hold records. Fix it and the next sync picks it up.
 - **Mass deletions are refused.** A sync that would delete more than `max(10, 50%)` of a table, or empty a table that had several records, stops unless you pass `--force`. A missing folder or a dropped table with previously synced records is an error, not a wipe.
 - **Conflicts keep both sides.** If a record changed in YAML and in the database, the newer change wins and the other version is saved to `.yamlite/conflicts/<table>/`. The file's modification time is compared with the database's last write (any row, in any table), so the database wins whenever it was written after the file was saved. Each backup starts with a `# yamlite: {...}` comment line that records the table, the key, which side won and when.
 - **Concurrent edits are detected.** Files are rewritten atomically and only if they are unchanged since they were read; database writes run in a transaction.
