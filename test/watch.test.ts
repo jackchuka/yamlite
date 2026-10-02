@@ -1,8 +1,8 @@
-import { unlinkSync, writeFileSync } from "node:fs";
+import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { open } from "../src/index.ts";
-import { dataRoot, read, sql, waitFor, write } from "./helpers.ts";
+import { dataRoot, read, sql, tmpRoot, waitFor, write } from "./helpers.ts";
 
 const fast = { pollMs: 50, debounceMs: 50 };
 
@@ -110,4 +110,31 @@ test("a broken yamlite.yaml keeps the previous configuration and reports an erro
   write(join(t.root, "tasks/a.yaml"), "title: B\n");
   await waitFor(() => title(t.db, "a") === "B");
   await t.y.close();
+});
+
+// a complete config, so registration never rewrites yamlite.yaml and triggers a full resync
+const tasksConfig = "tables:\n  tasks:\n    columns:\n      title: TEXT\n";
+
+test("edits in nested folders are synced, including folders created later", async () => {
+  const t = await start({ "tasks/auto/a.yaml": "title: A\n" }, tasksConfig);
+  expect(title(t.db, "auto/a")).toBe("A");
+  write(join(t.root, "tasks/auto/a.yaml"), "title: B\n");
+  await waitFor(() => title(t.db, "auto/a") === "B");
+  write(join(t.root, "tasks/new/deep/b.yaml"), "title: N\n");
+  await waitFor(() => title(t.db, "new/deep/b") === "N");
+  sql(t.db, "UPDATE tasks SET title = 'C' WHERE id = 'auto/a'");
+  await waitFor(() => read(join(t.root, "tasks/auto/a.yaml")) === "title: C\n");
+  await t.y.close();
+  expect(t.errors).toEqual([]);
+});
+
+test("a folder moved into a table is synced", async () => {
+  const t = await start({ "tasks/a.yaml": "title: A\n" }, tasksConfig);
+  const outside = join(tmpRoot(), "batch");
+  write(join(outside, "x.yaml"), "title: X\n");
+  write(join(outside, "sub/y.yaml"), "title: Y\n");
+  renameSync(outside, join(t.root, "tasks/moved"));
+  await waitFor(() => title(t.db, "moved/x") === "X" && title(t.db, "moved/sub/y") === "Y");
+  await t.y.close();
+  expect(t.errors).toEqual([]);
 });
