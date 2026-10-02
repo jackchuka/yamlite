@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { activityLines, warningLinks } from "./activity";
+import { activityLines, warningLinks, warningsByKey } from "./activity";
 
 test("activity is newest first, one line per change", () => {
   const lines = activityLines([
@@ -39,7 +39,31 @@ test("activity is newest first, one line per change", () => {
 
 test("warnings link to their record when they name one", () => {
   expect(warningLinks({ tasks: ['write-blog: reference "blog" not found', "could not add new columns"] })).toEqual([
-    { table: "tasks", key: "write-blog", text: 'reference "blog" not found' },
-    { table: "tasks", key: null, text: "could not add new columns" },
+    { table: "tasks", key: "write-blog", view: null, text: 'reference "blog" not found' },
+    { table: "tasks", key: null, view: null, text: "could not add new columns" },
   ]);
+});
+
+test("warnings about a view name the view, not a record", () => {
+  const views = new Set(["projects__milestones"]);
+  expect(
+    warningLinks({ projects: ['projects__milestones: owner "carol" not found in people.id (website/1)'] }, views),
+  ).toEqual([
+    {
+      table: "projects",
+      key: null,
+      view: "projects__milestones",
+      text: 'owner "carol" not found in people.id (website/1)',
+    },
+  ]);
+});
+
+test("a record's warnings are grouped by its key", () => {
+  const links = warningLinks({ tasks: ["a: one", "a: two", "b: three", "plain"] });
+  expect(warningsByKey(links)).toEqual(
+    new Map([
+      ["a", ["one", "two"]],
+      ["b", ["three"]],
+    ]),
+  );
 });

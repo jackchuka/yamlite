@@ -10,13 +10,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
-import { warnedKeys } from "@/lib/cell";
+import { warningLinks, warningsByKey } from "@/lib/activity";
 import { useEvents, useMeta } from "@/lib/providers";
 import type { Filter, Row, TableMeta, ViewMeta } from "@/lib/types";
 import { tableRoute } from "@/routes";
 import { FilterBar } from "./FilterBar";
 import { Grid, type GridColumn } from "./Grid";
 import { SchemaDialog } from "./SchemaDialog";
+import { TableWarnings } from "./TableWarnings";
 
 const PAGE = 100;
 
@@ -99,6 +100,12 @@ export function TableView({
     ? (_key: string, row: Row) =>
         void goTo({ to: "/t/$table", params: { table: view.table }, search: { key: String(row[keyCol]) } })
     : (key: string) => setSearch({ key });
+  // a view's warnings come with its table's sync, prefixed by the view's name
+  const source = t ? t.name : (view as ViewMeta).table;
+  const links = warningLinks({ [source]: warnings[source] ?? [] }, new Set(meta?.views.map((v) => v.name)));
+  const ownWarnings = links.filter((w) => w.view === (view ? view.name : null));
+  const onOpenRecord = (key: string) =>
+    void goTo({ to: "/t/$table", params: { table: view ? view.table : table }, search: { key } });
   const onSort = (column: string) => {
     const [col, dir] = (search.sort ?? "").split(":");
     const next = col !== column ? `${column}:asc` : dir === "asc" ? `${column}:desc` : undefined;
@@ -126,6 +133,7 @@ export function TableView({
             {total} {t ? "records" : "rows"}
           </span>
           <span className="flex-1" />
+          <TableWarnings items={ownWarnings} onOpenRecord={onOpenRecord} />
           <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
             <Database className="size-3.5" /> Schema
           </Button>
@@ -172,7 +180,7 @@ export function TableView({
             selectedKey={t ? search.key : undefined}
             onSelect={onSelect}
             onEndReached={onEndReached}
-            flagged={t ? warnedKeys(warnings[t.name]) : undefined}
+            flagged={t ? warningsByKey(links) : undefined}
             sort={search.sort}
             onSort={onSort}
           />

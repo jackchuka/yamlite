@@ -173,3 +173,20 @@ test("an expanded view is listed under its table and opens the record it comes f
   await expect(page.getByRole("heading", { name: "projects__milestones__tasks", exact: true })).toBeVisible();
   await expect(page.getByRole("row", { name: /Wireframes/ })).toBeVisible();
 });
+
+test("warnings sit next to the table's name and their messages open from the table", async ({ page }) => {
+  app = await start({
+    "yamlite.yaml": "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
+    "people.yaml": "- id: ann\n",
+    "tasks/a.yaml": "title: A\nassignee: ann\n",
+    "tasks/b.yaml": "title: B\nassignee: zed\n",
+  });
+  await page.goto(app.url);
+  const sidebar = page.getByRole("complementary", { name: "sidebar" });
+  const tasks = sidebar.getByRole("link", { name: /tasks/ });
+  await expect(tasks.getByRole("img", { name: "1 warnings" })).toBeVisible();
+  await expect(tasks).toContainText("2");
+  await tasks.click();
+  await page.getByRole("button", { name: /1 件の警告/ }).click();
+  await expect(page.getByRole("list", { name: "warnings" })).toContainText('assignee "zed" not found in people.id (b)');
+});

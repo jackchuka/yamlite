@@ -33,7 +33,8 @@ export function Grid({
   selectedKey?: string;
   onSelect?: (key: string, row: Row) => void;
   onEndReached?: () => void;
-  flagged?: Set<string>;
+  // each flagged row's warning messages, by row key
+  flagged?: Map<string, string[]>;
   sort?: string;
   onSort?: (column: string) => void;
 }) {
@@ -109,7 +110,7 @@ export function Grid({
                         <span
                           role="img"
                           aria-label="has warnings"
-                          title="has warnings"
+                          title={flagged.get(key)?.join("\n")}
                           className="mr-1.5 shrink-0 text-warn"
                         >
                           ⚠

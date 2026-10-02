@@ -50,13 +50,3 @@ export function cellView(value: unknown, type: ColumnType): CellView {
   }
   return { kind: "text", text: String(value) };
 }
-
-// engine warnings about one record start with "<key>: "
-export function warnedKeys(warnings: string[] | undefined): Set<string> {
-  const keys = new Set<string>();
-  for (const w of warnings ?? []) {
-    const i = w.indexOf(": ");
-    if (i > 0 && !w.slice(0, i).includes(" ")) keys.add(w.slice(0, i));
-  }
-  return keys;
-}

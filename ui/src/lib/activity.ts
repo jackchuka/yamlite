@@ -38,16 +38,31 @@ export function activityLines(events: ServeEvent[]): ActivityLine[] {
   return lines.reverse();
 }
 
+export interface WarningLink {
+  table: string;
+  key: string | null;
+  view: string | null;
+  text: string;
+}
+
+// engine warnings about one record start with "<key>: ", and those about an expanded view with "<view>: "
 export function warningLinks(
   warnings: Record<string, string[]>,
-): Array<{ table: string; key: string | null; text: string }> {
+  views: ReadonlySet<string> = new Set(),
+): WarningLink[] {
   return Object.entries(warnings).flatMap(([table, list]) =>
     list.map((w) => {
       const i = w.indexOf(": ");
       const head = i > 0 ? w.slice(0, i) : "";
-      return head !== "" && !head.includes(" ")
-        ? { table, key: head, text: w.slice(i + 2) }
-        : { table, key: null, text: w };
+      if (head === "" || head.includes(" ")) return { table, key: null, view: null, text: w };
+      const text = w.slice(i + 2);
+      return views.has(head) ? { table, key: null, view: head, text } : { table, key: head, view: null, text };
     }),
   );
+}
+
+export function warningsByKey(links: WarningLink[]): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const w of links) if (w.key !== null) out.set(w.key, [...(out.get(w.key) ?? []), w.text]);
+  return out;
 }

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
@@ -33,7 +34,11 @@ export function StatusBar() {
       <span>last sync {ago(lastSyncAt, now)}</span>
       <span>{location.host}</span>
       <span className="ml-auto flex items-center gap-3.5">
-        {warningCount > 0 && <span className="text-warn">⚠ {warningCount} warnings</span>}
+        {warningCount > 0 && (
+          <Link to="/sync" className="text-warn hover:underline">
+            ⚠ {warningCount} warnings
+          </Link>
+        )}
         {conflictCount > 0 && <span className="text-err">● {conflictCount} conflicts</span>}
         <button
           type="button"

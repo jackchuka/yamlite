@@ -21,10 +21,12 @@ test("only a flagged row's key cell carries the labelled warning mark", () => {
       ]}
       rows={rows}
       keyCol="id"
-      flagged={new Set(["b"])}
+      flagged={new Map([["b", ['"n" does not match column type TEXT', "second"]]])}
     />,
   );
-  expect(container.querySelector('[data-key="b"] [aria-label="has warnings"]')?.textContent).toBe("⚠");
+  const mark = container.querySelector('[data-key="b"] [aria-label="has warnings"]');
+  expect(mark?.textContent).toBe("⚠");
+  expect(mark?.getAttribute("title")).toBe('"n" does not match column type TEXT\nsecond');
   expect(container.querySelector('[data-key="a"] [aria-label="has warnings"]')).toBeNull();
 });
 
