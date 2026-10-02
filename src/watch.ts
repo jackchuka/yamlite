@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, resolve, sep } from "node:path";
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
 import { type ConflictInfo, type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { checkReferences, referrersOf } from "./references.ts";
@@ -49,16 +49,29 @@ export function startWatch(
   const debounceMs = options.debounceMs ?? 200;
   const timers = new Map<string, NodeJS.Timeout>();
   const running = new Map<string, Promise<void>>();
-  const watched = new Set<string>();
   let lastDbChange: number | undefined;
   let closed = false;
   let current = new Map(tables.map((t) => [t.name, t]));
   const all = () => [...current.values()];
   const root = config ? resolve(config.root) : undefined;
 
-  const watchDir = (t: TableSpec) => resolve(t.mode === "dir" ? t.path : dirname(t.path));
-  const initialDirs = [...new Set([...tables.map(watchDir), ...(root ? [root] : [])])].filter((dir) => existsSync(dir));
-  for (const dir of initialDirs) watched.add(dir);
+  // a directory table watches its folder tree; the root and list tables watch one level
+  const watchTarget = (t: TableSpec) => ({
+    dir: resolve(t.mode === "dir" ? t.path : dirname(t.path)),
+    deep: t.mode === "dir",
+  });
+  const watched = new Set<string>();
+  const watchedDirs = new Set<string>();
+  const claim = (dir: string, deep: boolean): boolean => {
+    const id = `${deep ? "deep" : "flat"}\0${dir}`;
+    if (watched.has(id) || !existsSync(dir)) return false;
+    watched.add(id);
+    watchedDirs.add(dir);
+    return true;
+  };
+  const initialTargets = [...tables.map(watchTarget), ...(root ? [{ dir: root, deep: false }] : [])].filter((x) =>
+    claim(x.dir, x.deep),
+  );
 
   const fsWatchers: FSWatcher[] = [];
   const onFsEvent = (event: string, path: string) => {
@@ -72,15 +85,19 @@ export function startWatch(
       if (CONFIG_FILES.has(name) || entry) scheduleReload();
     }
     for (const t of all()) {
-      if (t.mode === "dir" ? dirname(p) === resolve(t.path) : p === resolve(t.path)) schedule(t.name);
+      const inTable = t.mode === "dir" ? p.startsWith(resolve(t.path) + sep) : p === resolve(t.path);
+      if (inTable) schedule(t.name);
     }
   };
-  function startFs(dirs: string[]): Promise<void> {
+  function startFs(dirs: string[], deep: boolean): Promise<void> {
     const w = chokidarWatch(dirs, {
       ignoreInitial: true,
-      depth: 0,
+      ...(deep ? {} : { depth: 0 }),
       awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 25 },
-      ignored: (path: string) => basename(path).startsWith(".") && !watched.has(resolve(path)),
+      ignored: (path: string) => {
+        const name = basename(path);
+        return (name.startsWith(".") || name === "node_modules") && !watchedDirs.has(resolve(path));
+      },
     });
     fsWatchers.push(w);
     w.on("all", onFsEvent);
@@ -88,19 +105,22 @@ export function startWatch(
     return new Promise<void>((r) => w.once("ready", () => setTimeout(r, SETTLE_MS)));
   }
 
-  const fsReady = initialDirs.length > 0 ? startFs(initialDirs) : Promise.resolve();
+  const fsReady = Promise.all(
+    [false, true].map((deep) => {
+      const dirs = initialTargets.filter((x) => x.deep === deep).map((x) => x.dir);
+      return dirs.length > 0 ? startFs(dirs, deep) : Promise.resolve();
+    }),
+  );
 
   // A directory that appears later is scanned asynchronously; edits made before the
   // scan finishes are invisible to it, so catch up once it is ready.
   function ensureWatched(): void {
     for (const t of all()) {
-      const dir = watchDir(t);
-      if (!watched.has(dir) && existsSync(dir)) {
-        watched.add(dir);
-        void startFs([dir]).then(() => {
-          for (const u of all()) if (watchDir(u) === dir) schedule(u.name);
-        });
-      }
+      const { dir, deep } = watchTarget(t);
+      if (!claim(dir, deep)) continue;
+      void startFs([dir], deep).then(() => {
+        for (const u of all()) if (watchTarget(u).dir === dir) schedule(u.name);
+      });
     }
   }
 
