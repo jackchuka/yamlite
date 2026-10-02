@@ -7,6 +7,9 @@ import type { ColumnType } from "./types.ts";
 export interface Registration {
   table: string;
   columns?: Record<string, ColumnType>;
+  // written only when the table is new
+  path?: string;
+  key?: string;
 }
 
 // an empty flow map (`{}`) would keep everything added to it on one line
@@ -31,9 +34,12 @@ export function registerInConfig(path: string, registrations: Registration[]): b
   const root = doc.contents as unknown as YAMLMap;
   const tables = blockMap(doc, root, "tables");
   let changed = false;
-  for (const { table, columns = {} } of registrations) {
-    if (!tables.has(table)) changed = true;
+  for (const { table, columns = {}, path: tablePath, key } of registrations) {
+    const isNew = !tables.has(table);
+    if (isNew) changed = true;
     const entry = blockMap(doc, tables, table);
+    if (isNew && tablePath !== undefined) entry.set("path", tablePath);
+    if (isNew && key !== undefined) entry.set("key", key);
     const additions = Object.entries(columns);
     if (additions.length === 0) continue;
     const declared = blockMap(doc, entry, "columns");
