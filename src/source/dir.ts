@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { Document, isMap } from "yaml";
 import { type FileStamp, sameStamp, stamp, writeAtomic } from "../fsutil.ts";
@@ -13,6 +13,41 @@ export function invalidKey(key: string): string | null {
   if (key.startsWith(".")) return "key starts with a dot";
   if (Buffer.byteLength(key) + ".yaml".length > 255) return "key is too long for a file name";
   return null;
+}
+
+interface RecordFile {
+  key: string;
+  path: string;
+  mtimeMs: number;
+}
+
+const skipName = (name: string) => name.startsWith(".") || name === "node_modules";
+
+const lastSegment = (key: string) => key.slice(key.lastIndexOf("/") + 1);
+
+// an entry that cannot be read or stat-ed (a locked folder, a dangling link) throws,
+// so the table stops instead of reading its records as deleted
+function walk(root: string, warnings: string[]): RecordFile[] {
+  const out: RecordFile[] = [];
+  const visit = (dir: string, prefix: string, ancestors: ReadonlySet<string>) => {
+    for (const name of readdirSync(dir).sort()) {
+      if (skipName(name)) continue;
+      const path = join(dir, name);
+      const st = statSync(path);
+      if (st.isDirectory()) {
+        const real = realpathSync(path);
+        if (ancestors.has(real)) {
+          warnings.push(`${path}: symlink loop; skipped`);
+          continue;
+        }
+        visit(path, `${prefix}${name}/`, new Set([...ancestors, real]));
+      } else if (st.isFile() && YAML_EXT.test(name)) {
+        out.push({ key: prefix + name.replace(YAML_EXT, ""), path, mtimeMs: st.mtimeMs });
+      }
+    }
+  };
+  visit(root, "", new Set([realpathSync(root)]));
+  return out;
 }
 
 export class DirSource implements Source {
@@ -30,12 +65,14 @@ export class DirSource implements Source {
     this.skipped = res.skip;
     if (!existsSync(this.dir)) return res;
     res.exists = true;
-    for (const name of readdirSync(this.dir).sort()) {
-      if (name.startsWith(".") || !YAML_EXT.test(name)) continue;
-      const path = join(this.dir, name);
-      const st = statSync(path);
-      if (!st.isFile()) continue;
-      const key = name.replace(YAML_EXT, "");
+    let files: RecordFile[];
+    try {
+      files = walk(this.dir, res.warnings);
+    } catch (e) {
+      res.tableError = e instanceof Error ? e.message : String(e);
+      return res;
+    }
+    for (const { key, path, mtimeMs } of files) {
       if (this.paths.has(key)) {
         res.warnings.push(`${path}: another file already uses key "${key}"; skipped`);
         res.records.delete(key);
@@ -45,7 +82,7 @@ export class DirSource implements Source {
       }
       this.paths.set(key, path);
       const content = readFileSync(path, "utf8");
-      res.stamps.set(path, { mtimeMs: st.mtimeMs, contentHash: hashContent(content) });
+      res.stamps.set(path, { mtimeMs, contentHash: hashContent(content) });
       const parsed = parseRecordFile(content);
       if (!parsed.ok) {
         res.warnings.push(`${path}: ${parsed.error}; skipped`);
@@ -53,11 +90,11 @@ export class DirSource implements Source {
         continue;
       }
       const { [this.keyField]: inFile, ...record } = parsed.record;
-      if (inFile !== undefined && inFile !== null && String(inFile) !== key) {
+      if (inFile !== undefined && inFile !== null && String(inFile) !== key && String(inFile) !== lastSegment(key)) {
         res.warnings.push(`${path}: field "${this.keyField}" differs from the file name; the file name wins`);
       }
       res.records.set(key, record);
-      res.mtimes.set(key, st.mtimeMs);
+      res.mtimes.set(key, mtimeMs);
     }
     return res;
   }
