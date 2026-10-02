@@ -31,8 +31,9 @@ export function NewRecordDialog({
       );
       return api.create(table.name, key, set);
     },
+    onMutate: () => dispatch({ type: "saved", table: table.name, key, at: Date.now() }),
+    onError: () => dispatch({ type: "cancelled", table: table.name, key }),
     onSuccess: () => {
-      dispatch({ type: "saved", table: table.name, key, at: Date.now() });
       onOpenChange(false);
       setKey("");
       setValues({});

@@ -10,6 +10,7 @@ export type ReflectMap = Record<string, Reflect>;
 
 export type ReflectAction =
   | { type: "saved"; table: string; key: string; at: number }
+  | { type: "cancelled"; table: string; key: string }
   | { type: "event"; event: ServeEvent }
   | { type: "tick"; now: number };
 
@@ -24,6 +25,10 @@ export function reflectReducer(
 ): ReflectMap {
   if (action.type === "saved") {
     return { ...state, [reflectKey(action.table, action.key)]: { state: "pending", since: action.at } };
+  }
+  if (action.type === "cancelled") {
+    const { [reflectKey(action.table, action.key)]: _gone, ...rest } = state;
+    return rest;
   }
   if (action.type === "tick") {
     let next = state;

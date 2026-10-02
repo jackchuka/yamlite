@@ -5,11 +5,12 @@ import { api } from "@/lib/api";
 import type { TableMeta } from "@/lib/types";
 import { RecordDrawer } from "./RecordDrawer";
 
+const dispatch = vi.hoisted(() => vi.fn());
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
 vi.mock("@/lib/providers", () => ({
   useEvents: () => ({ connected: true }),
   useReflect: () => undefined,
-  useReflectDispatch: () => vi.fn(),
+  useReflectDispatch: () => dispatch,
 }));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
@@ -55,4 +56,22 @@ test("an unset INTEGER shows the 0 it was given", async () => {
   );
   fireEvent.click(await screen.findByLabelText("prio"));
   expect((screen.getByLabelText("prio") as HTMLInputElement).value).toBe("0");
+});
+
+test("write-back tracking starts before the save responds, and a failed save cancels it", async () => {
+  dispatch.mockClear();
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "old", prio: null }, file: "f", yaml: "" });
+  let fail: (e: Error) => void = () => {};
+  vi.mocked(api.update).mockReturnValue(new Promise((_r, reject) => (fail = reject)));
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(await screen.findByLabelText("title"), { target: { value: "new" } });
+  fireEvent.click(screen.getByRole("button", { name: /Save/ }));
+  // the watcher may write the file before the response, so the entry must already exist
+  await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "saved", key: "a" })));
+  fail(new Error("boom"));
+  await waitFor(() => expect(dispatch).toHaveBeenCalledWith({ type: "cancelled", table: "tasks", key: "a" }));
 });

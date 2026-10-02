@@ -67,8 +67,9 @@ export function RecordDrawer({
 
   const save = useMutation({
     mutationFn: ({ values, base: b }: { values: Row; base: Row }) => api.update(table.name, recordKey, values, b),
+    // tracked before the request: the watcher can write the file before the response arrives
+    onMutate: () => dispatch({ type: "saved", table: table.name, key: recordKey, at: Date.now() }),
     onSuccess: (_r, vars) => {
-      dispatch({ type: "saved", table: table.name, key: recordKey, at: Date.now() });
       const next = { ...base, ...vars.values };
       setBase(next);
       setDraft(next);
@@ -79,6 +80,7 @@ export function RecordDrawer({
       void client.invalidateQueries({ queryKey: ["record", table.name, recordKey] });
     },
     onError: (e) => {
+      dispatch({ type: "cancelled", table: table.name, key: recordKey });
       if (e instanceof ApiError && e.status === 409 && Array.isArray(e.body.stale)) {
         setStale({ fields: e.body.stale as string[], current: e.body.current as Row });
       }
@@ -86,8 +88,9 @@ export function RecordDrawer({
   });
   const remove = useMutation({
     mutationFn: () => api.remove(table.name, recordKey),
+    onMutate: () => dispatch({ type: "saved", table: table.name, key: recordKey, at: Date.now() }),
+    onError: () => dispatch({ type: "cancelled", table: table.name, key: recordKey }),
     onSuccess: () => {
-      dispatch({ type: "saved", table: table.name, key: recordKey, at: Date.now() });
       void navigate({ to: "/t/$table", params: { table: table.name }, search: {} });
     },
   });
