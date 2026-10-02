@@ -168,7 +168,7 @@ yamlite serve notes --open
   <img src="assets/ui.png" width="880" alt="yamlite serve: the web UI with a table of tasks and a record open in a form, saved back to tasks/release-notes.yaml">
 </p>
 
-`serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
+`serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, check each table's columns, references and indexes, run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
 
 - It listens on `127.0.0.1:4610` and prints a URL with an access token (new for each run, reusable until the process stops); open that URL (or pass `--open`). Requests without the token, from other sites, or with an unexpected `Host` are refused.
 - `serve` and `watch` cannot run on the same folder at the same time.

@@ -1,4 +1,14 @@
-import type { ConflictDetail, ConflictEntry, Filter, Meta, RecordDetail, Row, RowsPage, SqlResult } from "./types";
+import type {
+  ConflictDetail,
+  ConflictEntry,
+  Filter,
+  Meta,
+  RecordDetail,
+  Row,
+  RowsPage,
+  SqlResult,
+  TableSchema,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -86,6 +96,7 @@ export const api = {
     if (p.prefix) qs.set("prefix", p.prefix);
     return request<RowsPage>("GET", `${rowsPath(table)}?${qs}`);
   },
+  schema: (table: string) => request<TableSchema>("GET", `/api/tables/${enc(table)}/schema`),
   record: (table: string, key: string) => request<RecordDetail>("GET", rowPath(table, key)),
   create: (table: string, key: string, values: Row) =>
     request<{ key: string }>("POST", rowsPath(table), { key, values }),

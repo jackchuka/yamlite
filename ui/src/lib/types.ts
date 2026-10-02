@@ -25,6 +25,26 @@ export interface Meta {
   tables: TableMeta[];
 }
 
+export interface TableSchema {
+  name: string;
+  mode: "dir" | "list";
+  path: string;
+  key: string;
+  inDb: boolean;
+  columns: Record<string, ColumnType>;
+  declared: Record<string, ColumnType>;
+  references: Array<{ column: string; table: string; target: string; problems: string[] }>;
+  indexes: Array<{
+    name: string;
+    definition: string;
+    columns?: string[];
+    expr?: string;
+    unique: boolean;
+    inDb: boolean;
+  }>;
+  otherIndexes: string[];
+}
+
 export type Row = Record<string, unknown>;
 
 export interface RowsPage {

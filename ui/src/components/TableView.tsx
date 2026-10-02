@@ -1,6 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Columns3 } from "lucide-react";
+import { Columns3, Database } from "lucide-react";
 import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import type { Filter, TableMeta } from "@/lib/types";
 import { tableRoute } from "@/routes";
 import { FilterBar } from "./FilterBar";
 import { Grid, type GridColumn } from "./Grid";
+import { SchemaDialog } from "./SchemaDialog";
 
 const PAGE = 100;
 
@@ -50,6 +51,7 @@ export function TableView({
   const t = meta?.tables.find((x) => x.name === table);
   const filters = search.filter ?? [];
   const [hidden, setHidden] = useState(() => hiddenColumns(table));
+  const [schemaOpen, setSchemaOpen] = useState(false);
 
   const query = useInfiniteQuery({
     queryKey: ["rows", table, { sort: search.sort, filters, prefix: search.prefix }],
@@ -101,6 +103,9 @@ export function TableView({
           </span>
           <span className="text-[12px] whitespace-nowrap text-muted-foreground">{total} records</span>
           <span className="flex-1" />
+          <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
+            <Database className="size-3.5" /> Schema
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -150,6 +155,7 @@ export function TableView({
         )}
       </section>
       {search.key !== undefined && drawer?.(t, search.key)}
+      {schemaOpen && <SchemaDialog table={t.name} open onOpenChange={setSchemaOpen} />}
     </div>
   );
 }
