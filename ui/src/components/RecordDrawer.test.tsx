@@ -6,7 +6,8 @@ import type { TableMeta } from "@/lib/types";
 import { RecordDrawer } from "./RecordDrawer";
 
 const dispatch = vi.hoisted(() => vi.fn());
-vi.mock("@tanstack/react-router", () => ({ useNavigate: () => vi.fn() }));
+const navigate = vi.hoisted(() => vi.fn());
+vi.mock("@tanstack/react-router", () => ({ useNavigate: () => navigate }));
 vi.mock("@/lib/providers", () => ({
   useEvents: () => ({ connected: true }),
   useReflect: () => undefined,
@@ -74,4 +75,55 @@ test("write-back tracking starts before the save responds, and a failed save can
   await waitFor(() => expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "saved", key: "a" })));
   fail(new Error("boom"));
   await waitFor(() => expect(dispatch).toHaveBeenCalledWith({ type: "cancelled", table: "tasks", key: "a" }));
+});
+
+async function openDrawer() {
+  navigate.mockClear();
+  vi.mocked(api.record).mockResolvedValue({
+    row: { id: "a", title: "old", prio: null },
+    file: "tasks/a.yaml",
+    yaml: "",
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <main>
+        <div role="row" data-key="b">
+          <span>row b</span>
+        </div>
+        <p>outside</p>
+      </main>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  return (await screen.findByLabelText("title")) as HTMLInputElement;
+}
+
+const closedKey = () => {
+  const search = navigate.mock.calls.at(-1)?.[0]?.search as ((p: object) => { key?: string }) | undefined;
+  return search?.({ key: "a", sort: "title:asc" });
+};
+
+test("Escape closes the drawer", async () => {
+  await openDrawer();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(navigate).toHaveBeenCalledTimes(1);
+  expect(closedKey()).toEqual({ key: undefined, sort: "title:asc" });
+});
+
+test("a click outside closes the drawer; inside it or on another row does not", async () => {
+  const title = await openDrawer();
+  fireEvent.click(title);
+  fireEvent.click(screen.getByText("row b"));
+  expect(navigate).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("outside"));
+  expect(navigate).toHaveBeenCalledTimes(1);
+  expect(closedKey()).toEqual({ key: undefined, sort: "title:asc" });
+});
+
+test("unsaved edits keep the drawer open on Escape or a click outside", async () => {
+  const title = await openDrawer();
+  fireEvent.change(title, { target: { value: "new" } });
+  fireEvent.keyDown(document, { key: "Escape" });
+  fireEvent.click(screen.getByText("outside"));
+  expect(navigate).not.toHaveBeenCalled();
 });

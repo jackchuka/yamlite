@@ -113,57 +113,63 @@ export function TableView({
   };
 
   return (
-    <div className="flex min-w-0 flex-1">
+    <div className="relative flex min-w-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center gap-2.5 border-b px-[18px] py-3">
-          <h1 className="text-lg font-semibold tracking-tight">{table}</h1>
+        <div className="flex min-w-0 items-center gap-2.5 border-b px-[18px] py-3">
+          {/* a long name or path gives way, so the buttons stay in view */}
+          <h1 title={table} className="min-w-0 truncate text-lg font-semibold tracking-tight">
+            {table}
+          </h1>
           {t ? (
-            <span className="rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+            <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
               {t.mode === "dir" ? `${t.path}/*.yaml` : t.path}
             </span>
           ) : (
             <>
-              <span className="rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+              <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
                 from {view?.parent}
               </span>
-              <span className="rounded border px-1.5 text-[11px] text-muted-foreground">read-only view</span>
+              <span className="shrink-0 rounded border px-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
+                read-only view
+              </span>
             </>
           )}
-          <span className="text-[12px] whitespace-nowrap text-muted-foreground">
+          <span className="shrink-0 text-[12px] whitespace-nowrap text-muted-foreground">
             {total} {t ? "records" : "rows"}
           </span>
-          <span className="flex-1" />
-          <TableWarnings items={ownWarnings} onOpenRecord={onOpenRecord} />
-          <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
-            <Database className="size-3.5" /> Schema
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Columns3 className="size-3.5" /> Columns
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {Object.keys(all)
-                .filter((c) => !pinned.includes(c))
-                .map((c) => (
-                  <DropdownMenuCheckboxItem
-                    key={c}
-                    checked={!hidden.has(c)}
-                    onCheckedChange={(on) => {
-                      const next = new Set(hidden);
-                      if (on) next.delete(c);
-                      else next.add(c);
-                      setHidden(next);
-                      saveHidden(table, next);
-                    }}
-                  >
-                    {c}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {t && headerActions?.(t)}
+          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+            <TableWarnings items={ownWarnings} onOpenRecord={onOpenRecord} />
+            <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
+              <Database className="size-3.5" /> Schema
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Columns3 className="size-3.5" /> Columns
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {Object.keys(all)
+                  .filter((c) => !pinned.includes(c))
+                  .map((c) => (
+                    <DropdownMenuCheckboxItem
+                      key={c}
+                      checked={!hidden.has(c)}
+                      onCheckedChange={(on) => {
+                        const next = new Set(hidden);
+                        if (on) next.delete(c);
+                        else next.add(c);
+                        setHidden(next);
+                        saveHidden(table, next);
+                      }}
+                    >
+                      {c}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {t && headerActions?.(t)}
+          </div>
         </div>
         <FilterBar columns={all} filters={filters} prefix={search.prefix} onChange={onFilters} />
         {query.isError && (

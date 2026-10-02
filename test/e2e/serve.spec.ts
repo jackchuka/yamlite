@@ -168,6 +168,8 @@ test("an expanded view is listed under its table and opens the record it comes f
   await page.getByRole("row", { name: /Design/ }).click();
   await expect(page.getByRole("complementary", { name: "record" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "projects", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("complementary", { name: "record" })).toHaveCount(0);
   await page.getByRole("button", { name: /Schema/ }).click();
   await page.getByRole("dialog").getByRole("link", { name: "projects__milestones__tasks" }).click();
   await expect(page.getByRole("heading", { name: "projects__milestones__tasks", exact: true })).toBeVisible();
@@ -189,4 +191,20 @@ test("warnings sit next to the table's name and their messages open from the tab
   await tasks.click();
   await page.getByRole("button", { name: /1 件の警告/ }).click();
   await expect(page.getByRole("list", { name: "warnings" })).toContainText('assignee "zed" not found in people.id (b)');
+});
+
+test("the record drawer closes on Escape and on a click outside it", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "title: A\n", "tasks/b.yaml": "title: B\n" });
+  await page.goto(app.url);
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await page.getByRole("row", { name: /\ba\b/ }).click();
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await page.getByRole("row", { name: /\ba\b/ }).click();
+  await expect(drawer.getByText("tasks/a.yaml")).toBeVisible();
+  await page.getByRole("row", { name: /\bb\b/ }).click();
+  await expect(drawer.getByText("tasks/b.yaml")).toBeVisible();
+  await page.getByRole("heading", { name: "tasks", exact: true }).click();
+  await expect(drawer).toHaveCount(0);
 });
