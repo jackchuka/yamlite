@@ -1,0 +1,128 @@
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { ColumnType, Filter, FilterOp } from "@/lib/types";
+
+const OPS: Array<[FilterOp, string]> = [
+  ["eq", "="],
+  ["ne", "≠"],
+  ["lt", "<"],
+  ["lte", "≤"],
+  ["gt", ">"],
+  ["gte", "≥"],
+  ["contains", "contains"],
+  ["has", "has"],
+  ["null", "is empty"],
+  ["notnull", "is set"],
+];
+const label = (f: Filter) =>
+  `${f.col} ${OPS.find(([op]) => op === f.op)?.[1] ?? f.op}${f.value === undefined ? "" : ` ${JSON.stringify(f.value)}`}`;
+
+export function parseFilterValue(text: string, type: ColumnType): unknown {
+  if (type === "BOOLEAN") return text === "true";
+  if ((type === "INTEGER" || type === "REAL") && text.trim() !== "" && !Number.isNaN(Number(text))) {
+    return type === "INTEGER" && !Number.isSafeInteger(Number(text)) ? text : Number(text);
+  }
+  return text;
+}
+
+export function FilterBar({
+  columns,
+  filters,
+  prefix,
+  onChange,
+}: {
+  columns: Record<string, ColumnType>;
+  filters: Filter[];
+  prefix?: string;
+  onChange: (next: { filters: Filter[]; prefix?: string }) => void;
+}) {
+  const names = Object.keys(columns);
+  const [draft, setDraft] = useState<{ col: string; op: FilterOp; text: string }>({
+    col: names[0] ?? "",
+    op: "eq",
+    text: "",
+  });
+  const [prefixText, setPrefixText] = useState(prefix ?? "");
+  const [open, setOpen] = useState(false);
+  useEffect(() => setPrefixText(prefix ?? ""), [prefix]);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if ((prefix ?? "") !== prefixText) onChange({ filters, prefix: prefixText || undefined });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [prefixText, prefix, filters, onChange]);
+  const add = () => {
+    const needsValue = draft.op !== "null" && draft.op !== "notnull";
+    const value = needsValue ? parseFilterValue(draft.text, columns[draft.col] ?? "TEXT") : undefined;
+    onChange({ filters: [...filters, { col: draft.col, op: draft.op, ...(needsValue ? { value } : {}) }], prefix });
+    setOpen(false);
+  };
+  return (
+    <div className="flex items-center gap-2 border-b px-[18px] py-2">
+      <Input
+        aria-label="key prefix"
+        placeholder="key prefix…"
+        className="h-7 max-w-[220px] text-[12px]"
+        value={prefixText}
+        onChange={(e) => setPrefixText(e.target.value)}
+      />
+      {filters.map((f, i) => (
+        <button
+          key={`${i}-${label(f)}`}
+          type="button"
+          className="rounded-full border border-tomato bg-tomato-soft px-2 py-0.5 text-[11.5px] text-tomato"
+          onClick={() => onChange({ filters: filters.filter((_, j) => j !== i), prefix })}
+        >
+          {label(f)} ×
+        </button>
+      ))}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="rounded-full border border-dashed px-2 py-0.5 text-[11.5px] text-muted-foreground"
+          >
+            + filter
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="flex w-80 flex-col gap-2">
+          <select
+            aria-label="column"
+            className="rounded border bg-background px-2 py-1"
+            value={draft.col}
+            onChange={(e) => setDraft({ ...draft, col: e.target.value })}
+          >
+            {names.map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+          <select
+            aria-label="operator"
+            className="rounded border bg-background px-2 py-1"
+            value={draft.op}
+            onChange={(e) => setDraft({ ...draft, op: e.target.value as FilterOp })}
+          >
+            {OPS.map(([op, text]) => (
+              <option key={op} value={op}>
+                {text}
+              </option>
+            ))}
+          </select>
+          {draft.op !== "null" && draft.op !== "notnull" && (
+            <Input
+              aria-label="value"
+              value={draft.text}
+              onChange={(e) => setDraft({ ...draft, text: e.target.value })}
+              onKeyDown={(e) => e.key === "Enter" && add()}
+            />
+          )}
+          <Button size="sm" onClick={add}>
+            Add
+          </Button>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
