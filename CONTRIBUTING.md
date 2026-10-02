@@ -11,6 +11,16 @@ pnpm check               # typecheck, lint, test, build
 
 Needs Node 24.16 or newer (yamlite uses the built-in `node:sqlite`). `pnpm build && node dist/cli.mjs <command>` runs the CLI from source.
 
+## Working on the web UI
+
+The UI lives in `ui/` (React, Vite, Tailwind, shadcn/ui) and is bundled into `dist/ui/` by `pnpm build`; none of its packages are runtime dependencies.
+
+```bash
+node dist/cli.mjs serve ./some-data      # prints http://127.0.0.1:4610/?token=…
+YAMLITE_TOKEN=<token> pnpm dev:ui         # Vite with hot reload, proxying /api to that server
+pnpm test:e2e                             # Playwright against dist/ (run pnpm build first)
+```
+
 ## Scope
 
 yamlite never loses data silently. A change that could overwrite a file, delete a row, or drop a column must be guarded the same way the existing paths are: unreadable files are skipped, mass deletions are refused without `--force`, and the losing side of a conflict is saved to `.yamlite/conflicts/`. Tests cover each of these; add one for any new path that writes.

@@ -8,3 +8,5 @@ docs/superpowers/
 coverage/
 .DS_Store
 .idea/
+test-results/
+playwright-report/
