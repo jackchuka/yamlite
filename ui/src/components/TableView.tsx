@@ -92,8 +92,8 @@ export function TableView({
   const columns: GridColumn[] = Object.entries(all)
     .filter(([name]) => pinned.includes(name) || !hidden.has(name))
     .map(([name, type]) => {
-      const ref = t?.references.find((r) => r.column === name);
-      return { name, type, note: ref ? `→ ${ref.table}` : undefined };
+      const reference = (t ?? (view as ViewMeta)).references.find((r) => r.column === name);
+      return { name, type, note: reference ? `→ ${reference.table}` : undefined, reference };
     });
   const rowId = view ? (row: Row) => view.identity.map((c) => String(row[c])).join("/") : undefined;
   const onSelect = view

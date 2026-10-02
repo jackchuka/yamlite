@@ -99,6 +99,7 @@ test("a view's schema comes from its meta, without a request", () => {
           columns: { projects_id: "TEXT", idx: "INTEGER", title: "TEXT", points: "INTEGER" },
           identity: ["projects_id", "idx"],
           declared: { title: "TEXT" },
+          references: [],
           count: 2,
           inDb: true,
         }}
