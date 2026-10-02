@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { displayPath, painter, reloadLine, report, watchEvents, watchHeader } from "./format.ts";
 import { generateConfig, init, open } from "./index.ts";
+import { serve } from "./serve/index.ts";
+import { isLoopback } from "./serve/security.ts";
 
 const { version } = createRequire(import.meta.url)("../package.json") as { version: string };
 
@@ -110,6 +113,55 @@ withRoot(program.command("watch").description("sync continuously"))
     };
     process.once("SIGINT", stop);
     process.once("SIGTERM", stop);
+  });
+
+function openBrowser(url: string): void {
+  const [cmd, args]: [string, string[]] =
+    process.platform === "darwin"
+      ? ["open", [url]]
+      : process.platform === "win32"
+        ? ["cmd", ["/c", "start", "", url]]
+        : ["xdg-open", [url]];
+  // a missing opener is not an error: the URL is printed anyway
+  spawn(cmd, args, { stdio: "ignore", detached: true })
+    .on("error", () => {})
+    .unref();
+}
+
+withRoot(program.command("serve").description("open the web UI and sync continuously"))
+  .option("--port <number>", "port to listen on", "4610")
+  .option("--host <address>", "address to listen on", "127.0.0.1")
+  .option("--open", "open the UI in the browser")
+  .action(async (root: string, o: { db?: string; port: string; host: string; open?: boolean }) => {
+    const port = Number(o.port);
+    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`invalid port: ${o.port}`);
+    const s = await serve({ root, db: o.db, port, host: o.host });
+    if (!isLoopback(o.host)) {
+      console.error(
+        painter(process.stderr)(
+          "yellow",
+          `warning: listening on ${o.host}; anyone who can reach it and has the token can read and change the data`,
+        ),
+      );
+    }
+    console.log(`${out("green", "✓")} yamlite UI · ${out("bold", s.url)}`);
+    console.log(out("dim", `  watching ${displayPath(resolve(root))} · Ctrl+C to stop`));
+    if (o.open) openBrowser(s.url);
+    let stopping = false;
+    const stop = () => {
+      // a second signal gives up on a close that hangs
+      if (stopping) process.exit(130);
+      stopping = true;
+      s.close().then(
+        () => process.exit(0),
+        (e: unknown) => {
+          console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+          process.exit(1);
+        },
+      );
+    };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
   });
 
 program.parseAsync().catch((e: unknown) => {
