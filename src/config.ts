@@ -141,7 +141,8 @@ function withExcludes(tables: TableSpec[]): TableSpec[] {
 const REFERENCE = /^([^.\s]+)(?:\.([^.\s]+))?$/;
 
 function toColumns(where: string, raw: Record<string, string> | undefined): Record<string, ColumnType> {
-  const columns: Record<string, ColumnType> = {};
+  // no prototype, so that a field named "constructor" or "toString" is not mistaken for a declared column
+  const columns: Record<string, ColumnType> = Object.create(null);
   for (const [column, type] of Object.entries(raw ?? {})) {
     const upper = String(type).toUpperCase() as ColumnType;
     if (!COLUMN_TYPES.includes(upper)) throw new Error(`${where}unknown column type ${type} for "${column}"`);

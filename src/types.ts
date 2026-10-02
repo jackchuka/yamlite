@@ -6,6 +6,10 @@ export type Rec = Record<string, unknown>;
 export type DbValue = null | number | bigint | string | Uint8Array;
 export type DbRow = Record<string, DbValue>;
 
+// a field named like an Object.prototype member ("constructor", "toString") must not read the inherited one
+export const own = <T>(record: Record<string, T>, field: string): T | undefined =>
+  Object.hasOwn(record, field) ? record[field] : undefined;
+
 export interface IndexSpec {
   columns?: string[];
   expr?: string;

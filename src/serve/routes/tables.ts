@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { registerInConfig } from "../../configfile.ts";
-import { COLUMN_TYPES, type ColumnType } from "../../types.ts";
+import { COLUMN_TYPES, type ColumnType, own } from "../../types.ts";
 import { findView } from "../context.ts";
 import { HttpError, Reply } from "../http.ts";
 import { objectBody, writeTx } from "../write.ts";
@@ -46,7 +46,7 @@ export const tableRoutes: Routes = (router, ctx) => {
       throw new HttpError(400, e instanceof Error ? e.message : String(e));
     }
     if (!adopt) {
-      const defs = new Map<string, ColumnType>([[key, columns[key] ?? "TEXT"]]);
+      const defs = new Map<string, ColumnType>([[key, own(columns, key) ?? "TEXT"]]);
       for (const [column, type] of Object.entries(columns)) if (column !== key) defs.set(column, type);
       writeTx(ctx.store, () => ctx.store.ensureTable(name, key, defs, new Map()));
     }

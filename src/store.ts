@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { BaseHashes } from "./reconcile.ts";
 import { logicalType } from "./schema.ts";
-import type { ColumnType, DbRow, DbValue, ViewRecord } from "./types.ts";
+import { type ColumnType, type DbRow, type DbValue, own, type ViewRecord } from "./types.ts";
 
 export const q = (id: string): string => `"${id.replaceAll('"', '""')}"`;
 
@@ -271,7 +271,7 @@ export class Store {
       const sets = others.map((name) => `${q(name)} = ?`).join(", ");
       const result = this.db
         .prepare(`UPDATE ${q(table)} SET ${sets} WHERE ${q(keyCol)} = ?`)
-        .run(...others.map((name) => row[name] ?? null), keyValue);
+        .run(...others.map((name) => own(row, name) ?? null), keyValue);
       changed = Number(result.changes);
     } else if (this.readRow(table, keyCol, keyValue)) {
       changed = 1;
@@ -280,7 +280,7 @@ export class Store {
       const placeholders = names.map(() => "?").join(", ");
       this.db
         .prepare(`INSERT INTO ${q(table)} (${names.map(q).join(", ")}) VALUES (${placeholders})`)
-        .run(...names.map((name) => row[name] ?? null));
+        .run(...names.map((name) => own(row, name) ?? null));
     }
   }
 

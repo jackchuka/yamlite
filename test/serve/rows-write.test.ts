@@ -138,3 +138,11 @@ test("a body that is not an object is refused", async () => {
   expect((await t.api(rowsUrl(), { method: "POST", body: [1] })).status).toBe(400);
   expect((await t.api(rowsUrl("a"), { method: "PATCH", body: { values: "x" } })).status).toBe(400);
 });
+
+test("a field named like a prototype member is saved like any other", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  const res = await t.api(rowsUrl("a"), { method: "PATCH", body: { values: { constructor: "z" }, base: {} } });
+  expect(res).toEqual({ status: 200, body: { ok: true } });
+  await waitFor(() => read(file(t!, "tasks/a.yaml")).includes("constructor: z"));
+  expect(yamlOf(t, "tasks/a.yaml")).toEqual({ title: "A", constructor: "z" });
+});

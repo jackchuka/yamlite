@@ -55,7 +55,9 @@ export function FilterBar({
   }, [prefixText, prefix, filters, onChange]);
   const add = () => {
     const needsValue = draft.op !== "null" && draft.op !== "notnull";
-    const value = needsValue ? parseFilterValue(draft.text, columns[draft.col] ?? "TEXT") : undefined;
+    const value = needsValue
+      ? parseFilterValue(draft.text, (Object.hasOwn(columns, draft.col) ? columns[draft.col] : undefined) ?? "TEXT")
+      : undefined;
     onChange({ filters: [...filters, { col: draft.col, op: draft.op, ...(needsValue ? { value } : {}) }], prefix });
     setOpen(false);
   };

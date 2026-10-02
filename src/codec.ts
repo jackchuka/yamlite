@@ -1,6 +1,6 @@
 import { canonical } from "./hash.ts";
 import { matchesType } from "./schema.ts";
-import type { ColumnType, DbRow, DbValue, Rec } from "./types.ts";
+import { type ColumnType, type DbRow, type DbValue, own, type Rec } from "./types.ts";
 
 function toSafe(value: bigint): number | bigint {
   const n = Number(value);
@@ -67,7 +67,7 @@ const sqliteRealText = (text: string): string => text.replace(/\.0(?=e|$)/, "").
 export function crossEqual(fileRecord: Rec, dbRecord: Rec, types: Map<string, ColumnType>): boolean {
   const keys = new Set([...Object.keys(fileRecord), ...Object.keys(dbRecord)]);
   for (const key of keys) {
-    if (!sameValue(fileRecord[key], dbRecord[key], types.get(key) ?? "TEXT")) return false;
+    if (!sameValue(own(fileRecord, key), own(dbRecord, key), types.get(key) ?? "TEXT")) return false;
   }
   return true;
 }
@@ -76,7 +76,7 @@ export function preferFileValues(dbRecord: Rec, fileRecord: Rec | null, types: M
   if (fileRecord === null) return dbRecord;
   const out: Rec = {};
   for (const [field, value] of Object.entries(dbRecord)) {
-    const keep = field in fileRecord && sameValue(fileRecord[field], value, types.get(field) ?? "TEXT");
+    const keep = Object.hasOwn(fileRecord, field) && sameValue(fileRecord[field], value, types.get(field) ?? "TEXT");
     out[field] = keep ? fileRecord[field] : value;
   }
   return out;

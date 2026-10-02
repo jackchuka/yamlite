@@ -1,7 +1,15 @@
 import type { SchemaChange } from "./indexes.ts";
 import { inferColumns } from "./schema.ts";
 import { q, type Store } from "./store.ts";
-import type { ColumnType, DbValue, ExpandSpec, Rec, TableSpec, ViewRecord } from "./types.ts";
+import {
+  type ColumnType,
+  type DbValue,
+  type ExpandSpec,
+  own,
+  type Rec,
+  type TableSpec,
+  type ViewRecord,
+} from "./types.ts";
 
 export interface DeclaredView {
   spec: ExpandSpec;
@@ -82,7 +90,7 @@ export function buildView(spec: ExpandSpec, parent: ViewParent, values: readonly
 
   const warnings: string[] = [];
   const fields = new Map<string, unknown[]>();
-  const declared = (field: string) => (Object.hasOwn(spec.columns, field) ? spec.columns[field] : undefined);
+  const declared = (field: string) => own(spec.columns, field);
   const hidden = (field: string) => identity.includes(field) || (field === "value" && others.length > 0);
   const inferred = inferColumns(maps);
   for (const [field, type] of Object.entries(spec.columns)) {
@@ -100,7 +108,7 @@ export function buildView(spec: ExpandSpec, parent: ViewParent, values: readonly
     select.push(`${cast(extract, declared(field))} AS ${q(field)}`);
     fields.set(
       field,
-      maps.map((m) => m[field]),
+      maps.map((m) => own(m, field)),
     );
   }
   if (others.length > 0) {
@@ -113,8 +121,8 @@ export function buildView(spec: ExpandSpec, parent: ViewParent, values: readonly
   const rows = `CASE WHEN json_valid(${source}) THEN CASE WHEN json_type(${source}) IN ('array', 'object') THEN ${source} END END`;
   const last = identity.length - 1;
   const inherited = parent.identity.map((c) => c.as);
-  let own = `${spec.field}_${position}`;
-  for (let n = 2; inherited.includes(own); n++) own = `${spec.field}_${position}_${n}`;
+  let ownPosition = `${spec.field}_${position}`;
+  for (let n = 2; inherited.includes(ownPosition); n++) ownPosition = `${spec.field}_${position}_${n}`;
   return {
     sql: `CREATE VIEW ${q(spec.name)} AS SELECT ${select.join(", ")} FROM ${q(parent.name)} p, json_each(${rows}) e`,
     columns,
@@ -123,7 +131,7 @@ export function buildView(spec: ExpandSpec, parent: ViewParent, values: readonly
       name: spec.name,
       identity: identity.map((c, i) => ({
         from: c,
-        as: i === last ? own : c,
+        as: i === last ? ownPosition : c,
         type: columns[c] as ColumnType,
       })),
     },
@@ -224,7 +232,7 @@ export function reconcileViews(store: Store, spec: TableSpec, apply: boolean): V
       walk(
         e.expand,
         def.next,
-        (f) => (Object.hasOwn(def.columns, f) ? def.columns[f] : undefined),
+        (f) => own(def.columns, f),
         (f) => def.fields.get(f) ?? [],
       );
     }

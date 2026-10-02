@@ -11,10 +11,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
-import type { RecordDetail, Row, TableMeta } from "@/lib/types";
+import type { ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
 import { ReflectBadge } from "./ReflectBadge";
 import { StaleDialog } from "./StaleDialog";
+
+// a field named like a prototype member ("constructor") has no declared type unless the table has that column
+const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
+  Object.hasOwn(table.columns, field) ? table.columns[field] : undefined;
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
@@ -161,7 +165,7 @@ export function RecordDrawer({
                   <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground">
                     {f}
                     <span className="font-mono text-[10px] font-medium">
-                      {reference ? `→ ${reference.table}` : (table.columns[f] ?? "new")}
+                      {reference ? `→ ${reference.table}` : (columnType(table, f) ?? "new")}
                     </span>
                   </div>
                   <FormField
@@ -169,7 +173,7 @@ export function RecordDrawer({
                     readOnly={!connected}
                     path={[f]}
                     value={draft[f]}
-                    type={table.columns[f]}
+                    type={columnType(table, f)}
                     reference={reference}
                     onChange={(next) => setDraft({ ...draft, [f]: next })}
                     onValidity={(p, ok) =>

@@ -4,7 +4,7 @@ import { encode, recordToRow } from "../../codec.ts";
 import { canonical } from "../../hash.ts";
 import { invalidKey } from "../../source/dir.ts";
 import { q } from "../../store.ts";
-import type { DbRow, TableSpec } from "../../types.ts";
+import { type DbRow, own, type TableSpec } from "../../types.ts";
 import { type ApiContext, displayPath, findView, tableSpec, type ViewTarget } from "../context.ts";
 import { HttpError, Reply } from "../http.ts";
 import { buildWhere, orderBy, parseRowQuery, type RowQuery } from "../query.ts";
@@ -124,7 +124,9 @@ export const rowRoutes: Routes = (router, ctx) => {
       const types = store.columns(spec.name);
       const current = toWire(row, types);
       // only the fields being saved must be unchanged; edits to other fields are kept
-      const stale = Object.keys(values).filter((f) => canonical(current[f] ?? null) !== canonical(base[f] ?? null));
+      const stale = Object.keys(values).filter(
+        (f) => canonical(own(current, f) ?? null) !== canonical(own(base, f) ?? null),
+      );
       if (stale.length > 0) {
         throw new HttpError(409, `changed since it was loaded: ${stale.join(", ")}`, { current, stale });
       }
