@@ -23,12 +23,6 @@ yamlite keeps a folder of YAML files and a local SQLite database in sync, in bot
   <img src="assets/demo.gif" width="800" alt="yamlite demo: editing the YAML file updates the SQLite row, and an SQL UPDATE rewrites the file with its comment intact">
 </p>
 
-<p align="center">
-  <img src="assets/ui.png" width="880" alt="yamlite serve: the web UI with a table of tasks and a record open in a form, saved back to tasks/release-notes.yaml">
-  <br>
-  <sub>The web UI: <code>yamlite serve</code></sub>
-</p>
-
 ## Why
 
 YAML is great for data humans write: readable, diffable, comment-friendly, git-native. It is terrible to query. SQLite is the opposite. yamlite lets you keep both without choosing:
@@ -169,6 +163,10 @@ npx @jackchuka/yamlite status ./notes
 ```bash
 yamlite serve notes --open
 ```
+
+<p align="center">
+  <img src="assets/ui.png" width="880" alt="yamlite serve: the web UI with a table of tasks and a record open in a form, saved back to tasks/release-notes.yaml">
+</p>
 
 `serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
 
