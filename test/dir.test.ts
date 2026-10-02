@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { DirSource, invalidKey } from "../src/source/dir.ts";
@@ -14,18 +14,84 @@ describe("DirSource.read", () => {
     expect(setup().src.read().exists).toBe(false);
   });
 
-  test("one record per file, keyed by file name", () => {
+  test("one record per file in every subfolder, keyed by relative path", () => {
     const { dir, src } = setup();
     write(join(dir, "a.yaml"), "title: A\nn: 1\n");
     write(join(dir, "b.yml"), "title: B\n");
     write(join(dir, ".hidden.yaml"), "x: 1\n");
     write(join(dir, "notes.txt"), "x");
     write(join(dir, "sub/c.yaml"), "x: 1\n");
+    write(join(dir, "sub/deep/d.yaml"), "x: 2\n");
+    write(join(dir, ".git/e.yaml"), "x: 3\n");
+    write(join(dir, "sub/.cache/f.yaml"), "x: 4\n");
+    write(join(dir, "node_modules/g.yaml"), "x: 5\n");
+    write(join(dir, "sub/node_modules/h.yaml"), "x: 6\n");
     const r = src.read();
     expect(r.exists).toBe(true);
-    expect(Object.fromEntries(r.records)).toEqual({ a: { title: "A", n: 1n }, b: { title: "B" } });
-    expect([...r.mtimes.keys()]).toEqual(["a", "b"]);
-    expect(r.stamps.size).toBe(2);
+    expect(Object.fromEntries(r.records)).toEqual({
+      a: { title: "A", n: 1n },
+      b: { title: "B" },
+      "sub/c": { x: 1n },
+      "sub/deep/d": { x: 2n },
+    });
+    expect([...r.mtimes.keys()]).toEqual(["a", "b", "sub/c", "sub/deep/d"]);
+    expect(r.stamps.size).toBe(4);
+  });
+
+  test("the key field may hold the full key or its last segment", () => {
+    const { dir, src } = setup();
+    write(join(dir, "auto/a.yaml"), "id: a\n");
+    write(join(dir, "auto/b.yaml"), "id: auto/b\n");
+    write(join(dir, "auto/c.yaml"), "id: zzz\n");
+    const r = src.read();
+    expect(r.records.get("auto/a")).toEqual({});
+    expect(r.records.get("auto/b")).toEqual({});
+    expect(r.warnings).toEqual([expect.stringMatching(/c\.yaml: .*file name wins/)]);
+  });
+
+  test("two files with the same nested key are both skipped", () => {
+    const { dir, src } = setup();
+    write(join(dir, "s/a.yaml"), "x: 1\n");
+    write(join(dir, "s/a.yml"), "x: 2\n");
+    write(join(dir, "s.yaml"), "x: 3\n");
+    const r = src.read();
+    expect(r.skip.has("s/a")).toBe(true);
+    expect(r.records.has("s/a")).toBe(false);
+    expect(r.records.get("s")).toEqual({ x: 3n });
+  });
+
+  test("symlinked folders are followed and loops are skipped with a warning", () => {
+    const { dir, src } = setup();
+    const outside = join(tmpRoot(), "shared");
+    write(join(outside, "s.yaml"), "x: 1\n");
+    write(join(dir, "a.yaml"), "x: 2\n");
+    symlinkSync(outside, join(dir, "linked"));
+    symlinkSync(dir, join(dir, "loop"));
+    const r = src.read();
+    expect([...r.records.keys()]).toEqual(["a", "linked/s"]);
+    expect(r.warnings).toEqual([expect.stringMatching(/loop: symlink loop; skipped/)]);
+  });
+
+  // a dangling link may be an unmounted folder of records, so it is never read as a deletion
+  test("a dangling symlink stops the table, whatever its name", () => {
+    for (const name of ["stale-link", "b.yaml"]) {
+      const { dir, src } = setup();
+      write(join(dir, "a.yaml"), "x: 1\n");
+      symlinkSync(join(dir, "missing"), join(dir, name));
+      expect(src.read().tableError).toMatch(/ENOENT/);
+    }
+  });
+
+  test.skipIf(process.getuid?.() === 0)("an unreadable subfolder stops the table", () => {
+    const { dir, src } = setup();
+    write(join(dir, "a.yaml"), "x: 1\n");
+    write(join(dir, "locked/b.yaml"), "x: 2\n");
+    chmodSync(join(dir, "locked"), 0o000);
+    try {
+      expect(src.read().tableError).toMatch(/EACCES/);
+    } finally {
+      chmodSync(join(dir, "locked"), 0o755);
+    }
   });
 
   test("drops the key field and warns when it differs from the file name", () => {

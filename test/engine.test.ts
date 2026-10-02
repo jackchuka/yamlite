@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, rmSync, symlinkSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test, vi } from "vitest";
@@ -37,6 +37,37 @@ const types = (db: string, table: string) =>
   sql(db, `SELECT name, type FROM pragma_table_info('${table}')`).map((r) => `${r.name}:${r.type}`);
 
 describe("dir mode", () => {
+  test.skipIf(process.getuid?.() === 0)(
+    "a subfolder that cannot be searched fails the table and keeps every row",
+    () => {
+      const t = setup();
+      write(join(t.path, "sub/inner/b.yaml"), "n: 1\n");
+      write(join(t.path, "a.yaml"), "n: 2\n");
+      expect(t.sync()).toMatchObject({ ok: true });
+      chmodSync(join(t.path, "sub"), 0o444);
+      try {
+        expect(t.sync()).toMatchObject({ ok: false, error: expect.stringMatching(/EACCES/) });
+        expect(sql(t.db, "SELECT id FROM tasks ORDER BY id")).toEqual([{ id: "a" }, { id: "sub/inner/b" }]);
+      } finally {
+        chmodSync(join(t.path, "sub"), 0o755);
+      }
+    },
+  );
+
+  test.skipIf(process.getuid?.() === 0)("an unreadable subfolder fails the table and keeps every row", () => {
+    const t = setup();
+    write(join(t.path, "a.yaml"), "n: 1\n");
+    write(join(t.path, "locked/b.yaml"), "n: 2\n");
+    expect(t.sync()).toMatchObject({ ok: true });
+    chmodSync(join(t.path, "locked"), 0o000);
+    try {
+      expect(t.sync()).toMatchObject({ ok: false, error: expect.stringMatching(/EACCES/) });
+      expect(sql(t.db, "SELECT id FROM tasks ORDER BY id")).toEqual([{ id: "a" }, { id: "locked/b" }]);
+    } finally {
+      chmodSync(join(t.path, "locked"), 0o755);
+    }
+  });
+
   test("file to db with inferred types, then a no-op", () => {
     const t = setup();
     write(t.file, "title: A\ndone: false\nn: 3\nr: 1.5\ntags: [x]\n");
