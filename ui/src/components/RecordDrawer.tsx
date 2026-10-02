@@ -10,11 +10,19 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
+import { cn } from "@/lib/utils";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
-import type { RecordDetail, Row, TableMeta } from "@/lib/types";
+import type { ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
 import { ReflectBadge } from "./ReflectBadge";
 import { StaleDialog } from "./StaleDialog";
+
+// a field named like a prototype member ("constructor") has no declared type unless the table has that column
+const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
+  Object.hasOwn(table.columns, field) ? table.columns[field] : undefined;
+
+// laid over the table, so opening a record does not reflow the page under it
+const panel = "absolute inset-y-0 right-0 z-20 w-[360px] border-l bg-background shadow-xl";
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
@@ -100,6 +108,35 @@ export function RecordDrawer({
     save.mutate(buildPatch(base, draft));
   };
 
+  const close = () =>
+    void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: undefined }) });
+
+  // Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
+  useEffect(() => {
+    if (dirty) return;
+    // dialogs, menus and toasts render in portals outside the drawer, and a row opens its own record
+    const keep = (target: EventTarget | null) =>
+      !(target instanceof Element) ||
+      target.closest(
+        'aside[aria-label="record"], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]',
+      ) !== null;
+    // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away
+    const onClick = (e: MouseEvent) => {
+      if (!keep(e.target)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Escape belongs to an open dialog, menu or popover first
+      const layer = '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]';
+      if (e.key === "Escape" && !document.querySelector(layer)) close();
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  });
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
@@ -113,21 +150,19 @@ export function RecordDrawer({
 
   if (error) {
     return (
-      <aside aria-label="record" className="w-[360px] shrink-0 border-l p-4 text-err">
+      <aside aria-label="record" className={cn(panel, "p-4 text-err")}>
         {error.message}
       </aside>
     );
   }
-  if (!draft || !base || !data) return <aside aria-label="record" className="w-[360px] shrink-0 border-l" />;
+  if (!draft || !base || !data) return <aside aria-label="record" className={panel} />;
 
   const fields = Object.keys(table.columns).filter((c) => c !== table.key);
   const extra = Object.keys(draft).filter((c) => c !== table.key && !fields.includes(c));
   const changes = changedFields(base, draft).length;
-  const close = () =>
-    void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: undefined }) });
 
   return (
-    <aside aria-label="record" className="flex w-[360px] shrink-0 flex-col border-l bg-background">
+    <aside aria-label="record" className={cn(panel, "flex flex-col")}>
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -161,7 +196,7 @@ export function RecordDrawer({
                   <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground">
                     {f}
                     <span className="font-mono text-[10px] font-medium">
-                      {reference ? `→ ${reference.table}` : (table.columns[f] ?? "new")}
+                      {reference ? `→ ${reference.table}` : (columnType(table, f) ?? "new")}
                     </span>
                   </div>
                   <FormField
@@ -169,7 +204,7 @@ export function RecordDrawer({
                     readOnly={!connected}
                     path={[f]}
                     value={draft[f]}
-                    type={table.columns[f]}
+                    type={columnType(table, f)}
                     reference={reference}
                     onChange={(next) => setDraft({ ...draft, [f]: next })}
                     onValidity={(p, ok) =>

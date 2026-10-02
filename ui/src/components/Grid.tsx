@@ -18,6 +18,7 @@ export function Grid({
   columns,
   rows,
   keyCol,
+  rowId,
   selectedKey,
   onSelect,
   onEndReached,
@@ -28,10 +29,12 @@ export function Grid({
   columns: GridColumn[];
   rows: Row[];
   keyCol: string;
+  rowId?: (row: Row) => string;
   selectedKey?: string;
-  onSelect?: (key: string) => void;
+  onSelect?: (key: string, row: Row) => void;
   onEndReached?: () => void;
-  flagged?: Set<string>;
+  // each flagged row's warning messages, by row key
+  flagged?: Map<string, string[]>;
   sort?: string;
   onSort?: (column: string) => void;
 }) {
@@ -78,7 +81,7 @@ export function Grid({
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
           {items.map((item) => {
             const row = rows[item.index] as Row;
-            const key = String(row[keyCol]);
+            const key = rowId ? rowId(row) : String(row[keyCol]);
             const selected = key === selectedKey;
             return (
               <div
@@ -91,7 +94,7 @@ export function Grid({
                   selected && "bg-tomato-soft hover:bg-tomato-soft",
                 )}
                 style={{ gridTemplateColumns: template, height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
-                onClick={() => onSelect?.(key)}
+                onClick={() => onSelect?.(key, row)}
               >
                 {columns.map((c) => (
                   <div
@@ -107,7 +110,7 @@ export function Grid({
                         <span
                           role="img"
                           aria-label="has warnings"
-                          title="has warnings"
+                          title={flagged.get(key)?.join("\n")}
                           className="mr-1.5 shrink-0 text-warn"
                         >
                           ⚠

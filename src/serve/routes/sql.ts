@@ -16,7 +16,7 @@ export const sqlRoutes: Routes = (router, ctx) => {
     if (!read && touchesInternal(sql)) {
       throw new HttpError(
         400,
-        "_yamlite_state and _yamlite_columns are yamlite's bookkeeping; writing them breaks sync",
+        "_yamlite_state, _yamlite_columns and _yamlite_views are yamlite's bookkeeping; writing them breaks sync",
       );
     }
     const started = performance.now();

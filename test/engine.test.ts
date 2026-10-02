@@ -23,6 +23,7 @@ function setup(mode: Mode = "dir") {
     references: [],
     persisted: false,
     exclude: [],
+    expand: [],
   };
   return {
     db,

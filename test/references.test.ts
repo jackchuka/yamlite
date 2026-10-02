@@ -80,4 +80,43 @@ describe("references", () => {
     await waitFor(() => seen.includes('assignee "1" not found in people.id (a)'));
     await y.close();
   });
+
+  const viewConfig =
+    "tables:\n  projects:\n    expand:\n      milestones:\n        expand:\n          tasks:\n            references: { owner: people }\n";
+
+  test("references on a view are checked and labelled by the view's identity", async () => {
+    const root = setup(viewConfig, {
+      "people.yaml": "- id: ann\n",
+      "projects/website.yaml": "milestones:\n  - tasks:\n      - owner: ann\n      - owner: carol\n",
+    });
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "projects")).toEqual([
+      'projects__milestones__tasks: owner "carol" not found in people.id (website/0/1)',
+    ]);
+    await y.close();
+  });
+
+  test("watch re-checks a table whose view references the changed table", async () => {
+    const root = setup(viewConfig, {
+      "people.yaml": "- id: ann\n",
+      "projects/website.yaml": "milestones:\n  - tasks:\n      - owner: carol\n",
+    });
+    const y = await open({ root });
+    const syncs: string[][] = [];
+    const w = y.watch(
+      { onSync: (r) => r.table === "projects" && syncs.push(r.warnings) },
+      { pollMs: 60_000, debounceMs: 50 },
+    );
+    await w.ready;
+    await waitFor(() =>
+      syncs.some((warnings) =>
+        warnings.includes('projects__milestones__tasks: owner "carol" not found in people.id (website/0/0)'),
+      ),
+    );
+    const before = syncs.length;
+    write(join(root, "people.yaml"), "- id: ann\n- id: carol\n");
+    await waitFor(() => syncs.slice(before).some((warnings) => warnings.length === 0));
+    await w.close();
+    await y.close();
+  });
 });

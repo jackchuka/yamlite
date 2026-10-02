@@ -218,6 +218,33 @@ select * from tasks, json_each(tags) where json_each.value = 'a'; -- filter on l
 
 A field must be **always a scalar or always a map/list** across records. Mixing them in a new field stops the table with an error listing which records are which; a record that doesn't fit an existing column is skipped with a warning. If a JSON column in the database holds something that isn't a map or list (for example after a manual `UPDATE`), that row is not written back to YAML until you fix it in SQL or edit the file. To migrate a field (say, `title` → `{en, ja}`), declare it in `yamlite.yaml` (`columns: { title: JSON }`) and sync: the column is converted, and every record not yet converted shows up as a warning until you change its file.
 
+### Expanded views
+
+Lists inside records — milestones of a project, tasks of a milestone — can be queried as rows. Declare them under `expand`, and every sync keeps a read-only SQLite view per list:
+
+```yaml
+tables:
+  projects:
+    expand:
+      milestones: # the JSON column → view projects__milestones
+        columns: { points: INTEGER } # optional: pin a type
+        expand:
+          tasks: # a field of each milestone → view projects__milestones__tasks
+            references: { owner: people }
+```
+
+```sql
+select p.title, m.title, t.owner
+from projects p
+join projects__milestones m on m.projects_id = p.id
+join projects__milestones__tasks t on t.projects_id = m.projects_id and t.milestones_idx = m.idx;
+```
+
+- A view's first columns name the row: the table's key (`projects_id`), the positions of the lists above it (`milestones_idx`; a repeated name gets `_2`, `_3`, … as in `children_idx_2`), and its own position — `idx` for a list, `key` for a map. Then one column per field of the items; items that aren't maps (`tags: [a, b]`) go to a `value` column.
+- Columns and types are inferred from the data on every sync; `columns` pins a type. Nothing is written back to `yamlite.yaml`.
+- Views are read-only: edit the YAML, or update the JSON column of the table. `serve` lists them under their table and opens the record a row comes from.
+- `references` on a view are checked like a table's, and `status` shows planned `+ view` / `− view` changes. A list that can't become a view (the field isn't a JSON column, or a view of that name was made by hand) is a warning.
+
 ## Configuration
 
 `<root>/yamlite.yaml` (or `yamlite.yml`) is required — it is the schema of record. Create it with `yamlite init`, commit it with your data, and edit it to change keys, types, indexes or to add tables that live elsewhere. yamlite keeps it current for you: when `sync` or `watch` meets a new table under the root, a new YAML key, or a column an app added to the database, it appends it to `yamlite.yaml` (existing lines, comments and order are left untouched) — so new schema shows up as a reviewable diff. `yamlite status` lists these as `+ column … (will be added to yamlite.yaml)` first. `yamlite watch` reloads it on save — and picks up tables added under the root — without a restart; a broken file is reported and the previous configuration stays in effect.
@@ -227,6 +254,7 @@ tables:
   people:
     key: slug # default: id
     columns: { age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
+    expand: { tags: {} } # lists as views — see Expanded views
     indexes:
       - [team, age] # composite index
       - { columns: slug, unique: true }
@@ -293,7 +321,7 @@ flowchart LR
   E -- changed in both --> C[newer wins<br/>loser → .yamlite/conflicts]
 ```
 
-For every record, yamlite compares the current file hash and row hash with the hashes recorded at the last sync (stored in the `_yamlite_state` table). Only the side that changed is propagated, and each side is re-read after writing, so yamlite never echoes its own writes back or loops. Apart from two bookkeeping tables (`_yamlite_state` and `_yamlite_columns`), nothing is added to your database — no triggers, no change log.
+For every record, yamlite compares the current file hash and row hash with the hashes recorded at the last sync (stored in the `_yamlite_state` table). Only the side that changed is propagated, and each side is re-read after writing, so yamlite never echoes its own writes back or loops. Apart from three bookkeeping tables (`_yamlite_state`, `_yamlite_columns` and `_yamlite_views`) and the views you declare under `expand`, nothing is added to your database — no triggers, no change log.
 
 ## Library
 

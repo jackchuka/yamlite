@@ -162,6 +162,7 @@ describe("dropping columns", () => {
       references: [],
       persisted: true,
       exclude: [],
+      expand: [],
     };
     syncTable(ctx, spec);
     sql(db, "ALTER TABLE tasks ADD COLUMN note TEXT");
@@ -187,5 +188,28 @@ describe("dropping columns", () => {
     expect((await y.sync())[0]?.schema).toMatchObject([{ op: "dropColumn", name: "old" }]);
     expect(columnsOf(t.db)).toEqual(["id", "title"]);
     await y.close();
+  });
+
+  test("a column that a view reads can still be dropped", async () => {
+    const t = setup(
+      "tables:\n  tasks:\n    columns:\n      title: TEXT\n      old: JSON\n    expand:\n      old: {}\n",
+      {
+        "tasks/a.yaml": "title: A\nold: [x]\n",
+      },
+    );
+    const y = await open({ root: t.root });
+    await y.sync();
+    expect(sql(t.db, "SELECT value FROM tasks__old")).toEqual([{ value: "x" }]);
+    write(join(t.root, "tasks/a.yaml"), "title: A\n");
+    await y.sync();
+    write(t.config, titleOnly);
+    await y.close();
+    const y2 = await open({ root: t.root });
+    const r = (await y2.sync())[0];
+    expect(r).toMatchObject({ ok: true });
+    expect(r?.schema.map((c) => c.op)).toEqual(["dropColumn", "dropView"]);
+    expect(columnsOf(t.db)).toEqual(["id", "title"]);
+    expect(sql(t.db, "SELECT name FROM sqlite_schema WHERE type = 'view'")).toEqual([]);
+    await y2.close();
   });
 });

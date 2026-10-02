@@ -4,10 +4,10 @@ import { encode, recordToRow } from "../../codec.ts";
 import { canonical } from "../../hash.ts";
 import { invalidKey } from "../../source/dir.ts";
 import { q } from "../../store.ts";
-import type { DbRow, TableSpec } from "../../types.ts";
-import { displayPath, tableSpec } from "../context.ts";
+import { type DbRow, own, type TableSpec } from "../../types.ts";
+import { type ApiContext, displayPath, findView, tableSpec, type ViewTarget } from "../context.ts";
 import { HttpError, Reply } from "../http.ts";
-import { buildWhere, orderBy, parseRowQuery } from "../query.ts";
+import { buildWhere, orderBy, parseRowQuery, type RowQuery } from "../query.ts";
 import { fromWire, toWire } from "../wire.ts";
 import { ensureColumns, fromWireRecord, objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
@@ -41,8 +41,26 @@ function noKeyIn(spec: TableSpec, values: Record<string, unknown>, hint: string)
   if (spec.key in values) throw new HttpError(400, `"${spec.key}" is the key; ${hint}`, { field: spec.key });
 }
 
+function viewRows(ctx: ApiContext, view: ViewTarget, rq: RowQuery) {
+  if (!view.record) return { rows: [], total: 0 };
+  const { identity } = view.record;
+  const types = new Map(Object.entries(view.record.columns));
+  // prefix searches the table's key, the first identity column
+  const { where, params: values } = buildWhere(rq, types, identity[0] as string);
+  const total = Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(view.name)} ${where}`, ...values)[0]?.n ?? 0);
+  const found = ctx.store.query(
+    `SELECT * FROM ${q(view.name)} ${where} ${orderBy(rq, types, identity)} LIMIT ? OFFSET ?`,
+    ...values,
+    rq.limit,
+    rq.offset,
+  );
+  return { rows: found.map((r) => toWire(r, types)), total };
+}
+
 export const rowRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/tables/:table/rows", ({ params, query }) => {
+    const view = findView(ctx, params.table as string);
+    if (view) return viewRows(ctx, view, parseRowQuery(query));
     const spec = tableSpec(ctx, params.table as string);
     if (!ctx.store.tableExists(spec.name)) return { rows: [], total: 0 };
     const types = ctx.store.columns(spec.name);
@@ -50,7 +68,7 @@ export const rowRoutes: Routes = (router, ctx) => {
     const { where, params: values } = buildWhere(rq, types, spec.key);
     const total = Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(spec.name)} ${where}`, ...values)[0]?.n ?? 0);
     const found = ctx.store.query(
-      `SELECT * FROM ${q(spec.name)} ${where} ${orderBy(rq, types, spec.key)} LIMIT ? OFFSET ?`,
+      `SELECT * FROM ${q(spec.name)} ${where} ${orderBy(rq, types, [spec.key])} LIMIT ? OFFSET ?`,
       ...values,
       rq.limit,
       rq.offset,
@@ -106,7 +124,9 @@ export const rowRoutes: Routes = (router, ctx) => {
       const types = store.columns(spec.name);
       const current = toWire(row, types);
       // only the fields being saved must be unchanged; edits to other fields are kept
-      const stale = Object.keys(values).filter((f) => canonical(current[f] ?? null) !== canonical(base[f] ?? null));
+      const stale = Object.keys(values).filter(
+        (f) => canonical(own(current, f) ?? null) !== canonical(own(base, f) ?? null),
+      );
       if (stale.length > 0) {
         throw new HttpError(409, `changed since it was loaded: ${stale.join(", ")}`, { current, stale });
       }

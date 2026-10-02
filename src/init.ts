@@ -2,7 +2,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Document, type YAMLSeq } from "yaml";
-import { configPath, resolveConfig } from "./config.ts";
+import { configPath, expandToRaw, referenceToRaw, resolveConfig } from "./config.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
 import { checkShapes, inferColumns, logicalType } from "./schema.ts";
@@ -151,10 +151,9 @@ export function generateConfig(opts: InitOptions): string {
       const columns = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);
       if (spec.references.length > 0) {
-        entry.references = Object.fromEntries(
-          spec.references.map((r) => [r.column, r.target ? `${r.table}.${r.target}` : r.table]),
-        );
+        entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
       }
+      if (spec.expand.length > 0) entry.expand = expandToRaw(spec.expand);
       const node = doc.createNode(entry);
       const found = dbIndexes(db, spec.name);
       const declared: FoundIndex[] = found.length > 0 ? found : spec.indexes.map((s) => ({ spec: s }));

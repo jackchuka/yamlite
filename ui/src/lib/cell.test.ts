@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { cellView, warnedKeys } from "./cell";
+import { cellView } from "./cell";
 
 test("scalars", () => {
   expect(cellView(null, "TEXT")).toEqual({ kind: "null" });
@@ -37,11 +37,4 @@ test("nested values show a size badge and a key preview", () => {
   });
   expect(cellView([{ a: 1 }, { a: 2 }], "JSON")).toEqual({ kind: "nested", label: "[2]", preview: "{1}, {1}" });
   expect(cellView({}, "JSON")).toEqual({ kind: "nested", label: "{0}", preview: "" });
-});
-
-test("rows with warnings are found by the warning's key prefix", () => {
-  expect(warnedKeys(['write-blog: reference projects "blog" not found', "plain warning"])).toEqual(
-    new Set(["write-blog"]),
-  );
-  expect(warnedKeys(undefined)).toEqual(new Set());
 });

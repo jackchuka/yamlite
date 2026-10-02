@@ -22,16 +22,19 @@ export interface Schema {
 }
 
 // Drops a column whose declaration was removed, together with the managed indexes that use it.
-// Returns the dropped index names; throws when SQLite refuses.
-function dropColumn(store: Store, table: string, column: string): string[] {
+// Returns dropped index and view names; throws when SQLite refuses.
+function dropColumn(store: Store, table: string, column: string): { indexes: string[]; views: string[] } {
   const uses = new RegExp(`(^|[^\\w])"?${column.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"?([^\\w]|$)`);
   const indexes = store
     .query("SELECT name, sql FROM sqlite_schema WHERE type = 'index' AND tbl_name = ? AND name GLOB 'yamlite_*'", table)
     .filter((row) => uses.test(String(row.sql).replace(/^[^(]*\(/, "")))
     .map((row) => String(row.name));
   for (const name of indexes) store.exec(`DROP INDEX ${q(name)}`);
+  // SQLite refuses to drop a column a view reads; reconcileViews recreates the views later in the same sync
+  const views = store.registeredViews(table).map((v) => v.name);
+  for (const view of views) store.exec(`DROP VIEW IF EXISTS ${q(view)}`);
   store.exec(`ALTER TABLE ${q(table)} DROP COLUMN ${q(column)}`);
-  return indexes;
+  return { indexes, views };
 }
 
 function assertSyncable(store: Store, spec: TableSpec, files: SourceRead, base: Map<string, BaseHashes>): void {
@@ -93,7 +96,8 @@ export function migrateSchema(
       try {
         const dropped = dropColumn(store, spec.name, column);
         changes.push({ op: "dropColumn", name: column, definition: column });
-        for (const name of dropped) changes.push({ op: "dropIndex", name, definition: name });
+        for (const name of dropped.views) changes.push({ op: "dropView", name, definition: name });
+        for (const name of dropped.indexes) changes.push({ op: "dropIndex", name, definition: name });
       } catch (e) {
         warnings.push(`could not drop column "${column}": ${e instanceof Error ? e.message : String(e)}`);
         continue;

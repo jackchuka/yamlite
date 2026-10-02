@@ -178,6 +178,37 @@ describe("index changes", () => {
   });
 });
 
+describe("view changes", () => {
+  const schema = [
+    { op: "createView" as const, name: "projects__milestones", definition: "projects__milestones" },
+    { op: "dropView" as const, name: "projects__tags", definition: "projects__tags" },
+  ];
+
+  test("status lists each view change", () => {
+    const out = report([result({ records: 1, schema })], { mode: "status", root, paint: plain });
+    expect(out.split("\n").slice(2)).toEqual([
+      `  ● tasks   ${"2 view changes".padEnd(38)}1 record`,
+      "            + view projects__milestones",
+      "            − view projects__tags",
+      "",
+      "  2 view changes pending · run yamlite sync to apply",
+    ]);
+  });
+
+  test("watch prints one line per view change", () => {
+    const lines = watchEvents(result({ schema }), {
+      root,
+      now: new Date(2026, 9, 1, 12, 3, 41),
+      paint: plain,
+      quiet: false,
+    });
+    expect(lines).toEqual([
+      `  12:03:41  tasks  ${"+ view".padEnd(10)}  projects__milestones`,
+      `  12:03:41  tasks  ${"− view".padEnd(10)}  projects__tags`,
+    ]);
+  });
+});
+
 describe("column type changes", () => {
   const schema = [
     { op: "alterColumn" as const, name: "title", definition: "TEXT → JSON" },

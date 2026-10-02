@@ -46,6 +46,9 @@ test("yamlite's bookkeeping tables can be read but not written", async () => {
   const res = await run(t, "delete from _yamlite_state");
   expect(res.status).toBe(400);
   expect(res.body.error).toMatch(/bookkeeping/);
+  const views = await run(t, "delete from _yamlite_views");
+  expect(views.status).toBe(400);
+  expect(views.body.error).toMatch(/_yamlite_views/);
 });
 
 test("SQL errors are 400 with SQLite's message", async () => {

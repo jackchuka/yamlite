@@ -28,10 +28,12 @@ const changeCount = (r: TableResult) => r.toDb + r.toFile + r.deletedDb + r.dele
 
 function schemaCounts(schema: SchemaChange[]): string[] {
   const columns = schema.filter((c) => c.op === "alterColumn" || c.op === "dropColumn").length;
-  const indexes = schema.length - columns;
+  const views = schema.filter((c) => c.op === "createView" || c.op === "dropView").length;
+  const indexes = schema.length - columns - views;
   return [
     columns > 0 ? plural(columns, "column change") : "",
     indexes > 0 ? plural(indexes, "index change") : "",
+    views > 0 ? plural(views, "view change") : "",
   ].filter(Boolean);
 }
 
@@ -42,6 +44,8 @@ function schemaDetail(c: SchemaChange, paint: Painter, mode: "status" | "sync"):
     const note = mode === "status" ? "table will be rebuilt" : "table rebuilt";
     return `${paint("cyan", "↻")} column ${c.name} ${c.definition} ${paint("dim", `(${note})`)}`;
   }
+  if (c.op === "createView") return `${paint("green", "+")} view ${c.definition}`;
+  if (c.op === "dropView") return `${paint("red", "−")} view ${c.definition}`;
   return c.op === "createIndex"
     ? `${paint("green", "+")} index ${c.definition}`
     : `${paint("red", "−")} index ${c.definition}`;
@@ -176,6 +180,8 @@ export function watchEvents(r: TableResult, { root, now, paint, quiet, nameWidth
       if (c.op === "alterColumn") lines.push(line("cyan", "↻ column", `${c.name} ${c.definition}`));
       else if (c.op === "dropColumn") lines.push(line("red", "− column", c.name));
       else if (c.op === "createIndex") lines.push(line("green", "+ index", c.definition));
+      else if (c.op === "createView") lines.push(line("green", "+ view", c.definition));
+      else if (c.op === "dropView") lines.push(line("red", "− view", c.definition));
       else lines.push(line("red", "− index", c.definition));
     }
     for (const c of r.registered) lines.push(line("green", "+ column", `${c.column} ${c.type}`));

@@ -10,6 +10,7 @@ import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
 import type { ColumnType, TableSpec } from "./types.ts";
+import { reconcileViews } from "./views.ts";
 
 export type { Registered } from "./plan.ts";
 
@@ -135,6 +136,9 @@ export function syncTable(ctx: EngineContext, spec: TableSpec, opts: SyncOptions
       const indexes = reconcileIndexes(store, spec.name, spec.indexes, new Set(p.types.keys()), false);
       res.schema.push(...indexes.changes);
       res.warnings.push(...indexes.warnings);
+      const views = reconcileViews(store, spec, false);
+      res.schema.push(...views.changes);
+      res.warnings.push(...views.warnings);
       store.rollback();
       if (p.blocked) res.warnings.push(p.blocked);
       res.decisions = p.decisions;
@@ -156,6 +160,9 @@ export function syncTable(ctx: EngineContext, spec: TableSpec, opts: SyncOptions
       res.schema.push(...indexes.changes);
       res.warnings.push(...indexes.warnings);
     }
+    const views = reconcileViews(store, spec, true);
+    res.schema.push(...views.changes);
+    res.warnings.push(...views.warnings);
     store.commit();
 
     applyToFiles(store, spec, source, files, p, fileOps, res);

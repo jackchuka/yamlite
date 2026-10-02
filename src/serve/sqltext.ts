@@ -49,7 +49,7 @@ export const firstKeyword = (sql: string): string => /^\s*([A-Za-z]+)/.exec(stri
 const READS = new Set(["SELECT", "EXPLAIN", "VALUES"]);
 export const isRead = (sql: string): boolean => READS.has(firstKeyword(sql));
 
-export const touchesInternal = (sql: string): boolean => /_yamlite_(state|columns)\b/i.test(stripSql(sql));
+export const touchesInternal = (sql: string): boolean => /_yamlite_(state|columns|views)\b/i.test(stripSql(sql));
 
 const CREATE_TABLE =
   /^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:(?:main|"main")\s*\.\s*)?(?:"((?:[^"]|"")+)"|`([^`]+)`|\[([^\]]+)\]|([A-Za-z_][\w$]*))/i;

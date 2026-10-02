@@ -31,6 +31,7 @@ test("discovers tables by convention", () => {
     references: [],
     persisted: true,
     exclude: [],
+    expand: [],
   });
   expect(cfg.db).toBe(join(root, ".yamlite", "db.sqlite"));
   expect(cfg.stateDir).toBe(join(root, ".yamlite"));
@@ -205,4 +206,58 @@ test("a directory table excludes the paths of tables nested inside it", () => {
   expect(byName.get("tasks")).toEqual([join(root, "tasks/archive"), join(root, "tasks/people.yaml")]);
   expect(byName.get("archive")).toEqual([]);
   expect(byName.get("people")).toEqual([]);
+});
+
+test("expand declares views over JSON columns, nested", () => {
+  const root = dataRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  projects:\n    expand:\n      milestones:\n        columns: { points: integer }\n        expand:\n          tasks:\n            references: { owner: people.slug }\n      tags: ~\n",
+  );
+  const t = resolveConfig({ root }).tables.find((x) => x.name === "projects");
+  expect(t?.expand).toEqual([
+    {
+      field: "milestones",
+      name: "projects__milestones",
+      columns: { points: "INTEGER" },
+      references: [],
+      expand: [
+        {
+          field: "tasks",
+          name: "projects__milestones__tasks",
+          columns: {},
+          references: [{ column: "owner", table: "people", target: "slug" }],
+          expand: [],
+        },
+      ],
+    },
+    { field: "tags", name: "projects__tags", columns: {}, references: [], expand: [] },
+  ]);
+});
+
+test.each([
+  ["      milestones: { colums: {} }\n", /expand\.milestones has an unknown key "colums"/],
+  ["      milestones: { columns: { a: nope } }\n", /expand\.milestones: unknown column type nope for "a"/],
+  [
+    "      milestones: { references: { a: x.y.z } }\n",
+    /expand\.milestones\.references\.a must be "table" or "table\.column"/,
+  ],
+  ["      milestones: [a]\n", /expand\.milestones must be a map of columns, references and expand/],
+])("rejects a malformed expand: %s", (body, error) => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), `tables:\n  projects:\n    expand:\n${body}`);
+  expect(() => resolveConfig({ root })).toThrow(error);
+});
+
+test("a view name must not clash with a table or another view", () => {
+  const root = dataRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  projects:\n    expand: { milestones: {} }\n  projects__milestones: {}\n",
+  );
+  expect(() => resolveConfig({ root })).toThrow(
+    /view name "projects__milestones" is already used by table "projects__milestones"/,
+  );
+  write(join(root, "yamlite.yaml"), "tables:\n  a:\n    expand: { b__c: {} }\n  a__b:\n    expand: { c: {} }\n");
+  expect(() => resolveConfig({ root })).toThrow(/view name "a__b__c" is already used by a view of table "a"/);
 });

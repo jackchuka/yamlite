@@ -1,6 +1,7 @@
 import { describeIndex, indexName, MANAGED_PREFIX } from "../../indexes.ts";
 import { checkReferences } from "../../references.ts";
-import { displayPath, tableSpec } from "../context.ts";
+import { displayPath, findView, tableSpec } from "../context.ts";
+import { declaredViews, reconcileViews } from "../../views.ts";
 import type { Routes } from "./index.ts";
 
 export const schemaRoutes: Routes = (router, ctx) => {
@@ -10,6 +11,8 @@ export const schemaRoutes: Routes = (router, ctx) => {
     const { store } = ctx;
     const inDb = store.tableExists(spec.name);
     const problems = checkReferences(store, spec, ctx.y.tables);
+    // a dry run: only the warnings, which say why a view is not there
+    const viewWarnings = inDb ? reconcileViews(store, spec, false).warnings : [];
     const built = inDb ? store.managedIndexes(spec.name) : new Set<string>();
     const others = inDb
       ? store
@@ -49,6 +52,21 @@ export const schemaRoutes: Routes = (router, ctx) => {
         };
       }),
       otherIndexes: others,
+      views: declaredViews(spec).map(({ spec: view, parent, depth }) => {
+        const record = findView(ctx, view.name)?.record;
+        return {
+          name: view.name,
+          parent,
+          depth,
+          columns: record?.columns ?? {},
+          identity: record?.identity ?? [],
+          inDb: record !== undefined,
+          problems: [
+            ...viewWarnings.filter((w) => w.startsWith(`view ${view.name} `) || w.startsWith(`view ${view.name}:`)),
+            ...problems.filter((p) => p.startsWith(`${view.name}: `)),
+          ],
+        };
+      }),
     };
   });
 };

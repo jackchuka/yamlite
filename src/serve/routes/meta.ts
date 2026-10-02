@@ -1,5 +1,6 @@
 import { q } from "../../store.ts";
-import { displayPath } from "../context.ts";
+import { displayPath, findView } from "../context.ts";
+import { declaredViews } from "../../views.ts";
 import type { Routes } from "./index.ts";
 
 export const metaRoutes: Routes = (router, ctx) => {
@@ -25,5 +26,27 @@ export const metaRoutes: Routes = (router, ctx) => {
         inDb,
       };
     }),
+    views: ctx.y.tables.flatMap((t) =>
+      declaredViews(t).map(({ spec, parent, depth }) => {
+        const record = findView(ctx, spec.name)?.record;
+        let count = 0;
+        try {
+          if (record) count = Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(spec.name)}`)[0]?.n ?? 0);
+        } catch {
+          // a view whose table changed under it counts as empty until the next sync rebuilds it
+        }
+        return {
+          name: spec.name,
+          table: t.name,
+          parent,
+          depth,
+          columns: record?.columns ?? {},
+          identity: record?.identity ?? [],
+          declared: spec.columns,
+          count,
+          inDb: record !== undefined,
+        };
+      }),
+    ),
   }));
 };

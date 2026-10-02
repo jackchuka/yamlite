@@ -1,6 +1,6 @@
 import { type Document, isMap, isNode, isScalar, parseDocument, type YAMLMap } from "yaml";
 import { canonical } from "../hash.ts";
-import type { Rec } from "../types.ts";
+import { own, type Rec } from "../types.ts";
 
 export const PARSE_OPTIONS = { intAsBigInt: true } as const;
 export const STRINGIFY_OPTIONS = { flowCollectionPadding: false } as const;
@@ -25,7 +25,7 @@ export function updateMap(doc: Document, map: YAMLMap, record: Rec, keep: (field
   for (const pair of map.items.slice()) {
     const field = String(isScalar(pair.key) ? pair.key.value : pair.key);
     if (keep(field)) continue;
-    const next = record[field];
+    const next = own(record, field);
     if (next !== null && next !== undefined) continue;
     const explicitNull = pair.value === null || (isScalar(pair.value) && pair.value.value === null);
     if (!explicitNull) map.delete(field);

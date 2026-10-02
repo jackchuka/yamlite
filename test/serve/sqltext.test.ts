@@ -24,6 +24,7 @@ test("the first keyword skips comments", () => {
 test("internal tables are found in code, not in strings", () => {
   expect(touchesInternal('delete from "_yamlite_state"')).toBe(true);
   expect(touchesInternal("update _YAMLITE_COLUMNS set col = 'x'")).toBe(true);
+  expect(touchesInternal("delete from _yamlite_views")).toBe(true);
   expect(touchesInternal("select * from t where x = '_yamlite_state'")).toBe(false);
 });
 

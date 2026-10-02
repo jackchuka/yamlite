@@ -179,7 +179,8 @@ export function SyncView() {
   const { data } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts });
   useEffect(() => store.markConflictsSeen(), [store]);
   const conflicts = data?.conflicts ?? [];
-  const warningList = warningLinks(warnings);
+  const { data: meta } = useMeta();
+  const warningList = warningLinks(warnings, new Set(meta?.views.map((v) => v.name)));
   const lines = activityLines(activity);
   return (
     <section className="flex min-w-0 flex-1 flex-col">
@@ -210,10 +211,16 @@ export function SyncView() {
                 <span className="font-semibold">
                   {w.table}
                   {w.key && ` / ${w.key}`}
+                  {w.view && ` / ${w.view}`}
                 </span>
                 <span className="flex-1 text-muted-foreground">{w.text}</span>
                 {w.key && (
                   <Link to="/t/$table" params={{ table: w.table }} search={{ key: w.key }} className="text-tomato">
+                    開く
+                  </Link>
+                )}
+                {w.view && (
+                  <Link to="/t/$table" params={{ table: w.view }} className="text-tomato">
                     開く
                   </Link>
                 )}

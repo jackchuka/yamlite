@@ -3,7 +3,7 @@ import { q, type Store } from "./store.ts";
 import type { IndexSpec } from "./types.ts";
 
 export interface SchemaChange {
-  op: "createIndex" | "dropIndex" | "alterColumn" | "dropColumn";
+  op: "createIndex" | "dropIndex" | "alterColumn" | "dropColumn" | "createView" | "dropView";
   name: string;
   definition: string;
 }
