@@ -1,8 +1,30 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { FormField } from "./FormField";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    params,
+    search,
+    children,
+    ...rest
+  }: {
+    params: { table: string };
+    search: unknown;
+    children: ReactNode;
+  }) => (
+    <a href="#" data-table={params.table} data-search={JSON.stringify(search)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+vi.mock("@/lib/providers", () => ({ useMeta: () => ({ data: { tables: [{ name: "people", key: "id" }] } }) }));
+vi.mock("@/lib/api", async (orig) => ({
+  ...(await orig<typeof import("@/lib/api")>()),
+  api: { rows: vi.fn(() => new Promise(() => {})) },
+}));
 
 const wrap = (ui: React.ReactNode) => <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>;
 
@@ -91,4 +113,17 @@ test("choosing JSON keeps a JSON editor even though the value is []", () => {
   const el = screen.getByLabelText("j");
   expect(el.tagName).not.toBe("INPUT");
   expect(el.textContent).toContain("[]");
+});
+
+test("a reference field links to the record it names once it has a value", () => {
+  const reference = { column: "owner", table: "people" };
+  const { rerender } = render(
+    wrap(<FormField path={["owner"]} value={null} reference={reference} onChange={() => {}} />),
+  );
+  expect(screen.queryByRole("link")).toBeNull();
+  rerender(wrap(<FormField path={["owner"]} value="ann" reference={reference} onChange={() => {}} />));
+  expect(screen.getByRole("link", { name: "open people ann" }).dataset).toMatchObject({
+    table: "people",
+    search: JSON.stringify({ key: "ann" }),
+  });
 });

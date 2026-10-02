@@ -3,7 +3,7 @@ import { cellView } from "@/lib/cell";
 import type { ColumnType } from "@/lib/types";
 import { JsonPopover } from "./JsonPopover";
 
-const chip = "inline-block rounded-full bg-chip px-[7px] text-[11.5px] text-chip-foreground mr-[3px]";
+export const chip = "inline-block rounded-full bg-chip px-[7px] text-[11.5px] text-chip-foreground mr-[3px]";
 
 export function Cell({
   value,

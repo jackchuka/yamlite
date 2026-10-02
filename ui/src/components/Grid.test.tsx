@@ -1,6 +1,25 @@
-import { fireEvent, render } from "@testing-library/react";
-import { beforeAll, expect, test } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { beforeAll, expect, test, vi } from "vitest";
 import { Grid } from "./Grid";
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    params,
+    search,
+    children,
+    ...rest
+  }: {
+    params: { table: string };
+    search: unknown;
+    children: ReactNode;
+  }) => (
+    <a href="#" data-table={params.table} data-search={JSON.stringify(search)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+vi.mock("@/lib/providers", () => ({ useMeta: () => ({ data: { tables: [{ name: "people", key: "id" }] } }) }));
 
 // jsdom has no layout; give the scroll container a size so the virtualizer renders rows
 beforeAll(() => {
@@ -51,4 +70,43 @@ test("rowId names the rows and onSelect receives the row", () => {
   );
   fireEvent.click(container.querySelector('[data-key="website/1"]') as HTMLElement);
   expect(picked).toEqual([rows[1]]);
+});
+
+test("a reference cell links each value to its record without selecting the row", () => {
+  const onSelect = vi.fn();
+  render(
+    <Grid
+      columns={[
+        { name: "id", type: "TEXT" },
+        { name: "owner", type: "TEXT", reference: { column: "owner", table: "people" } },
+        { name: "reviewers", type: "JSON", reference: { column: "reviewers", table: "people" } },
+        { name: "email", type: "TEXT", reference: { column: "email", table: "people", target: "email" } },
+      ]}
+      rows={[{ id: "a", owner: "ann", reviewers: ["bob", "cy"], email: "a@x", missing: null }]}
+      keyCol="id"
+      onSelect={onSelect}
+    />,
+  );
+  const ann = screen.getByRole("link", { name: "open people ann" });
+  expect(ann.dataset).toMatchObject({ table: "people", search: JSON.stringify({ key: "ann" }) });
+  expect(screen.getByRole("link", { name: "open people cy" }).dataset.search).toBe(JSON.stringify({ key: "cy" }));
+  expect(screen.getByRole("link", { name: "open people a@x" }).dataset.search).toBe(
+    JSON.stringify({ filter: [{ col: "email", op: "eq", value: "a@x" }] }),
+  );
+  fireEvent.click(ann);
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+test("an empty reference cell is not a link", () => {
+  render(
+    <Grid
+      columns={[
+        { name: "id", type: "TEXT" },
+        { name: "owner", type: "TEXT", reference: { column: "owner", table: "people" } },
+      ]}
+      rows={[{ id: "a", owner: null }]}
+      keyCol="id"
+    />,
+  );
+  expect(screen.queryByRole("link")).toBeNull();
 });

@@ -1,7 +1,7 @@
 import { json } from "@codemirror/lang-json";
 import { useQuery } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
-import { X } from "lucide-react";
+import { ArrowUpRight, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { emptyValueFor, fieldKind } from "@/lib/form";
 import type { ColumnType, Reference } from "@/lib/types";
+import { RefLink } from "./RefLink";
 
 export interface FieldProps {
   path: Array<string | number>;
@@ -130,14 +131,22 @@ function RefField({ path, value, reference, onChange }: FieldProps) {
     enabled: target !== "",
   });
   const listId = `ref-${label(path)}`;
+  const text = value == null ? "" : String(value);
   return (
     <>
-      <Input
-        aria-label={label(path)}
-        list={listId}
-        value={value == null ? "" : String(value)}
-        onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
-      />
+      <div className="flex items-center gap-1.5">
+        <Input
+          aria-label={label(path)}
+          list={listId}
+          value={text}
+          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+        />
+        {reference && text !== "" && (
+          <RefLink reference={reference} value={text} className="shrink-0 text-muted-foreground hover:text-foreground">
+            <ArrowUpRight className="size-4" />
+          </RefLink>
+        )}
+      </div>
       <datalist id={listId}>
         {data?.rows.map((r) => {
           const key = String(r[reference?.target ?? "id"] ?? Object.values(r)[0]);

@@ -1,15 +1,37 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useEffect, useRef } from "react";
-import type { ColumnType, Row } from "@/lib/types";
+import { cellView } from "@/lib/cell";
+import type { ColumnType, Reference, Row } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Cell } from "./Cell";
+import { Cell, chip } from "./Cell";
+import { RefLink } from "./RefLink";
 
 export interface GridColumn {
   name: string;
   type: ColumnType;
   // "→ projects" for reference columns
   note?: string;
+  reference?: Reference;
+}
+
+function GridCell({ column, row, rowKey }: { column: GridColumn; row: Row; rowKey: string }) {
+  const value = row[column.name];
+  const v = cellView(value, column.type);
+  const { reference } = column;
+  if (reference && (v.kind === "text" || v.kind === "number"))
+    return <RefLink reference={reference} value={String(value)} />;
+  if (reference && v.kind === "chips") {
+    return (
+      <span>
+        {v.items.map((item, i) => (
+          <RefLink key={`${i}-${item}`} reference={reference} value={item} className={`${chip} hover:underline`} />
+        ))}
+        {v.more > 0 && <span className={chip}>+{v.more}</span>}
+      </span>
+    );
+  }
+  return <Cell value={value} type={column.type} column={column.name} rowKey={rowKey} />;
 }
 
 const ROW_HEIGHT = 34;
@@ -119,7 +141,7 @@ export function Grid({
                         <span aria-hidden className="mr-1.5 w-[1em] shrink-0" />
                       ))}
                     <span className="truncate">
-                      <Cell value={row[c.name]} type={c.type} column={c.name} rowKey={key} />
+                      <GridCell column={c} row={row} rowKey={key} />
                     </span>
                   </div>
                 ))}

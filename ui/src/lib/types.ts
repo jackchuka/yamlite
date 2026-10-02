@@ -25,6 +25,7 @@ export interface ViewMeta {
   columns: Record<string, ColumnType>;
   identity: string[];
   declared: Record<string, ColumnType>;
+  references: Reference[];
   count: number;
   inDb: boolean;
 }
