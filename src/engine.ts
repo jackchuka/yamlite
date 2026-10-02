@@ -191,7 +191,7 @@ function applyToDb(
     const dbRecord = row ? rowToRecord(row, p.types, p.omit) : null;
     if (decision.conflict) {
       const loser = decision.conflict === "file" ? dbRecord : fileRecord;
-      const savedTo = saveConflict(ctx.stateDir, spec.name, key, loser);
+      const savedTo = saveConflict(ctx.stateDir, spec.name, key, loser, decision.conflict);
       res.conflicts.push({ table: spec.name, key, winner: decision.conflict, savedTo });
     }
     if (decision.action === "toDb") {

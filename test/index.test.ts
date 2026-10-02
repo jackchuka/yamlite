@@ -67,7 +67,7 @@ test("a sync conflict keeps the file when it changed after the database", async 
   expect(synced?.conflicts).toMatchObject([{ key: "a", winner: "file" }]);
   expect(sql(dbOf(root), "SELECT title FROM tasks")).toEqual([{ title: "FILE" }]);
   expect(read(file)).toBe("title: FILE\n");
-  expect(read(synced?.conflicts[0]?.savedTo as string)).toBe("title: DB\n");
+  expect(read(synced?.conflicts[0]?.savedTo as string)).toMatch(/\ntitle: DB\n$/);
 });
 
 test("a sync conflict keeps the database when it changed after the file", async () => {
@@ -75,7 +75,7 @@ test("a sync conflict keeps the database when it changed after the file", async 
   expect(planned?.conflicts).toMatchObject([{ key: "a", winner: "db" }]);
   expect(synced?.conflicts).toMatchObject([{ key: "a", winner: "db" }]);
   expect(read(file)).toBe("title: DB\n");
-  expect(read(synced?.conflicts[0]?.savedTo as string)).toBe("title: FILE\n");
+  expect(read(synced?.conflicts[0]?.savedTo as string)).toMatch(/\ntitle: FILE\n$/);
 });
 
 test("mass deletion is refused unless forced", async () => {

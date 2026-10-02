@@ -91,7 +91,7 @@ describe("dir mode", () => {
     expect(r.conflicts).toHaveLength(1);
     expect(r.conflicts[0]).toMatchObject({ table: "tasks", key: "a", winner: "db" });
     expect(read(t.file)).toBe("title: DB\n");
-    expect(read(r.conflicts[0]?.savedTo as string)).toBe("title: FILE\n");
+    expect(read(r.conflicts[0]?.savedTo as string)).toMatch(/^# yamlite: .*"winner":"db".*\ntitle: FILE\n$/);
   });
 
   test("conflict with an older db time: the newer file wins", () => {
@@ -103,7 +103,7 @@ describe("dir mode", () => {
     const r = t.sync({ dbTime: 0 });
     expect(r.conflicts[0]).toMatchObject({ winner: "file" });
     expect(sql(t.db, "SELECT title FROM tasks")).toEqual([{ title: "FILE" }]);
-    expect(read(r.conflicts[0]?.savedTo as string)).toBe("title: DB\n");
+    expect(read(r.conflicts[0]?.savedTo as string)).toMatch(/^# yamlite: .*"winner":"file".*\ntitle: DB\n$/);
   });
 
   test("broken files are neither overwritten nor deleted", () => {
