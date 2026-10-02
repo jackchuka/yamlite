@@ -12,7 +12,7 @@ import {
 import { api } from "@/lib/api";
 import { warnedKeys } from "@/lib/cell";
 import { useEvents, useMeta } from "@/lib/providers";
-import type { Filter, TableMeta } from "@/lib/types";
+import type { Filter, Row, TableMeta, ViewMeta } from "@/lib/types";
 import { tableRoute } from "@/routes";
 import { FilterBar } from "./FilterBar";
 import { Grid, type GridColumn } from "./Grid";
@@ -46,15 +46,19 @@ export function TableView({
   const { table } = tableRoute.useParams();
   const search = tableRoute.useSearch();
   const navigate = useNavigate({ from: tableRoute.fullPath });
+  const goTo = useNavigate();
   const { data: meta } = useMeta();
   const { warnings } = useEvents();
   const t = meta?.tables.find((x) => x.name === table);
+  const view: ViewMeta | undefined = t ? undefined : meta?.views.find((x) => x.name === table);
   const filters = search.filter ?? [];
   const [hidden, setHidden] = useState(() => hiddenColumns(table));
   const [schemaOpen, setSchemaOpen] = useState(false);
 
   const query = useInfiniteQuery({
-    queryKey: ["rows", table, { sort: search.sort, filters, prefix: search.prefix }],
+    queryKey: view
+      ? ["rows", view.table, view.name, { sort: search.sort, filters, prefix: search.prefix }]
+      : ["rows", table, { sort: search.sort, filters, prefix: search.prefix }],
     queryFn: ({ pageParam }) =>
       api.rows(table, { limit: PAGE, offset: pageParam, sort: search.sort, filters, prefix: search.prefix }),
     initialPageParam: 0,
@@ -62,7 +66,7 @@ export function TableView({
       const loaded = pages.reduce((n, p) => n + p.rows.length, 0);
       return loaded < last.total ? loaded : undefined;
     },
-    enabled: t !== undefined,
+    enabled: t !== undefined || view !== undefined,
   });
   const rows = useMemo(() => query.data?.pages.flatMap((p) => p.rows) ?? [], [query.data]);
   const total = query.data?.pages[0]?.total ?? 0;
@@ -80,13 +84,21 @@ export function TableView({
     [setSearch],
   );
 
-  if (!t) return null;
-  const columns: GridColumn[] = Object.entries(t.columns)
-    .filter(([name]) => name === t.key || !hidden.has(name))
+  if (!t && !view) return null;
+  const all = t ? t.columns : (view as ViewMeta).columns;
+  const keyCol = t ? t.key : (view?.identity[0] ?? "");
+  const pinned = t ? [t.key] : (view?.identity ?? []);
+  const columns: GridColumn[] = Object.entries(all)
+    .filter(([name]) => pinned.includes(name) || !hidden.has(name))
     .map(([name, type]) => {
-      const ref = t.references.find((r) => r.column === name);
+      const ref = t?.references.find((r) => r.column === name);
       return { name, type, note: ref ? `→ ${ref.table}` : undefined };
     });
+  const rowId = view ? (row: Row) => view.identity.map((c) => String(row[c])).join("/") : undefined;
+  const onSelect = view
+    ? (_key: string, row: Row) =>
+        void goTo({ to: "/t/$table", params: { table: view.table }, search: { key: String(row[keyCol]) } })
+    : (key: string) => setSearch({ key });
   const onSort = (column: string) => {
     const [col, dir] = (search.sort ?? "").split(":");
     const next = col !== column ? `${column}:asc` : dir === "asc" ? `${column}:desc` : undefined;
@@ -97,11 +109,22 @@ export function TableView({
     <div className="flex min-w-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2.5 border-b px-[18px] py-3">
-          <h1 className="text-lg font-semibold tracking-tight">{t.name}</h1>
-          <span className="rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
-            {t.mode === "dir" ? `${t.path}/*.yaml` : t.path}
+          <h1 className="text-lg font-semibold tracking-tight">{table}</h1>
+          {t ? (
+            <span className="rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+              {t.mode === "dir" ? `${t.path}/*.yaml` : t.path}
+            </span>
+          ) : (
+            <>
+              <span className="rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+                from {view?.parent}
+              </span>
+              <span className="rounded border px-1.5 text-[11px] text-muted-foreground">read-only view</span>
+            </>
+          )}
+          <span className="text-[12px] whitespace-nowrap text-muted-foreground">
+            {total} {t ? "records" : "rows"}
           </span>
-          <span className="text-[12px] whitespace-nowrap text-muted-foreground">{total} records</span>
           <span className="flex-1" />
           <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
             <Database className="size-3.5" /> Schema
@@ -113,8 +136,8 @@ export function TableView({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {Object.keys(t.columns)
-                .filter((c) => c !== t.key)
+              {Object.keys(all)
+                .filter((c) => !pinned.includes(c))
                 .map((c) => (
                   <DropdownMenuCheckboxItem
                     key={c}
@@ -124,7 +147,7 @@ export function TableView({
                       if (on) next.delete(c);
                       else next.add(c);
                       setHidden(next);
-                      saveHidden(t.name, next);
+                      saveHidden(table, next);
                     }}
                   >
                     {c}
@@ -132,9 +155,9 @@ export function TableView({
                 ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          {headerActions?.(t)}
+          {t && headerActions?.(t)}
         </div>
-        <FilterBar columns={t.columns} filters={filters} prefix={search.prefix} onChange={onFilters} />
+        <FilterBar columns={all} filters={filters} prefix={search.prefix} onChange={onFilters} />
         {query.isError && (
           <div role="alert" className="border-b px-[18px] py-2 text-err">
             {query.error.message}
@@ -144,18 +167,19 @@ export function TableView({
           <Grid
             columns={columns}
             rows={rows}
-            keyCol={t.key}
-            selectedKey={search.key}
-            onSelect={(key) => setSearch({ key })}
+            keyCol={keyCol}
+            rowId={rowId}
+            selectedKey={t ? search.key : undefined}
+            onSelect={onSelect}
             onEndReached={onEndReached}
-            flagged={warnedKeys(warnings[t.name])}
+            flagged={t ? warnedKeys(warnings[t.name]) : undefined}
             sort={search.sort}
             onSort={onSort}
           />
         )}
       </section>
-      {search.key !== undefined && drawer?.(t, search.key)}
-      {schemaOpen && <SchemaDialog table={t.name} open onOpenChange={setSchemaOpen} />}
+      {t && search.key !== undefined && drawer?.(t, search.key)}
+      {schemaOpen && <SchemaDialog table={table} view={view} open onOpenChange={setSchemaOpen} />}
     </div>
   );
 }

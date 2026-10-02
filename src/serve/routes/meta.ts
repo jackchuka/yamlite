@@ -42,6 +42,7 @@ export const metaRoutes: Routes = (router, ctx) => {
           depth,
           columns: record?.columns ?? {},
           identity: record?.identity ?? [],
+          declared: spec.columns,
           count,
           inDb: record !== undefined,
         };

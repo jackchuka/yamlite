@@ -11,6 +11,7 @@ const config = `tables:
   projects:
     expand:
       milestones:
+        columns: { title: TEXT }
         references: { owner: people }
         expand:
           tasks: {}
@@ -43,6 +44,7 @@ test("meta lists the views under their table", async () => {
       depth: 1,
       columns: { projects_id: "TEXT", idx: "INTEGER", title: "TEXT", owner: "TEXT", tasks: "JSON" },
       identity: ["projects_id", "idx"],
+      declared: { title: "TEXT" },
       count: 3,
       inDb: true,
     },
@@ -53,6 +55,7 @@ test("meta lists the views under their table", async () => {
       depth: 2,
       columns: { projects_id: "TEXT", milestones_idx: "INTEGER", idx: "INTEGER", title: "TEXT" },
       identity: ["projects_id", "milestones_idx", "idx"],
+      declared: {},
       count: 1,
       inDb: true,
     },

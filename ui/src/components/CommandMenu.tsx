@@ -43,6 +43,18 @@ export function CommandMenu() {
             </CommandItem>
           ))}
         </CommandGroup>
+        {meta && meta.views.length > 0 && (
+          <CommandGroup heading="Views">
+            {meta.views.map((v) => (
+              <CommandItem
+                key={v.name}
+                onSelect={() => go(() => navigate({ to: "/t/$table", params: { table: v.name } }))}
+              >
+                {v.name}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
         <CommandGroup heading="Tools">
           <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>

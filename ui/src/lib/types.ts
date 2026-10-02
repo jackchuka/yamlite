@@ -17,12 +17,25 @@ export interface TableMeta {
   inDb: boolean;
 }
 
+export interface ViewMeta {
+  name: string;
+  table: string;
+  parent: string;
+  depth: number;
+  columns: Record<string, ColumnType>;
+  identity: string[];
+  declared: Record<string, ColumnType>;
+  count: number;
+  inDb: boolean;
+}
+
 export interface Meta {
   root: string;
   db: string;
   configFile: string;
   configError: string | null;
   tables: TableMeta[];
+  views: ViewMeta[];
 }
 
 export interface TableSchema {
@@ -43,6 +56,15 @@ export interface TableSchema {
     inDb: boolean;
   }>;
   otherIndexes: string[];
+  views: Array<{
+    name: string;
+    parent: string;
+    depth: number;
+    columns: Record<string, ColumnType>;
+    identity: string[];
+    inDb: boolean;
+    problems: string[];
+  }>;
 }
 
 export type Row = Record<string, unknown>;

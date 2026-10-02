@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Plus, Table2, Terminal } from "lucide-react";
+import { ArrowLeftRight, Layers, Plus, Table2, Terminal } from "lucide-react";
+import { Fragment } from "react";
 import { api } from "@/lib/api";
 import { useEvents, useMeta } from "@/lib/providers";
 import { cn } from "@/lib/utils";
@@ -35,17 +36,35 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
         {meta?.tables.map((t) => {
           const warn = warnings[t.name]?.length ?? 0;
           return (
-            <Link key={t.name} to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
-              <Table2 className="size-3.5 opacity-70" />
-              {t.name}
-              {warn > 0 ? (
-                <span className="ml-auto rounded-full bg-warn-soft px-1.5 text-[10.5px] font-semibold text-warn">
-                  {warn}
-                </span>
-              ) : (
-                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
-              )}
-            </Link>
+            <Fragment key={t.name}>
+              <Link to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
+                <Table2 className="size-3.5 opacity-70" />
+                {t.name}
+                {warn > 0 ? (
+                  <span className="ml-auto rounded-full bg-warn-soft px-1.5 text-[10.5px] font-semibold text-warn">
+                    {warn}
+                  </span>
+                ) : (
+                  <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
+                )}
+              </Link>
+              {meta.views
+                .filter((v) => v.table === t.name)
+                .map((v) => (
+                  <Link
+                    key={v.name}
+                    to="/t/$table"
+                    params={{ table: v.name }}
+                    className={item}
+                    activeProps={active}
+                    style={{ paddingLeft: `${10 + v.depth * 14}px` }}
+                  >
+                    <Layers className="size-3.5 shrink-0 opacity-70" />
+                    <span className="truncate">{v.name}</span>
+                    <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{v.count}</span>
+                  </Link>
+                ))}
+            </Fragment>
           );
         })}
         <button
