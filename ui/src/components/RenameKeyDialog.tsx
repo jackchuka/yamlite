@@ -32,8 +32,9 @@ export function RenameKeyDialog({
   const [to, setTo] = useState(recordKey);
   const rename = useMutation({
     mutationFn: () => api.rename(table.name, recordKey, to),
+    onMutate: () => dispatch({ type: "saved", table: table.name, key: to, at: Date.now() }),
+    onError: () => dispatch({ type: "cancelled", table: table.name, key: to }),
     onSuccess: () => {
-      dispatch({ type: "saved", table: table.name, key: to, at: Date.now() });
       onOpenChange(false);
       void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: to }) });
     },

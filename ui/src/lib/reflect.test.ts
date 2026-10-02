@@ -65,3 +65,8 @@ test("a save with no event for a while is waiting", () => {
   );
   expect(late[k]?.state).toBe("applied");
 });
+
+test("a failed request drops its pending entry", () => {
+  const next = reflectReducer(saved, { type: "cancelled", table: "tasks", key: "a" }, fileOf);
+  expect(next[k]).toBeUndefined();
+});
