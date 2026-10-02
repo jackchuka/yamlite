@@ -84,7 +84,7 @@ test("keys are validated", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" });
   const post = (body: unknown) => t!.api(rowsUrl(), { method: "POST", body });
   expect(await post({ key: "", values: {} })).toMatchObject({ status: 400, body: { field: "key" } });
-  expect(await post({ key: "x/y", values: {} })).toMatchObject({ status: 400, body: { field: "key" } });
+  expect(await post({ key: "x//y", values: {} })).toMatchObject({ status: 400, body: { field: "key" } });
   expect(await post({ key: ".hidden", values: {} })).toMatchObject({ status: 400, body: { field: "key" } });
   expect((await post({ key: "a", values: {} })).status).toBe(409);
   expect((await post({ key: "b", values: { id: "c" } })).status).toBe(400);
