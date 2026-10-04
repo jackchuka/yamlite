@@ -230,3 +230,21 @@ test("dragging the drawer's edge resizes it, keeps it open and survives a reload
   await page.getByRole("row", { name: /\ba\b/ }).click();
   expect(Math.round((await drawer.boundingBox())?.width ?? 0)).toBe(560);
 });
+
+test("the ERD draws tables and their references, and opens a table on double-click", async ({ page }) => {
+  app = await start({
+    "yamlite.yaml": "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
+    "people.yaml": "- id: ann\n",
+    "tasks/a.yaml": "title: A\nassignee: ann\n",
+    "tasks/b.yaml": "title: B\nassignee: zed\n",
+  });
+  await page.goto(app.url);
+  await page.getByRole("complementary", { name: "sidebar" }).getByRole("link", { name: /^ERD/ }).click();
+  const tasks = page.getByTestId("erd-node-tasks");
+  await expect(tasks).toBeVisible();
+  await expect(page.getByTestId("erd-node-people")).toBeVisible();
+  await expect(page.getByTestId("rf__edge-ref:tasks.assignee")).toBeAttached();
+  await expect(tasks.getByTitle('assignee "zed" not found in people.id (b)')).toBeVisible();
+  await page.getByTestId("rf__node-people").dblclick();
+  await expect(page.getByRole("heading", { name: "people", exact: true })).toBeVisible();
+});
