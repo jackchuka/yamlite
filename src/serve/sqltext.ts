@@ -1,6 +1,6 @@
 // Only good enough to guard the console: it does not parse SQL, it hides comments and string literals
 // so that keywords, ";" and table names are looked for in code only.
-export function stripSql(sql: string, keepQuoted = true): string {
+export function stripSql(sql: string, keepQuoted = true, keepStrings = false): string {
   let out = "";
   let i = 0;
   while (i < sql.length) {
@@ -29,7 +29,7 @@ export function stripSql(sql: string, keepQuoted = true): string {
         }
         break;
       }
-      out += c === "'" || !keepQuoted ? "''" : sql.slice(i, j + 1);
+      out += (c === "'" && !keepStrings) || !keepQuoted ? "''" : sql.slice(i, j + 1);
       i = j + 1;
       continue;
     }
@@ -58,4 +58,22 @@ export function createdTable(sql: string): string | null {
   const m = CREATE_TABLE.exec(stripSql(sql));
   if (!m) return null;
   return m[1]?.replaceAll('""', '"') ?? m[2] ?? m[3] ?? m[4] ?? null;
+}
+
+const QUOTED = `"(?:[^"]|"")*"|\`[^\`]*\`|\\[[^\\]]*\\]|'(?:[^']|'')*'`;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// `name AS (` or `name(cols) AS (`, bare or quoted: a WITH clause that would stand in for one of these names
+export function definesName(sql: string, names: Iterable<string>): string | null {
+  const code = stripSql(sql, true, true);
+  for (const name of names) {
+    const e = escapeRe(name);
+    const ident = `(?:(?<![\\w$])${e}(?![\\w$])|"${escapeRe(name.replaceAll('"', '""'))}"|\`${e}\`|\\[${e}\\]|'${escapeRe(name.replaceAll("'", "''"))}')`;
+    const columns = `\\((?:${QUOTED}|[^)"\`\\['])*\\)`;
+    const definition = `${ident}\\s*(?:${columns}\\s*)?AS\\s*(?:NOT\\s+)?(?:MATERIALIZED\\s*)?\\(`;
+    // quoted tokens that are not a definition are consumed whole, so text inside a string is never read as code
+    const scan = new RegExp(`(${definition})|${QUOTED}`, "gi");
+    if (Array.from(code.matchAll(scan)).some((m) => m[1] !== undefined)) return name;
+  }
+  return null;
 }

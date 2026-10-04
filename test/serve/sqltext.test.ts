@@ -1,5 +1,12 @@
 import { expect, test } from "vitest";
-import { createdTable, firstKeyword, isRead, statementCount, touchesInternal } from "../../src/serve/sqltext.ts";
+import {
+  createdTable,
+  definesName,
+  firstKeyword,
+  isRead,
+  statementCount,
+  touchesInternal,
+} from "../../src/serve/sqltext.ts";
 
 test("statements are counted outside strings and comments", () => {
   expect(statementCount("select 1")).toBe(1);
@@ -35,4 +42,30 @@ test("the name of a created table", () => {
   expect(createdTable("create table [a b](x)")).toBe("a b");
   expect(createdTable("create temp table x(a)")).toBeNull();
   expect(createdTable("create index i on t(x)")).toBeNull();
+});
+
+test("definesName finds a WITH clause that defines one of the names", () => {
+  const names = ["projects__milestones"];
+  expect(definesName("with projects__milestones as (select 1) select * from projects__milestones", names)).toBe(
+    "projects__milestones",
+  );
+  expect(definesName('WITH RECURSIVE "Projects__Milestones"(a) AS MATERIALIZED (select 1) select 1', names)).toBe(
+    "projects__milestones",
+  );
+  expect(
+    definesName("with x as (select 1), [projects__milestones] as not materialized (select 2) select 1", names),
+  ).toBe("projects__milestones");
+  expect(definesName("with x as (select * from projects__milestones) select * from x", names)).toBeNull();
+  expect(definesName("select 'projects__milestones as (' from t", names)).toBeNull();
+  expect(definesName("select * from my_projects__milestones as (x)", names)).toBeNull();
+});
+
+test("definesName sees single-quoted names and column lists with quoted parentheses", () => {
+  const names = ["projects__milestones"];
+  expect(definesName("with 'projects__milestones' as (select 1) select 1", names)).toBe("projects__milestones");
+  expect(definesName('with projects__milestones("a)") as (select 1) select 1', names)).toBe("projects__milestones");
+  expect(definesName("with projects__milestones(a,\n  b\n) as (select 1, 2) select 1", names)).toBe(
+    "projects__milestones",
+  );
+  expect(definesName("select 'a projects__milestones as (' from t", names)).toBeNull();
 });
