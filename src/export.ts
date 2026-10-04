@@ -76,12 +76,14 @@ function get(router: Router, path: string): Json {
 }
 
 // warnings quote the absolute paths sync read: root-relative inside the root, base name outside it
-function warningScrubber(root: string, specPaths: string[]): (warning: string) => string {
+export function warningScrubber(root: string, specPaths: string[]): (warning: string) => string {
   const outside = specPaths.map((p) => resolve(root, p)).filter((p) => p !== root && !p.startsWith(`${root}/`));
+  const name = basename(root);
   return (warning) => {
     let out = warning;
     for (const p of outside.sort((a, b) => b.length - a.length)) out = out.split(p).join(basename(p));
-    return out.split(`${root}/`).join("");
+    out = out.split(`${root}/`).join("");
+    return name === "" ? out : out.split(root).join(name);
   };
 }
 

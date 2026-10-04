@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync
 import { basename, dirname, join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, test } from "vitest";
-import { exportSite, writeSnapshotData } from "../src/export.ts";
+import { exportSite, warningScrubber, writeSnapshotData } from "../src/export.ts";
 import { acquireLock } from "../src/lock.ts";
 import { startServe } from "./serve/helpers.ts";
 import { dataRoot, tmpRoot, write } from "./helpers.ts";
@@ -357,4 +357,12 @@ test("an invalid SOURCE_DATE_EPOCH is reported by name", async () => {
       delete process.env.SOURCE_DATE_EPOCH;
     }
   }
+});
+
+test("a warning naming the bare root shows the root's folder name", () => {
+  const scrub = warningScrubber("/home/me/notes", ["/elsewhere/people.yaml"]);
+  expect(scrub("cannot read /home/me/notes")).toBe("cannot read notes");
+  expect(scrub("cannot read /home/me/notes/a.yaml and /home/me/notes.")).toBe("cannot read a.yaml and notes.");
+  expect(scrub("see /home/me/notes-old/x.yaml")).toBe("see notes-old/x.yaml");
+  expect(scrub("see /elsewhere/people.yaml")).toBe("see people.yaml");
 });
