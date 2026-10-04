@@ -169,11 +169,12 @@ yamlite serve notes --open
   <img src="assets/ui.png" width="880" alt="yamlite serve: the web UI with a table of tasks and a record open in a form, saved back to tasks/release-notes.yaml">
 </p>
 
-`serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, check each table's columns, references and indexes, run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
+`serve` runs `watch` and a local web UI in one process: browse and edit records with forms that fit each column type, check each table's columns, references and indexes, see every table, view and reference on one diagram (ERD), run SQL, and see sync activity, warnings and conflicts as they happen. Edits from the UI are written to the database and reach your YAML files through the same sync as any other app, so comments and the safety checks all apply. A conflict's losing side can be restored from the Sync page.
 
 - It listens on `127.0.0.1:4610` and prints a URL with an access token (new for each run, reusable until the process stops); open that URL (or pass `--open`). Requests without the token, from other sites, or with an unexpected `Host` are refused.
 - `serve` and `watch` cannot run on the same folder at the same time.
 - `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
+- The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
 
 ## Export
 
@@ -181,7 +182,7 @@ yamlite serve notes --open
 yamlite export notes --out ../notes-site
 ```
 
-`export` writes the web UI as a static site you can put on any web server: browse tables and views, open records with their YAML, filter, sort, and run `SELECT` in the SQL console. Nothing can be written: there are no save, delete or new buttons, no Sync page, and the console refuses anything but `SELECT`, `EXPLAIN` and `VALUES`. The data runs in the browser with [sql.js](https://sql.js.org).
+`export` writes the web UI as a static site you can put on any web server: browse tables and views, open records with their YAML, filter, sort, see the ERD, and run `SELECT` in the SQL console. Nothing can be written: there are no save, delete or new buttons, no Sync page, and the console refuses anything but `SELECT`, `EXPLAIN` and `VALUES`. The data runs in the browser with [sql.js](https://sql.js.org).
 
 - It syncs your YAML into a temporary database, so it works in CI without `.yamlite/` and never touches the root: no `yamlite.yaml` changes, no `.yamlite/` folder, no lock.
 - `--table` (repeatable) limits the export to those tables; the others are left out of the database too.
