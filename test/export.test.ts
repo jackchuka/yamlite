@@ -236,3 +236,22 @@ test("SOURCE_DATE_EPOCH makes two exports byte-identical", async () => {
   expect(tree(b)).toEqual(tree(a));
   expect(readJson(join(a, "data/snapshot.json")).generatedAt).toBe(new Date(1790000000 * 1000).toISOString());
 });
+
+test("the output folder may not contain the data root or be a table inside it", async () => {
+  const root = setup();
+  await expect(exportSite({ root, out: root, uiDir: ui(), force: true })).rejects.toThrow("contains the data root");
+  expect(readFileSync(join(root, "people.yaml"), "utf8")).toContain("Ann");
+  await expect(exportSite({ root, out: join(root, ".."), uiDir: ui(), force: true })).rejects.toThrow(
+    "contains the data root",
+  );
+  expect(existsSync(join(root, "people.yaml"))).toBe(true);
+  await expect(exportSite({ root, out: join(root, "site"), uiDir: ui() })).rejects.toThrow("inside the data root");
+  expect(existsSync(join(root, "site"))).toBe(false);
+
+  const out = join(root, ".site");
+  await exportSite({ root, out, uiDir: ui() });
+  expect(existsSync(join(out, "index.html"))).toBe(true);
+  const snapshot = readJson(join(out, "data/snapshot.json"));
+  expect(Object.keys(snapshot.schemas)).not.toContain(".site");
+  expect(Object.keys(snapshot.schemas)).not.toContain("site");
+});

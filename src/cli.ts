@@ -168,7 +168,7 @@ program
   .command("export")
   .description("write the web UI as a read-only static site")
   .argument("[root]", "data directory", ".")
-  .option("--out <dir>", "output folder", "yamlite-export")
+  .option("--out <dir>", "output folder", ".yamlite-export")
   .option("--table <name>", "only this table (repeatable)", collect, [])
   .option("--force", "replace an output folder that is not a previous export")
   .action(async (root: string, o: { out: string; table: string[]; force?: boolean }) => {

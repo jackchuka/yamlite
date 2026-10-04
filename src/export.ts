@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { configPath } from "./config.ts";
@@ -209,8 +209,22 @@ function checkOut(out: string, force: boolean): void {
   throw new Error(`${out} is not a yamlite export and not empty; pass --force to replace it`);
 }
 
+function checkAgainstRoot(out: string, root: string): void {
+  const fromOut = relative(out, root);
+  if (fromOut === "" || (!fromOut.startsWith("..") && !isAbsolute(fromOut))) {
+    throw new Error(`refusing to write to ${out}: it contains the data root ${root}`);
+  }
+  const inside = relative(root, out);
+  if (inside.startsWith("..") || isAbsolute(inside)) return;
+  if (inside.split(sep).some((segment) => segment.startsWith("."))) return;
+  throw new Error(
+    `${out} is inside the data root and would be synced as a table; use a folder outside it or a dot-folder such as .yamlite-export`,
+  );
+}
+
 export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
   const out = resolve(opts.out);
+  checkAgainstRoot(out, resolve(opts.root));
   checkOut(out, opts.force ?? false);
   const uiDir = opts.uiDir ?? DEFAULT_UI;
   const indexPath = join(uiDir, "index.html");
@@ -232,7 +246,12 @@ export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
     if (existsSync(out)) {
       const old = `${staging}-old`;
       renameSync(out, old);
-      renameSync(staging, out);
+      try {
+        renameSync(staging, out);
+      } catch (e) {
+        renameSync(old, out);
+        throw e;
+      }
       rmSync(old, { recursive: true, force: true });
     } else {
       renameSync(staging, out);
