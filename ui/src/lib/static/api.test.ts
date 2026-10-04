@@ -60,6 +60,16 @@ const snapshot: Snapshot = {
         count: 5,
         inDb: true,
       },
+      {
+        name: "nums",
+        mode: "dir",
+        path: "nums",
+        key: "id",
+        columns: { id: "TEXT", vals: "JSON" },
+        references: [],
+        count: 2,
+        inDb: true,
+      },
     ],
     views: [
       {
