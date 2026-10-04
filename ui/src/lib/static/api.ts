@@ -122,8 +122,10 @@ export function createStaticApi(opts: {
         if (!row) throw new HttpError(404, `no record "${key}" in ${t.name}`);
         const out = { row: toWire(row, new Map(Object.entries(t.columns))), file: "", yaml: null as string | null };
         try {
-          const entry = (await opts.loadYaml(t.name))[key];
-          return { ...out, file: entry?.file ?? "", yaml: entry?.yaml ?? null };
+          const { files, keys } = await opts.loadYaml(t.name);
+          const file = Object.hasOwn(keys, key) ? keys[key] : undefined;
+          if (file === undefined) return out;
+          return { ...out, file, yaml: Object.hasOwn(files, file) ? (files[file] as string) : null };
         } catch (e) {
           return { ...out, yamlError: e instanceof Error ? e.message : String(e) };
         }

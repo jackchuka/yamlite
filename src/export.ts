@@ -22,6 +22,7 @@ import type { ApiContext } from "./serve/context.ts";
 import { EventHub } from "./serve/events.ts";
 import { Router } from "./serve/http.ts";
 import { ROUTES } from "./serve/routes/index.ts";
+import { recordFile } from "./serve/routes/rows.ts";
 
 export interface Snapshot {
   version: 1;
@@ -47,6 +48,12 @@ export interface ExportResult {
 }
 
 type Json = Record<string, any>;
+
+// data/yaml/<table>.json: a file's text once, and each record key's file
+interface YamlMap {
+  files: Record<string, string>;
+  keys: Record<string, string>;
+}
 
 function generatedAt(now: () => Date): string {
   const epoch = process.env.SOURCE_DATE_EPOCH;
@@ -89,7 +96,7 @@ export async function writeSnapshotData(opts: {
     const warnings: Record<string, string[]> = {};
     let meta: Json;
     const schemas: Record<string, unknown> = {};
-    const yaml: Record<string, Record<string, { file: string; yaml: string | null }>> = {};
+    const yaml: Array<[string, YamlMap]> = [];
     try {
       const all = y.tables.map((t) => t.name);
       const unknown = (opts.tables ?? []).filter((n) => !all.includes(n));
@@ -134,16 +141,26 @@ export async function writeSnapshotData(opts: {
           const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
           schemas[name] = { ...schema, path: hidePath(schema.path) };
           const spec = y.tables.find((t) => t.name === name);
-          const map: Record<string, { file: string; yaml: string | null }> = {};
+          const files = new Map<string, string>();
+          const keys: Array<[string, string]> = [];
+          // a list table's records share one file: read it through serve once, not once per record
+          const seen = new Map<string, string>();
           if (spec && store.tableExists(name)) {
-            const keys = store.query(`SELECT ${q(spec.key)} AS k FROM ${q(name)} ORDER BY ${q(spec.key)}`);
-            for (const { k } of keys) {
+            const rows = store.query(`SELECT ${q(spec.key)} AS k FROM ${q(name)} ORDER BY ${q(spec.key)}`);
+            for (const { k } of rows) {
               const key = String(k);
-              const detail = get(router, `/api/tables/${encodeURIComponent(name)}/rows/${encodeURIComponent(key)}`);
-              map[key] = { file: hidePath(detail.file), yaml: detail.yaml };
+              const source = recordFile(spec, key);
+              let file = seen.get(source);
+              if (file === undefined) {
+                const detail = get(router, `/api/tables/${encodeURIComponent(name)}/rows/${encodeURIComponent(key)}`);
+                file = hidePath(detail.file);
+                seen.set(source, file);
+                if (detail.yaml !== null) files.set(file, detail.yaml);
+              }
+              keys.push([key, file]);
             }
           }
-          yaml[name] = map;
+          yaml.push([name, { files: Object.fromEntries(files), keys: Object.fromEntries(keys) }]);
         }
       } finally {
         store.close();
@@ -162,7 +179,7 @@ export async function writeSnapshotData(opts: {
       warnings,
     };
     writeJson(join(opts.dir, "data", "snapshot.json"), snapshot);
-    for (const [name, map] of Object.entries(yaml)) writeJson(join(opts.dir, "data", "yaml", `${name}.json`), map);
+    for (const [name, map] of yaml) writeJson(join(opts.dir, "data", "yaml", `${name}.json`), map);
     return { tables: selected, warnings };
   } finally {
     rmSync(work, { recursive: true, force: true });

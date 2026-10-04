@@ -148,4 +148,8 @@ export interface Snapshot {
   warnings: Record<string, string[]>;
 }
 
-export type YamlMap = Record<string, { file: string; yaml: string | null }>;
+// each file's text is stored once: a list table's records all point at the same file
+export interface YamlMap {
+  files: Record<string, string>;
+  keys: Record<string, string>;
+}

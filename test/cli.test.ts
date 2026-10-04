@@ -95,6 +95,7 @@ test("export writes a static site and lists what it wrote", () => {
   expect(r.stdout).toContain(out);
   expect(readFileSync(join(out, "index.html"), "utf8")).toContain('content="static"');
   expect(JSON.parse(readFileSync(join(out, "data/yaml/tasks.json"), "utf8"))).toEqual({
-    a: { file: "tasks/a.yaml", yaml: "title: A\n" },
+    files: { "tasks/a.yaml": "title: A\n" },
+    keys: { a: "tasks/a.yaml" },
   });
 });

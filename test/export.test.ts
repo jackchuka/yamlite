@@ -103,18 +103,29 @@ test("yaml map keys and file names survive unusual names", async () => {
   const dir = tmpRoot();
   await writeSnapshotData({ root, dir });
   const notes = readJson(join(dir, "data/yaml/notes.json"));
-  expect(notes).toEqual({ "a b#1": { file: "notes/a b#1.yaml", yaml: "text: 日本語\n" } });
+  expect(notes).toEqual({ files: { "notes/a b#1.yaml": "text: 日本語\n" }, keys: { "a b#1": "notes/a b#1.yaml" } });
   const projects = readJson(join(dir, "data/yaml/projects.json"));
-  expect(projects.website.yaml).toContain("# the site");
+  expect(projects.files[projects.keys.website]).toContain("# the site");
 });
 
-test("list tables map every key to the list file", async () => {
+test("list tables map every key to the list file, whose text is stored once", async () => {
   const root = setup();
   const dir = tmpRoot();
   await writeSnapshotData({ root, dir });
   const people = readJson(join(dir, "data/yaml/people.json"));
-  expect(Object.keys(people)).toEqual(["ann", "bob"]);
-  expect(people.bob).toEqual({ file: "people.yaml", yaml: files["people.yaml"] });
+  expect(people).toEqual({ files: { "people.yaml": files["people.yaml"] }, keys: { ann: "people.yaml", bob: "people.yaml" } });
+});
+
+test("a large list table's YAML map grows with the file, not with records times the file", async () => {
+  const items = Array.from({ length: 1000 }, (_, i) => `- id: p${String(i).padStart(4, "0")}\n  name: Person ${i}\n`).join("");
+  const root = setup({ "people.yaml": items });
+  const dir = tmpRoot();
+  await writeSnapshotData({ root, dir, tables: ["people"] });
+  const path = join(dir, "data/yaml/people.json");
+  const people = readJson(path);
+  expect(Object.keys(people.files)).toEqual(["people.yaml"]);
+  expect(Object.keys(people.keys)).toHaveLength(1000);
+  expect(statSync(path).size).toBeLessThan(items.length * 3);
 });
 
 test("warnings from the sync are kept per table", async () => {

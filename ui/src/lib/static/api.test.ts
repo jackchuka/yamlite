@@ -90,7 +90,10 @@ const snapshot: Snapshot = {
   warnings: {},
 };
 
-const yaml: YamlMap = { a: { file: "tasks/a.yaml", yaml: "title: Buy milk\n" } };
+const yaml: YamlMap = {
+  files: { "tasks/a.yaml": "title: Buy milk\n" },
+  keys: { a: "tasks/a.yaml", b: "tasks/gone.yaml" },
+};
 const make = (loadYaml: (t: string) => Promise<YamlMap> = async () => yaml) =>
   createStaticApi({ db: fixture(), snapshot, loadYaml });
 const ids = (rows: Array<Record<string, unknown>>) => rows.map((r) => r.id);
@@ -165,6 +168,19 @@ test("a record carries its YAML, and a YAML that cannot load is reported on the 
     yamlError: "data/yaml/tasks.json: 404 Not Found",
   });
   await expect(make().record("tasks", "zz")).rejects.toMatchObject({ status: 404 });
+});
+
+test("a record whose key or file is missing from the YAML map has no YAML", async () => {
+  expect(await make().record("tasks", "b")).toMatchObject({ file: "tasks/gone.yaml", yaml: null });
+  expect(await make().record("tasks", "c")).toMatchObject({ file: "", yaml: null });
+  expect((await make().record("tasks", "c")).yamlError).toBeUndefined();
+});
+
+test("records of a list table share the file's text", async () => {
+  const list: YamlMap = { files: { "tasks.yaml": "- id: a\n- id: b\n" }, keys: { a: "tasks.yaml", b: "tasks.yaml" } };
+  const api = make(async () => list);
+  expect((await api.record("tasks", "a")).yaml).toBe("- id: a\n- id: b\n");
+  expect((await api.record("tasks", "b")).file).toBe("tasks.yaml");
 });
 
 test("meta and schema come from the snapshot, conflicts are empty", async () => {
