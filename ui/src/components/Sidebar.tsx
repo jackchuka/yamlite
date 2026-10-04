@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Layers, Plus, Table2, Terminal, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Layers, Network, Plus, Table2, Terminal, TriangleAlert } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { warningLinks } from "@/lib/activity";
 import { api } from "@/lib/api";
@@ -100,6 +100,9 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
       <nav className="flex flex-col gap-px">
         <Link to="/sql" className={item} activeProps={active}>
           <Terminal className="size-3.5 opacity-70" /> SQL console
+        </Link>
+        <Link to="/erd" className={item} activeProps={active}>
+          <Network className="size-3.5 opacity-70" /> ERD
         </Link>
         {!readOnly && (
           <Link to="/sync" className={item} activeProps={active}>

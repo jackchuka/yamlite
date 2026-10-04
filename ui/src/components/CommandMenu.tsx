@@ -58,6 +58,7 @@ export function CommandMenu() {
         )}
         <CommandGroup heading="Tools">
           <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
+          <CommandItem onSelect={() => go(() => navigate({ to: "/erd" }))}>ERD</CommandItem>
           {!isReadOnly() && <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>}
         </CommandGroup>
       </CommandList>

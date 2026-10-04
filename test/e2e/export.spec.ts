@@ -98,3 +98,12 @@ test("an export opened from file:// says it needs a web server", async ({ page }
   await page.goto(pathToFileURL(join(out, "index.html")).toString());
   await expect(page.getByText(/スナップショットを開くには Web サーバーが必要です。/)).toBeVisible();
 });
+
+test("an export draws the ERD with its expanded views", async ({ page }) => {
+  const url = await host(exportFixture());
+  await page.goto(url);
+  await page.getByRole("complementary", { name: "sidebar" }).getByRole("link", { name: /^ERD/ }).click();
+  await expect(page.getByTestId("erd-node-projects")).toBeVisible();
+  await expect(page.getByTestId("erd-node-projects__milestones")).toBeVisible();
+  await expect(page.getByTestId("rf__edge-parent:projects__milestones")).toBeAttached();
+});

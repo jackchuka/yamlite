@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createHashHistory, createRoute, createRouter, Navigate } from "@tanstack/react-router";
+import { createHashHistory, createRoute, createRouter, lazyRouteComponent, Navigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { NewRecordDialog } from "./components/NewRecordDialog";
 import { Placeholder } from "./components/Placeholder";
@@ -12,7 +12,7 @@ import { TableView } from "./components/TableView";
 import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import type { TableMeta } from "./lib/types";
-import { rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
+import { erdRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
 
 function Home() {
   const { data } = useMeta();
@@ -81,10 +81,12 @@ rootRoute.update({ component: Shell });
 tableRoute.update({ component: TablePage });
 sqlRoute.update({ component: SqlConsole });
 syncRoute.update({ component: () => (isReadOnly() ? <Navigate to="/" /> : <SyncView />) });
+// React Flow and dagre load only when the ERD opens
+erdRoute.update({ component: lazyRouteComponent(() => import("./components/ErdView"), "ErdView") });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute]),
   history: createHashHistory(),
 });
 
