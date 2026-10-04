@@ -32,3 +32,11 @@ test("network origins reach the policy", () => {
   const meta = parse(injectPage("<p>x</p>", ["https://cdn.example.com"])).head.firstElementChild;
   expect(meta?.getAttribute("content")).toBe(pageCsp(["https://cdn.example.com"]));
 });
+
+test("many leading comments without a doctype do not stall the injection", () => {
+  const html = `${"<!--a-->".repeat(40)}<p>x</p>`;
+  const started = performance.now();
+  const out = injectPage(html, []);
+  expect(performance.now() - started).toBeLessThan(100);
+  expect(parse(out).head.firstElementChild?.getAttribute("http-equiv")).toBe("Content-Security-Policy");
+});
