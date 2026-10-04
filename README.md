@@ -250,14 +250,14 @@ jobs:
 
 ### Tables
 
-| Under the root       | Table    | Records                                                          | Key                                                               |
-| -------------------- | -------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `tasks/` (directory) | `tasks`  | one per `*.yaml` / `*.yml` file in the folder and its subfolders | the path without extension (`id`): `buy-milk`, `archive/buy-milk` |
-| `people.yaml` (file) | `people` | each item of the top-level list                                  | the `id` field                                                    |
+| Under the root       | Table    | Records                                                                                                                                           | Key                                                               |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `tasks/` (directory) | `tasks`  | one per `*.yaml` / `*.yml` file in the folder and its subfolders; the same as `files: "tasks/**/*.{yaml,yml}"`, which you only write to change it | the path without extension (`id`): `buy-milk`, `archive/buy-milk` |
+| `people.yaml` (file) | `people` | each item of the top-level list                                                                                                                   | the `id` field                                                    |
 
 Dotfiles, dot-folders and `node_modules` are ignored at every level, and `yamlite.yaml` at the root. Symlinked files and directories are followed.
 
-In a directory table, a file's own `id` field may hold the full key (`archive/buy-milk`) or just the file name (`buy-milk`); anything else is a warning and the path wins. Inserting a row with a nested key creates its folders, and deleting the last record in a folder removes the emptied folder. A folder or file that another table is configured at (`archive: { path: tasks/archive }`) is left to that table. Renaming a folder deletes and re-adds its records, so renaming a large folder can trip the mass-deletion guard and need `--force` (see [Safety](#safety)).
+In a directory table, a file's own `id` field may hold the full key (`archive/buy-milk`) or just the file name (`buy-milk`); anything else is a warning and the path wins. Inserting a row with a nested key creates its folders, and deleting the last record in a folder removes the emptied folder. A table declared inside another one's folder takes the files its glob matches (`archive: { files: "tasks/archive/*.yaml" }`), and the outer table leaves them alone. Renaming a folder deletes and re-adds its records, so renaming a large folder can trip the mass-deletion guard and need `--force` (see [Safety](#safety)).
 
 ### Types
 
@@ -333,8 +333,10 @@ tables:
       - { columns: slug, unique: true }
       - { expr: "json_extract(meta, '$.ja')" } # index a nested value
   inbox:
-    path: ~/Dropbox/inbox # relative paths resolve from the root
+    files: ~/Dropbox/inbox/*.yaml
 ```
+
+`files:` takes a glob from the root: everything before the first wildcard is the table's folder (it may be outside the root), and the key is the path below it without the extension. `files: "**/*.{yaml,yml}"` makes the whole root one table; the conventions then add no folder tables under it, and `yamlite.yaml` itself is never a record. A file two tables match belongs to the one whose folder is deeper; two tables with the same folder matching the same file is an error. `path:` is for a single YAML file holding a list of records — a folder there is an error that names the `files:` line to use instead.
 
 ### Removing columns
 
@@ -405,7 +407,7 @@ For every record, yamlite compares the current file hash and row hash with the h
 ```ts
 import { open } from "@jackchuka/yamlite";
 
-const y = await open({ root: "./notes" }); // or { db: "./app.db", tables: [{ name: "tasks", path: "./tasks" }] }
+const y = await open({ root: "./notes" }); // or { db: "./app.db", tables: [{ name: "tasks", files: "./tasks/**/*.yaml" }] }
 
 const plan = await y.status(); // what would change
 const results = await y.sync(); // [{ table, ok, toDb, toFile, conflicts, warnings, ... }]
