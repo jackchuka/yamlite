@@ -108,6 +108,15 @@ test("yaml map keys and file names survive unusual names", async () => {
   expect(projects.files[projects.keys.website]).toContain("# the site");
 });
 
+test("a record key named __proto__ keeps its YAML", async () => {
+  const root = setup({ "notes/__proto__.yaml": "text: odd\n" });
+  const dir = tmpRoot();
+  await writeSnapshotData({ root, dir, tables: ["notes"] });
+  const notes = readJson(join(dir, "data/yaml/notes.json"));
+  expect(Object.hasOwn(notes.keys, "__proto__")).toBe(true);
+  expect(notes.files[notes.keys.__proto__]).toBe("text: odd\n");
+});
+
 test("list tables map every key to the list file, whose text is stored once", async () => {
   const root = setup();
   const dir = tmpRoot();

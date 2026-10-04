@@ -228,3 +228,12 @@ test("integer filters match on columns without affinity like the server", async 
   const idx = await api.rows("tasks__tags", { limit: 10, offset: 0, filters: [{ col: "idx", op: "eq", value: 0 }] });
   expect(idx.total).toBe(3);
 });
+
+test("a record key named __proto__ finds its YAML, and one named like an Object method finds none", async () => {
+  const map = JSON.parse('{"files":{"tasks/__proto__.yaml":"x: 1\\n"},"keys":{"__proto__":"tasks/__proto__.yaml"}}');
+  const db = fixture();
+  db.run("INSERT INTO tasks (id) VALUES ('__proto__'), ('toString')");
+  const api = createStaticApi({ db, snapshot, loadYaml: async () => map });
+  expect(await api.record("tasks", "__proto__")).toMatchObject({ file: "tasks/__proto__.yaml", yaml: "x: 1\n" });
+  expect(await api.record("tasks", "toString")).toMatchObject({ file: "", yaml: null });
+});
