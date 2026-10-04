@@ -32,6 +32,15 @@ export interface ViewMeta {
   inDb: boolean;
 }
 
+export interface PageMeta {
+  name: string;
+  title: string;
+  path: string;
+  access: Record<string, "read" | "write">;
+  sql: boolean;
+  network: string[];
+}
+
 export interface Meta {
   root: string;
   db: string;
@@ -39,6 +48,7 @@ export interface Meta {
   configError: string | null;
   tables: TableMeta[];
   views: ViewMeta[];
+  pages: PageMeta[];
 }
 
 export interface TableSchema {
@@ -92,6 +102,7 @@ export interface Change {
 }
 
 export type ServeEvent =
+  | { type: "page"; at: string; pages: string[] }
   | {
       type: "sync";
       at: string;

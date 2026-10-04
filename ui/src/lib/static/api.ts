@@ -2,7 +2,7 @@ import type { BindParams, Database, SqlValue } from "sql.js";
 import { q } from "../../../../src/ident.ts";
 import { HttpError } from "../../../../src/serve/errors.ts";
 import { buildWhere, orderBy, parseRowQuery } from "../../../../src/serve/query.ts";
-import { isRead, statementCount } from "../../../../src/serve/sqltext.ts";
+import { firstKeyword, isRead, statementCount, stripSql } from "../../../../src/serve/sqltext.ts";
 import { toWire } from "../../../../src/serve/wire.ts";
 import type { ColumnType, DbRow, DbValue } from "../../../../src/types.ts";
 import { type Api, ApiError, rowsQuery } from "../api";
@@ -10,6 +10,7 @@ import type { ConflictDetail, RecordDetail, RowsPage, Snapshot, SqlResult, Table
 
 export const READ_ONLY_MESSAGE = "read-only snapshot: only SELECT, EXPLAIN and VALUES run here";
 const MAX_ROWS = 1000;
+const WRITES = /\b(?:INSERT|UPDATE|DELETE|REPLACE(?!\s*\())\b/i;
 
 const refuse = (): Promise<never> => Promise.reject(new ApiError(403, READ_ONLY_MESSAGE, { error: READ_ONLY_MESSAGE }));
 
@@ -39,6 +40,7 @@ export function createStaticApi(opts: {
   db: Database;
   snapshot: Snapshot;
   loadYaml: (table: string) => Promise<YamlMap>;
+  loadPage: (name: string) => Promise<string>;
 }): Api {
   const { db, snapshot } = opts;
   const { meta } = snapshot;
@@ -64,6 +66,13 @@ export function createStaticApi(opts: {
     } finally {
       stmt.free();
     }
+  }
+
+  function select(sql: string): SqlResult {
+    const started = performance.now();
+    const r = all(sql, [], MAX_ROWS);
+    const ms = Math.round((performance.now() - started) * 10) / 10;
+    return { columns: r.columns, rows: r.rows.map((row) => toWire(row, new Map())), truncated: r.truncated, ms };
   }
 
   function page(
@@ -135,10 +144,20 @@ export function createStaticApi(opts: {
         if (sql.trim() === "") throw new HttpError(400, "sql is required");
         if (statementCount(sql) > 1) throw new HttpError(400, "run one statement at a time");
         if (!isRead(sql)) throw new ApiError(403, READ_ONLY_MESSAGE, { error: READ_ONLY_MESSAGE });
-        const started = performance.now();
-        const r = all(sql, [], MAX_ROWS);
-        const ms = Math.round((performance.now() - started) * 10) / 10;
-        return { columns: r.columns, rows: r.rows.map((row) => toWire(row, new Map())), truncated: r.truncated, ms };
+        return select(sql);
+      }),
+    pageHtml: (name) => guard(() => opts.loadPage(name)),
+    pageSql: (name, sql) =>
+      guard((): SqlResult => {
+        const spec = meta.pages.find((p) => p.name === name);
+        if (!spec) throw new HttpError(404, `unknown page: ${name}`);
+        if (!spec.sql) throw new HttpError(403, `page ${name} may not run SQL`);
+        if (sql.trim() === "") throw new HttpError(400, "sql is required");
+        if (statementCount(sql) > 1) throw new HttpError(400, "run one statement at a time");
+        // sql.js has no authorizer, so a WITH-led statement is run only when no code in it writes
+        const readOnly = isRead(sql) || (firstKeyword(sql) === "WITH" && !WRITES.test(stripSql(sql, false)));
+        if (!readOnly) throw new HttpError(403, "a page can only run SELECT");
+        return select(sql);
       }),
     conflicts: async () => ({ conflicts: [] }),
     conflict: () => Promise.reject(new ApiError(404, "no conflicts in a snapshot", {})) as Promise<ConflictDetail>,

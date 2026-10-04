@@ -9,7 +9,9 @@ import { createStaticApi } from "./api";
 const require = createRequire(import.meta.url);
 let SQL: Awaited<ReturnType<typeof initSqlJs>>;
 beforeAll(async () => {
-  SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
+  SQL = await initSqlJs({
+    locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm"),
+  });
 });
 
 function fixture(): Database {
@@ -87,6 +89,24 @@ const snapshot: Snapshot = {
         inDb: true,
       },
     ],
+    pages: [
+      {
+        name: "board",
+        title: "Board",
+        path: ".pages/b.html",
+        access: { tasks: "read" },
+        sql: true,
+        network: [],
+      },
+      {
+        name: "plain",
+        title: "Plain",
+        path: ".pages/p.html",
+        access: { tasks: "read" },
+        sql: false,
+        network: [],
+      },
+    ],
   },
   schemas: {},
   warnings: {},
@@ -97,33 +117,62 @@ const yaml: YamlMap = {
   keys: { a: "tasks/a.yaml", b: "tasks/gone.yaml" },
 };
 const make = (loadYaml: (t: string) => Promise<YamlMap> = async () => yaml) =>
-  createStaticApi({ db: fixture(), snapshot, loadYaml });
+  createStaticApi({
+    db: fixture(),
+    snapshot,
+    loadYaml,
+    loadPage: async (name) => `<p>${name}</p>`,
+  });
 const ids = (rows: Array<Record<string, unknown>>) => rows.map((r) => r.id);
 
 test("rows page, sort and filter like the server", async () => {
   const api = make();
   expect(await api.rows("tasks", { limit: 2, offset: 2, filters: [] })).toMatchObject({ total: 5 });
   expect(ids((await api.rows("tasks", { limit: 2, offset: 2, filters: [] })).rows)).toEqual(["ab", "b"]);
-  expect(ids((await api.rows("tasks", { limit: 10, offset: 0, sort: "priority:desc", filters: [] })).rows)).toEqual([
-    "b",
-    "c",
-    "a",
-    "ab",
-    "a_1",
-  ]);
-  const done = await api.rows("tasks", { limit: 10, offset: 0, filters: [{ col: "done", op: "eq", value: true }] });
+  expect(
+    ids(
+      (
+        await api.rows("tasks", {
+          limit: 10,
+          offset: 0,
+          sort: "priority:desc",
+          filters: [],
+        })
+      ).rows,
+    ),
+  ).toEqual(["b", "c", "a", "ab", "a_1"]);
+  const done = await api.rows("tasks", {
+    limit: 10,
+    offset: 0,
+    filters: [{ col: "done", op: "eq", value: true }],
+  });
   expect(ids(done.rows)).toEqual(["a_1", "c"]);
-  const home = await api.rows("tasks", { limit: 10, offset: 0, filters: [{ col: "tags", op: "has", value: "home" }] });
+  const home = await api.rows("tasks", {
+    limit: 10,
+    offset: 0,
+    filters: [{ col: "tags", op: "has", value: "home" }],
+  });
   expect(ids(home.rows)).toEqual(["a", "b"]);
-  expect(ids((await api.rows("tasks", { limit: 10, offset: 0, filters: [], prefix: "a" })).rows)).toEqual([
-    "a",
-    "a_1",
-    "ab",
-  ]);
+  expect(
+    ids(
+      (
+        await api.rows("tasks", {
+          limit: 10,
+          offset: 0,
+          filters: [],
+          prefix: "a",
+        })
+      ).rows,
+    ),
+  ).toEqual(["a", "a_1", "ab"]);
 });
 
 test("values come back typed like the server", async () => {
-  const { rows } = await make().rows("tasks", { limit: 1, offset: 0, filters: [] });
+  const { rows } = await make().rows("tasks", {
+    limit: 1,
+    offset: 0,
+    filters: [],
+  });
   expect(rows[0]).toEqual({
     id: "a",
     title: "Buy milk",
@@ -140,7 +189,12 @@ test("big integers come back as strings like the server", async () => {
 });
 
 test("views page by their identity", async () => {
-  const page = await make().rows("tasks__tags", { limit: 10, offset: 0, filters: [], prefix: "a" });
+  const page = await make().rows("tasks__tags", {
+    limit: 10,
+    offset: 0,
+    filters: [],
+    prefix: "a",
+  });
   expect(page.total).toBe(3);
   expect(page.rows.map((r) => [r.tasks_id, r.idx])).toEqual([
     ["a", 0],
@@ -150,7 +204,14 @@ test("views page by their identity", async () => {
 });
 
 test("an unknown column is a 400 like the server", async () => {
-  await expect(make().rows("tasks", { limit: 1, offset: 0, sort: "nope:asc", filters: [] })).rejects.toMatchObject({
+  await expect(
+    make().rows("tasks", {
+      limit: 1,
+      offset: 0,
+      sort: "nope:asc",
+      filters: [],
+    }),
+  ).rejects.toMatchObject({
     status: 400,
     message: "unknown column: nope",
   });
@@ -158,7 +219,14 @@ test("an unknown column is a 400 like the server", async () => {
 
 test("a record carries its YAML, and a YAML that cannot load is reported on the record", async () => {
   expect(await make().record("tasks", "a")).toEqual({
-    row: { id: "a", title: "Buy milk", done: false, priority: 3, tags: ["home", "errand"], big: null },
+    row: {
+      id: "a",
+      title: "Buy milk",
+      done: false,
+      priority: 3,
+      tags: ["home", "errand"],
+      big: null,
+    },
     file: "tasks/a.yaml",
     yaml: "title: Buy milk\n",
   });
@@ -169,17 +237,28 @@ test("a record carries its YAML, and a YAML that cannot load is reported on the 
     yaml: null,
     yamlError: "data/yaml/tasks.json: 404 Not Found",
   });
-  await expect(make().record("tasks", "zz")).rejects.toMatchObject({ status: 404 });
+  await expect(make().record("tasks", "zz")).rejects.toMatchObject({
+    status: 404,
+  });
 });
 
 test("a record whose key or file is missing from the YAML map has no YAML", async () => {
-  expect(await make().record("tasks", "b")).toMatchObject({ file: "tasks/gone.yaml", yaml: null });
-  expect(await make().record("tasks", "c")).toMatchObject({ file: "", yaml: null });
+  expect(await make().record("tasks", "b")).toMatchObject({
+    file: "tasks/gone.yaml",
+    yaml: null,
+  });
+  expect(await make().record("tasks", "c")).toMatchObject({
+    file: "",
+    yaml: null,
+  });
   expect((await make().record("tasks", "c")).yamlError).toBeUndefined();
 });
 
 test("records of a list table share the file's text", async () => {
-  const list: YamlMap = { files: { "tasks.yaml": "- id: a\n- id: b\n" }, keys: { a: "tasks.yaml", b: "tasks.yaml" } };
+  const list: YamlMap = {
+    files: { "tasks.yaml": "- id: a\n- id: b\n" },
+    keys: { a: "tasks.yaml", b: "tasks.yaml" },
+  };
   const api = make(async () => list);
   expect((await api.record("tasks", "a")).yaml).toBe("- id: a\n- id: b\n");
   expect((await api.record("tasks", "b")).file).toBe("tasks.yaml");
@@ -203,8 +282,12 @@ test("sql runs reads with the server's shape and refuses everything else", async
     ],
     truncated: false,
   });
-  await expect(api.sql("update tasks set title = 'x'")).rejects.toMatchObject({ status: 403 });
-  await expect(api.sql("select 1; select 2")).rejects.toMatchObject({ status: 400 });
+  await expect(api.sql("update tasks set title = 'x'")).rejects.toMatchObject({
+    status: 403,
+  });
+  await expect(api.sql("select 1; select 2")).rejects.toMatchObject({
+    status: 400,
+  });
   await expect(api.sql("select * from nope")).rejects.toBeInstanceOf(ApiError);
 });
 
@@ -225,9 +308,17 @@ test("writes are refused", async () => {
 
 test("integer filters match on columns without affinity like the server", async () => {
   const api = make();
-  const has = await api.rows("nums", { limit: 10, offset: 0, filters: [{ col: "vals", op: "has", value: 3 }] });
+  const has = await api.rows("nums", {
+    limit: 10,
+    offset: 0,
+    filters: [{ col: "vals", op: "has", value: 3 }],
+  });
   expect(ids(has.rows)).toEqual(["n1"]);
-  const idx = await api.rows("tasks__tags", { limit: 10, offset: 0, filters: [{ col: "idx", op: "eq", value: 0 }] });
+  const idx = await api.rows("tasks__tags", {
+    limit: 10,
+    offset: 0,
+    filters: [{ col: "idx", op: "eq", value: 0 }],
+  });
   expect(idx.total).toBe(3);
 });
 
@@ -235,7 +326,70 @@ test("a record key named __proto__ finds its YAML, and one named like an Object 
   const map = JSON.parse('{"files":{"tasks/__proto__.yaml":"x: 1\\n"},"keys":{"__proto__":"tasks/__proto__.yaml"}}');
   const db = fixture();
   db.run("INSERT INTO tasks (id) VALUES ('__proto__'), ('toString')");
-  const api = createStaticApi({ db, snapshot, loadYaml: async () => map });
-  expect(await api.record("tasks", "__proto__")).toMatchObject({ file: "tasks/__proto__.yaml", yaml: "x: 1\n" });
-  expect(await api.record("tasks", "toString")).toMatchObject({ file: "", yaml: null });
+  const api = createStaticApi({
+    db,
+    snapshot,
+    loadYaml: async () => map,
+    loadPage: async () => "",
+  });
+  expect(await api.record("tasks", "__proto__")).toMatchObject({
+    file: "tasks/__proto__.yaml",
+    yaml: "x: 1\n",
+  });
+  expect(await api.record("tasks", "toString")).toMatchObject({
+    file: "",
+    yaml: null,
+  });
+});
+
+test("a page's html comes from its file in the export", async () => {
+  expect(await make().pageHtml("board")).toBe("<p>board</p>");
+});
+
+test("page sql runs SELECTs for pages that may, and refuses the rest", async () => {
+  const api = make();
+  expect(await api.pageSql("board", "select id from tasks where id = 'a'")).toMatchObject({ rows: [{ id: "a" }] });
+  await expect(api.pageSql("plain", "select 1")).rejects.toMatchObject({
+    status: 403,
+    message: "page plain may not run SQL",
+  });
+  await expect(api.pageSql("board", "delete from tasks")).rejects.toMatchObject({
+    status: 403,
+    message: "a page can only run SELECT",
+  });
+  await expect(api.pageSql("nope", "select 1")).rejects.toMatchObject({
+    status: 404,
+    message: "unknown page: nope",
+  });
+});
+
+test("page sql allows replace() in a WITH-led SELECT but not REPLACE INTO", async () => {
+  const api = make();
+  expect(
+    await api.pageSql("board", "with x as (select 'ab' as s) select replace (s, 'a', 'c') as r from x"),
+  ).toMatchObject({
+    rows: [{ r: "cb" }],
+  });
+  await expect(api.pageSql("board", "with x as (select 1) replace into tasks select * from x")).rejects.toMatchObject({
+    status: 403,
+  });
+});
+
+test("page sql runs a WITH-led SELECT but not a WITH-led write", async () => {
+  const api = make();
+  const { total } = await api.rows("tasks", {
+    limit: 10,
+    offset: 0,
+    filters: [],
+  });
+  expect(await api.pageSql("board", "with x as (select 1 as n) select n from x")).toMatchObject({ rows: [{ n: 1 }] });
+  await expect(api.pageSql("board", "with x as (select 1) delete from tasks")).rejects.toMatchObject({
+    status: 403,
+    message: "a page can only run SELECT",
+  });
+  await expect(api.pageSql("board", "with x as (select 1) delete from tasks returning *")).rejects.toMatchObject({
+    status: 403,
+    message: "a page can only run SELECT",
+  });
+  expect((await api.rows("tasks", { limit: 10, offset: 0, filters: [] })).total).toBe(total);
 });

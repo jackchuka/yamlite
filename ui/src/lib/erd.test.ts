@@ -35,6 +35,7 @@ const meta = (tables: TableMeta[], views: ViewMeta[] = []): Meta => ({
   configError: null,
   tables,
   views,
+  pages: [],
 });
 
 const schema = (

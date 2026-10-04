@@ -32,9 +32,17 @@ test("a sync without changes refetches nothing", () => {
 });
 
 test("reloads refetch meta, conflicts refetch the conflict list", () => {
-  expect(invalidationsFor({ type: "reload", at: "t", tables: [] })).toEqual([["meta"]]);
+  expect(invalidationsFor({ type: "reload", at: "t", tables: [] })).toEqual([["meta"], ["page"]]);
   expect(
     invalidationsFor({ type: "conflict", at: "t", table: "tasks", key: "a", winner: "file", savedTo: null }),
   ).toEqual([["conflicts"]]);
   expect(invalidationsFor({ type: "error", at: "t", message: "x" })).toEqual([]);
+});
+
+test("a saved page reloads only that page; a config reload reloads every page", () => {
+  expect(invalidationsFor({ type: "page", at: "", pages: ["board", "copy"] })).toEqual([
+    ["page", "board"],
+    ["page", "copy"],
+  ]);
+  expect(invalidationsFor({ type: "reload", at: "", tables: [] })).toEqual([["meta"], ["page"]]);
 });
