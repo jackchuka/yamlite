@@ -54,7 +54,7 @@ test("an atomic save right after ready is never lost", async () => {
 }, 30000);
 
 test("a table directory created later is watched", async () => {
-  const t = await start({}, "tables:\n  tasks:\n    path: ./tasks\n");
+  const t = await start({}, 'tables:\n  tasks:\n    files: "tasks/**/*.{yaml,yml}"\n');
   sql(t.db, "CREATE TABLE tasks (id TEXT PRIMARY KEY, title TEXT)");
   sql(t.db, "INSERT INTO tasks VALUES ('x', 'X')");
   await waitFor(() => read(join(t.root, "tasks/x.yaml")) === "title: X\n");
@@ -137,4 +137,24 @@ test("a folder moved into a table is synced", async () => {
   await waitFor(() => title(t.db, "moved/x") === "X" && title(t.db, "moved/sub/y") === "Y");
   await t.y.close();
   expect(t.errors).toEqual([]);
+});
+
+test("a table covering the root picks up edits and does not loop on its own database writes", async () => {
+  const root = dataRoot();
+  write(join(root, "a.yaml"), "title: A\n");
+  write(join(root, "sub/b.yaml"), "title: B\n");
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "**/*.{yaml,yml}"\n');
+  const db = join(root, "data.sqlite");
+  const y = await open({ root, db });
+  const errors: Error[] = [];
+  let syncs = 0;
+  const w = y.watch({ onError: (e) => errors.push(e), onSync: () => syncs++ }, fast);
+  await w.ready;
+  const titleOf = (id: string) => sql(db, "SELECT title FROM docs WHERE id = ?", id)[0]?.title;
+  await new Promise((r) => setTimeout(r, 1000));
+  expect(syncs).toBeLessThanOrEqual(2);
+  write(join(root, "sub/b.yaml"), "title: C\n");
+  await waitFor(() => titleOf("sub/b") === "C");
+  await y.close();
+  expect(errors).toEqual([]);
 });

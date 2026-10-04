@@ -4,7 +4,7 @@ export const COLUMN_TYPES: readonly ColumnType[] = ["INTEGER", "REAL", "TEXT", "
 export type ColumnFormat = "markdown";
 export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown"];
 
-export type Mode = "dir" | "list";
+export type Mode = "files" | "list";
 export type Rec = Record<string, unknown>;
 export type DbValue = null | number | bigint | string | Uint8Array;
 export type DbRow = Record<string, DbValue>;
@@ -45,10 +45,24 @@ export interface ViewRecord {
   identity: string[];
 }
 
+// another table's hold on files inside a files table's folder
+export interface Claim {
+  // 'table "archive"' or "yamlite.yaml"; quoted in skip reasons and errors
+  owner: string;
+  // absolute: the claiming table's folder (glob set) or its one file (glob null)
+  path: string;
+  glob: string | null;
+  // same folder as the reading table: a file both match is an error, not a skip
+  tie: boolean;
+}
+
 export interface TableSpec {
   name: string;
+  // files: the folder the glob starts from; list: the one file
   path: string;
   mode: Mode;
+  // files: the pattern below path ("**/*.{yaml,yml}"); list: null
+  glob: string | null;
   key: string;
   columns: Record<string, ColumnType>;
   formats: Record<string, ColumnFormat>;
@@ -56,8 +70,8 @@ export interface TableSpec {
   references: Reference[];
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)
   persisted: boolean;
-  // paths of other tables inside this directory table's folder; never read or written by it
-  exclude: string[];
+  // files that other tables (and yamlite.yaml) own inside this files table's folder
+  exclude: Claim[];
   expand: ExpandSpec[];
 }
 

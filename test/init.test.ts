@@ -100,15 +100,22 @@ describe("generateConfig", () => {
     );
   });
 
-  test("writes key and path only when they differ from the defaults", () => {
+  test("writes key, path and files only when they differ from the defaults", () => {
     const root = tmpRoot();
     const outside = tmpRoot();
     write(join(outside, "x.yaml"), "a: 1\n");
     write(join(root, "people.yaml"), "- slug: ann\n");
-    write(join(root, "yamlite.yaml"), `tables:\n  people:\n    key: slug\n  inbox:\n    path: ${outside}\n`);
+    write(join(root, "content/blog/p.yaml"), "t: x\n");
+    write(join(root, "tasks/a.yaml"), "t: y\n");
+    write(
+      join(root, "yamlite.yaml"),
+      `tables:\n  people:\n    key: slug\n  inbox:\n    files: ${outside}/*.yaml\n  posts:\n    files: "content/blog/**/*.yaml"\n`,
+    );
     const out = generateConfig({ root, force: true });
-    expect(out).toContain(`  inbox:\n    path: ${outside}\n    columns:\n      a: INTEGER\n`);
+    expect(out).toContain(`  inbox:\n    files: ${outside}/*.yaml\n    columns:\n      a: INTEGER\n`);
     expect(out).toContain("  people:\n    key: slug\n    columns:\n      slug: TEXT\n");
+    expect(out).toContain("  posts:\n    files: content/blog/**/*.yaml\n");
+    expect(out).toContain("  tasks:\n    columns:\n");
   });
 
   test("refuses mixed shapes and an existing file without force", () => {

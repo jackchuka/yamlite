@@ -420,3 +420,16 @@ test("pages are written next to the data, and pages that cannot be exported are 
     gone: "page file not found: .pages/missing.html",
   });
 });
+
+test("a files table outside the root keeps only its folder name in the files pattern", async () => {
+  const outside = tmpRoot();
+  write(join(outside, "n.yaml"), "body: hi\n");
+  const root = setup({ "yamlite.yaml": `tables:\n  notes: {}\n  inbox:\n    files: ${outside}/*.yaml\n` });
+  const dir = tmpRoot();
+  await writeSnapshotData({ root, dir });
+  const snap = readJson(join(dir, "data/snapshot.json"));
+  const table = (name: string) => snap.meta.tables.find((t: any) => t.name === name);
+  expect(table("inbox").files).toBe(`${basename(outside)}/*.yaml`);
+  expect(snap.schemas.inbox.files).toBe(`${basename(outside)}/*.yaml`);
+  expect(table("notes").files).toBe("notes/**/*.{yaml,yml}");
+});

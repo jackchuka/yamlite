@@ -57,7 +57,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
           }
         }
         // same shape as the engine's backup of a database side
-        const current = row ? rowToRecord(row, before, spec.mode === "dir" ? spec.key : undefined) : null;
+        const current = row ? rowToRecord(row, before, spec.mode === "files" ? spec.key : undefined) : null;
         // the restored side wins now, so the saved version belongs to the side that won the original conflict
         swapPath = saveConflict(ctx.stateDir, spec.name, key, current, entry.winner === "db" ? "file" : "db");
         if (backup.record === null) {

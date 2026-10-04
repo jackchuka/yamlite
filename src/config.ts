@@ -1,16 +1,17 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse } from "yaml";
-import { YAML_EXT } from "./source/yamldoc.ts";
+import { claims } from "./source/files.ts";
+import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
 import {
   COLUMN_FORMATS,
   COLUMN_TYPES,
   type ColumnFormat,
   type ColumnType,
+  type Claim,
   type ExpandSpec,
   type IndexSpec,
-  type Mode,
   type PageAccess,
   type PageSpec,
   type Reference,
@@ -20,7 +21,10 @@ import { declaredViews } from "./views.ts";
 
 export interface TableInput {
   name: string;
-  path: string;
+  // a YAML file holding a list of records
+  path?: string;
+  // a glob of files, one record each
+  files?: string;
   key?: string;
   columns?: Record<string, string>;
   formats?: Record<string, string>;
@@ -28,6 +32,9 @@ export interface TableInput {
   references?: Record<string, unknown>;
   expand?: Record<string, unknown>;
 }
+
+// a table input whose files are found: path is absolute, glob is null for a list table
+type Located = Omit<TableInput, "path" | "files"> & { path: string; glob: string | null };
 
 export interface OpenOptions {
   root?: string;
@@ -52,13 +59,57 @@ export function expandPath(p: string, base: string): string {
   return isAbsolute(p) ? p : resolve(base, p);
 }
 
-export function detectMode(path: string): Mode {
-  if (existsSync(path)) return statSync(path).isDirectory() ? "dir" : "list";
-  return YAML_EXT.test(path) ? "list" : "dir";
+const WILDCARD = /[*?[{]/;
+const YAML_FILES = /\*\.(?:ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
+
+// "content/blog/**/*.yaml" → base "content/blog", glob "**/*.yaml"
+export function splitFiles(where: string, files: string): { base: string; glob: string } {
+  const parts = files.split("/");
+  const i = parts.findIndex((p) => WILDCARD.test(p));
+  if (i < 0 || !YAML_FILES.test(files)) throw new Error(`${where}files must end in *.yaml, *.yml or *.{yaml,yml}`);
+  const tail = parts.slice(i);
+  if (tail.some((p) => p === "." || p === "..")) throw new Error(`${where}files cannot use . or .. after a wildcard`);
+  return { base: parts.slice(0, i).join("/"), glob: tail.join("/") };
 }
 
-function scanRoot(root: string): TableInput[] {
-  const out: TableInput[] = [];
+class FolderPathError extends Error {}
+
+function locate(
+  where: string,
+  t: { path?: string; files?: string },
+  base: string,
+  conventional?: { name: string; root: string },
+): { path: string; glob: string | null } {
+  if (t.path !== undefined && t.files !== undefined) throw new Error(`${where}use either path or files, not both`);
+  if (t.files !== undefined) {
+    const split = splitFiles(where, t.files);
+    return { path: expandPath(split.base === "" ? "." : split.base, base), glob: split.glob };
+  }
+  if (t.path === undefined) throw new Error(`${where}needs path or files`);
+  const path = expandPath(t.path, base);
+  if ((existsSync(path) && statSync(path).isDirectory()) || !YAML_EXT.test(path)) {
+    const dir = t.path.replace(/^\.\//, "").replace(/^\.$/, "").replace(/\/+$/, "");
+    const glob = dir === "" ? YAML_GLOB : `${dir}/${YAML_GLOB}`;
+    const isDefault = conventional !== undefined && path === join(conventional.root, conventional.name);
+    throw new FolderPathError(
+      isDefault
+        ? `${where}path must be a YAML file; remove the path: line (the folder ${conventional.name}/ is the default) or use files: "${glob}"`
+        : `${where}path must be a YAML file; for one record per file use files: "${glob}"`,
+    );
+  }
+  return { path, glob: null };
+}
+
+// how yamlite.yaml writes a files table: relative to the root inside it, absolute outside
+export function filesOf(root: string, spec: TableSpec): string {
+  const rel = relative(root, spec.path);
+  if (rel === "") return spec.glob ?? "";
+  const base = rel.startsWith("..") || isAbsolute(rel) ? spec.path : rel.split(sep).join("/");
+  return `${base}/${spec.glob}`;
+}
+
+function scanRoot(root: string): Located[] {
+  const out: Located[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const name = entry.name;
     if (name.startsWith(".") || name === "node_modules" || CONFIG_NAMES.includes(name)) continue;
@@ -71,14 +122,15 @@ function scanRoot(root: string): TableInput[] {
         continue;
       }
     }
-    if (kind.isDirectory()) out.push({ name, path });
-    else if (kind.isFile() && YAML_EXT.test(name)) out.push({ name: name.replace(YAML_EXT, ""), path });
+    if (kind.isDirectory()) out.push({ name, path, glob: YAML_GLOB });
+    else if (kind.isFile() && YAML_EXT.test(name)) out.push({ name: name.replace(YAML_EXT, ""), path, glob: null });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface RawTable {
   path?: string;
+  files?: string;
   key?: string;
   columns?: Record<string, string>;
   formats?: Record<string, string>;
@@ -95,12 +147,13 @@ export function configPath(root: string): string | null {
   return null;
 }
 
-// a listed table without a path lives next to the config: <name>.yaml / <name>.yml if present, else <name>/
-function defaultPath(root: string, name: string): string {
+// a listed table without a path or files lives next to the config: <name>.yaml / <name>.yml if present, else <name>/
+function defaultLocation(root: string, name: string): { path: string; glob: string | null } {
   for (const ext of [".yaml", ".yml"]) {
-    if (existsSync(join(root, `${name}${ext}`))) return join(root, `${name}${ext}`);
+    const path = join(root, `${name}${ext}`);
+    if (existsSync(path)) return { path, glob: null };
   }
-  return join(root, name);
+  return { path: join(root, name), glob: YAML_GLOB };
 }
 
 export function listedTables(path: string): Record<string, unknown> {
@@ -121,7 +174,7 @@ function readRootConfig(root: string): { tables: Array<{ name: string } & RawTab
   return { tables: Object.entries(raw?.tables ?? {}).map(([name, t]) => ({ name, ...t })), pages: raw?.pages };
 }
 
-function toSpec(t: TableInput, persisted: boolean): TableSpec {
+function toSpec(t: Located, persisted: boolean): TableSpec {
   if (!t.name || t.name.startsWith("_yamlite") || /[/\\\0]/.test(t.name) || t.name === "." || t.name.includes("..")) {
     throw new Error(`invalid table name: "${t.name}"`);
   }
@@ -129,7 +182,8 @@ function toSpec(t: TableInput, persisted: boolean): TableSpec {
   return {
     name: t.name,
     path: t.path,
-    mode: detectMode(t.path),
+    mode: t.glob === null ? "list" : "files",
+    glob: t.glob,
     key: t.key ?? "id",
     columns,
     formats: toFormats(`table "${t.name}": `, t.formats, columns),
@@ -143,10 +197,24 @@ function toSpec(t: TableInput, persisted: boolean): TableSpec {
   };
 }
 
-function withExcludes(tables: TableSpec[]): TableSpec[] {
-  return tables.map((t) =>
-    t.mode === "dir" ? { ...t, exclude: tables.filter((o) => o.path.startsWith(t.path + sep)).map((o) => o.path) } : t,
-  );
+// the most specific table owns a file: a table excludes the files of every table inside its folder,
+// and a table with the same folder that matches the same file is an error for both
+function withClaims(tables: TableSpec[], configFiles: string[]): TableSpec[] {
+  return tables.map((t) => {
+    if (t.mode !== "files") return t;
+    const inside = (o: TableSpec) =>
+      o !== t && (o.mode === "files" && o.path === t.path ? true : o.path.startsWith(t.path + sep));
+    const exclude: Claim[] = tables.filter(inside).map((o) => ({
+      owner: `table "${o.name}"`,
+      path: o.path,
+      glob: o.glob,
+      tie: o.mode === "files" && o.path === t.path,
+    }));
+    for (const path of configFiles) {
+      if (path.startsWith(t.path + sep)) exclude.push({ owner: basename(path), path, glob: null, tie: false });
+    }
+    return { ...t, exclude };
+  });
 }
 
 const REFERENCE = /^([^.\s]+)(?:\.([^.\s]+))?$/;
@@ -348,28 +416,63 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     if (requireConfig && configPath(root) === null) {
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
-    const merged = new Map(scanRoot(root).map((t) => [t.name, t]));
+    const scanned = scanRoot(root);
     const raw = readRootConfig(root);
+    const declared = new Map<string, Located>();
+    const pathErrors: string[] = [];
     for (const o of raw.tables) {
-      const prev = merged.get(o.name);
-      const path = o.path ? expandPath(o.path, root) : (prev?.path ?? defaultPath(root, o.name));
-      merged.set(o.name, {
+      const where = `table "${o.name}": `;
+      const prev = scanned.find((s) => s.name === o.name);
+      let loc: { path: string; glob: string | null };
+      try {
+        loc =
+          o.path !== undefined || o.files !== undefined
+            ? locate(where, o, root, { name: o.name, root })
+            : prev
+              ? { path: prev.path, glob: prev.glob }
+              : defaultLocation(root, o.name);
+      } catch (e) {
+        if (!(e instanceof FolderPathError)) throw e;
+        pathErrors.push(e.message);
+        continue;
+      }
+      declared.set(o.name, {
         name: o.name,
-        path,
-        key: o.key ?? prev?.key,
-        columns: { ...prev?.columns, ...o.columns },
-        formats: o.formats ?? prev?.formats,
-        indexes: o.indexes ?? prev?.indexes,
-        references: o.references ?? prev?.references,
-        expand: o.expand ?? prev?.expand,
+        ...loc,
+        key: o.key,
+        columns: o.columns,
+        formats: o.formats,
+        indexes: o.indexes,
+        references: o.references,
+        expand: o.expand,
       });
     }
+    if (pathErrors.length > 0) throw new Error(pathErrors.join("\n"));
     const inCode = new Set<string>();
     for (const t of opts.tables ?? []) {
-      merged.set(t.name, { ...t, path: expandPath(t.path, root) });
+      declared.set(t.name, { ...t, ...locate(`table "${t.name}": `, t, root) });
       inCode.add(t.name);
     }
-    const tables = checkViewNames(withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name)))));
+    // a declared files table covering a folder or file keeps the conventions from making it a table of its own
+    const globs = [...declared.values()].filter((d) => d.glob !== null);
+    const covered = (s: Located) =>
+      s.glob !== null
+        ? globs.some((d) => s.path === d.path || s.path.startsWith(d.path + sep))
+        : globs.some((d) => claims({ owner: "", path: d.path, glob: d.glob, tie: false }, s.path));
+    const merged = new Map<string, Located>();
+    for (const s of scanned) {
+      const d = declared.get(s.name);
+      if (d) merged.set(s.name, d);
+      else if (!covered(s)) merged.set(s.name, s);
+    }
+    for (const [name, d] of declared) if (!merged.has(name)) merged.set(name, d);
+    const configFiles = CONFIG_NAMES.map((name) => join(root, name));
+    const tables = checkViewNames(
+      withClaims(
+        [...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))),
+        configFiles,
+      ),
+    );
     return {
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
       stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(root, ".yamlite"),
@@ -383,7 +486,10 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     db,
     stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(dirname(db), ".yamlite"),
     tables: checkViewNames(
-      withExcludes((opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false))),
+      withClaims(
+        (opts.tables ?? []).map((t) => toSpec({ ...t, ...locate(`table "${t.name}": `, t, process.cwd()) }, false)),
+        [],
+      ),
     ),
     pages: [],
   };

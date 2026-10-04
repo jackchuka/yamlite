@@ -7,7 +7,7 @@ const table = (
   key: string,
   columns: TableMeta["columns"],
   references: TableMeta["references"] = [],
-): TableMeta => ({ name, mode: "dir", path: name, key, columns, formats: {}, references, count: 1, inDb: true });
+): TableMeta => ({ name, mode: "files", path: name, key, columns, formats: {}, references, count: 1, inDb: true });
 
 const view = (
   name: string,
@@ -44,7 +44,7 @@ const schema = (
   views: TableSchema["views"] = [],
 ): TableSchema => ({
   name,
-  mode: "dir",
+  mode: "files",
   path: name,
   key: "id",
   inDb: true,

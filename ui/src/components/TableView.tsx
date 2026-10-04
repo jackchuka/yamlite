@@ -122,7 +122,7 @@ export function TableView({
           </h1>
           {t ? (
             <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
-              {t.mode === "dir" ? `${t.path}/*.yaml` : t.path}
+              {t.mode === "files" ? t.files : t.path}
             </span>
           ) : (
             <>

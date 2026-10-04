@@ -46,7 +46,7 @@ export function RenameKeyDialog({
         <DialogHeader>
           <DialogTitle>キーを変更</DialogTitle>
           <DialogDescription>
-            {table.mode === "dir"
+            {table.mode === "files"
               ? "ファイル名が変わります。新しいファイルは DB の値から書き直されるので、元のファイルのコメントは失われます。"
               : "リスト内のレコードのキーが変わります。このレコードのコメントは失われることがあります。"}
           </DialogDescription>

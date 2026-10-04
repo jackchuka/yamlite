@@ -31,7 +31,7 @@ const meta = (taskCount = 3): Meta => ({
   tables: [
     {
       name: "tasks",
-      mode: "dir",
+      mode: "files",
       path: "tasks",
       key: "id",
       columns: { id: "TEXT", project: "TEXT" },
@@ -42,7 +42,7 @@ const meta = (taskCount = 3): Meta => ({
     },
     {
       name: "projects",
-      mode: "dir",
+      mode: "files",
       path: "projects",
       key: "id",
       columns: { id: "TEXT" },
@@ -153,7 +153,7 @@ test("a self-reference is drawn with the self-loop edge", () => {
       tables: [
         {
           name: "tasks",
-          mode: "dir",
+          mode: "files",
           path: "tasks",
           key: "id",
           columns: { id: "TEXT", parent: "TEXT" },

@@ -2,7 +2,8 @@ import { mkdirSync, symlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { expandPath, resolveConfig } from "../src/config.ts";
+import { expandPath, filesOf, resolveConfig } from "../src/config.ts";
+import type { TableSpec } from "../src/types.ts";
 import { dataRoot, tmpRoot, write } from "./helpers.ts";
 
 test("discovers tables by convention", () => {
@@ -19,12 +20,13 @@ test("discovers tables by convention", () => {
   expect(cfg.tables.map((t) => [t.name, t.mode])).toEqual([
     ["other", "list"],
     ["people", "list"],
-    ["tasks", "dir"],
+    ["tasks", "files"],
   ]);
   expect(cfg.tables[2]).toEqual({
     name: "tasks",
     path: join(root, "tasks"),
-    mode: "dir",
+    mode: "files",
+    glob: "**/*.{yaml,yml}",
     key: "id",
     columns: {},
     formats: {},
@@ -44,7 +46,7 @@ test("yamlite.yaml overrides discovered tables and adds outside ones", () => {
   write(join(root, "people.yaml"), "[]\n");
   write(
     join(root, "yamlite.yaml"),
-    `tables:\n  people:\n    key: slug\n    columns: { age: integer }\n  inbox:\n    path: ${outside}\n  rel:\n    path: ../x.yaml\n`,
+    `tables:\n  people:\n    key: slug\n    columns: { age: integer }\n  inbox:\n    files: ${outside}/**/*.yaml\n  rel:\n    path: ../x.yaml\n`,
   );
   const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
   expect(t.people).toMatchObject({
@@ -52,7 +54,7 @@ test("yamlite.yaml overrides discovered tables and adds outside ones", () => {
     columns: { age: "INTEGER" },
     mode: "list",
   });
-  expect(t.inbox).toMatchObject({ path: outside, mode: "dir" });
+  expect(t.inbox).toMatchObject({ path: outside, mode: "files", glob: "**/*.yaml" });
   expect(t.rel).toMatchObject({ path: resolve(root, "../x.yaml"), mode: "list" });
 });
 
@@ -116,7 +118,7 @@ test("requires yamlite.yaml unless asked not to", () => {
 test("rejects bad configs", () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  ghost:\n    key: id\n");
-  expect(resolveConfig({ root }).tables[0]).toMatchObject({ name: "ghost", path: join(root, "ghost"), mode: "dir" });
+  expect(resolveConfig({ root }).tables[0]).toMatchObject({ name: "ghost", path: join(root, "ghost"), mode: "files" });
 
   const root2 = tmpRoot();
   write(join(root2, "p.yaml"), "[]\n");
@@ -128,14 +130,16 @@ test("rejects bad configs", () => {
   expect(() =>
     resolveConfig({
       db: "/tmp/x.db",
-      tables: [{ name: "_yamlite_x", path: "/tmp/q" }],
+      tables: [{ name: "_yamlite_x", files: "/tmp/q/*.yaml" }],
     }),
   ).toThrow(/invalid table name/);
 });
 
 test("rejects table names that are not plain names", () => {
   for (const name of ["a/b", "a\\b", "a\0b", ".", "..", "x..y"]) {
-    expect(() => resolveConfig({ db: "/tmp/x.db", tables: [{ name, path: "/tmp/q" }] })).toThrow(/invalid table name/);
+    expect(() => resolveConfig({ db: "/tmp/x.db", tables: [{ name, files: "/tmp/q/*.yaml" }] })).toThrow(
+      /invalid table name/,
+    );
   }
 });
 
@@ -149,17 +153,17 @@ test("discovers symlinked tables", () => {
   symlinkSync(join(outside, "missing"), join(root, "broken"));
   expect(resolveConfig({ root }).tables.map((t) => [t.name, t.mode])).toEqual([
     ["people", "list"],
-    ["tasks", "dir"],
+    ["tasks", "files"],
   ]);
 });
 
 test("library mode keeps state next to the database", () => {
   const cfg = resolveConfig({
     db: "/tmp/a/b.sqlite",
-    tables: [{ name: "t", path: "/tmp/a/t" }],
+    tables: [{ name: "t", files: "/tmp/a/t/**/*.yaml" }],
   });
   expect(cfg.stateDir).toBe("/tmp/a/.yamlite");
-  expect(cfg.tables[0]?.mode).toBe("dir");
+  expect(cfg.tables[0]?.mode).toBe("files");
 });
 
 test("parses index declarations", () => {
@@ -217,29 +221,15 @@ test("tables passed in code are not persisted, the ones from the root are", () =
   const root = dataRoot();
   const outside = tmpRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
-  const tables = resolveConfig({ root, tables: [{ name: "inbox", path: outside }] }).tables;
+  const tables = resolveConfig({ root, tables: [{ name: "inbox", files: `${outside}/**/*.yaml` }] }).tables;
   expect(tables.map((t) => [t.name, t.persisted])).toEqual([
     ["tasks", true],
     ["inbox", false],
   ]);
   expect(
-    resolveConfig({ db: join(root, "x.db"), tables: [{ name: "inbox", path: outside }] }).tables[0]?.persisted,
+    resolveConfig({ db: join(root, "x.db"), tables: [{ name: "inbox", files: `${outside}/**/*.yaml` }] }).tables[0]
+      ?.persisted,
   ).toBe(false);
-});
-
-test("a directory table excludes the paths of tables nested inside it", () => {
-  const root = tmpRoot();
-  write(join(root, "tasks/a.yaml"), "x: 1\n");
-  write(join(root, "tasks/archive/b.yaml"), "x: 1\n");
-  write(join(root, "tasks/people.yaml"), "- id: 1\n");
-  write(
-    join(root, "yamlite.yaml"),
-    "tables:\n  tasks: {}\n  archive:\n    path: tasks/archive\n  people:\n    path: tasks/people.yaml\n",
-  );
-  const byName = new Map(resolveConfig({ root }).tables.map((t) => [t.name, t.exclude]));
-  expect(byName.get("tasks")).toEqual([join(root, "tasks/archive"), join(root, "tasks/people.yaml")]);
-  expect(byName.get("archive")).toEqual([]);
-  expect(byName.get("people")).toEqual([]);
 });
 
 test("expand declares views over JSON columns, nested", () => {
@@ -296,4 +286,114 @@ test("a view name must not clash with a table or another view", () => {
   );
   write(join(root, "yamlite.yaml"), "tables:\n  a:\n    expand: { b__c: {} }\n  a__b:\n    expand: { c: {} }\n");
   expect(() => resolveConfig({ root })).toThrow(/view name "a__b__c" is already used by a view of table "a"/);
+});
+
+test("files: is a glob from the root: its fixed part is the folder, the rest the pattern", () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    'tables:\n  posts:\n    files: "content/blog/**/*.yaml"\n  top:\n    files: "*.yml"\n  away:\n    files: ~/inbox/*.yaml\n',
+  );
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(t.posts).toMatchObject({ mode: "files", path: join(root, "content/blog"), glob: "**/*.yaml" });
+  expect(t.top).toMatchObject({ mode: "files", path: root, glob: "*.yml" });
+  expect(t.away).toMatchObject({ mode: "files", path: join(homedir(), "inbox"), glob: "*.yaml" });
+});
+
+test("a path to a folder is refused with the files: line to use instead", () => {
+  const root = tmpRoot();
+  write(join(root, "inbox/a.yaml"), "x: 1\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    path: ./inbox/\n");
+  expect(() => resolveConfig({ root })).toThrow(
+    'table "tasks": path must be a YAML file; for one record per file use files: "inbox/**/*.{yaml,yml}"',
+  );
+  expect(() => resolveConfig({ db: join(root, "x.db"), tables: [{ name: "t", path: "./missing" }] })).toThrow(
+    'files: "missing/**/*.{yaml,yml}"',
+  );
+});
+
+test("a path to the table's own folder says the line can be removed", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    path: ./tasks\n");
+  expect(() => resolveConfig({ root })).toThrow(
+    'table "tasks": path must be a YAML file; remove the path: line (the folder tasks/ is the default) or use files: "tasks/**/*.{yaml,yml}"',
+  );
+});
+
+test("every bad path is reported at once", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "notes/a.yaml"), "x: 1\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    path: ./tasks\n  notes:\n    path: ./other/\n");
+  let message = "";
+  try {
+    resolveConfig({ root });
+  } catch (e) {
+    message = (e as Error).message;
+  }
+  expect(message.split("\n")).toEqual([
+    'table "tasks": path must be a YAML file; remove the path: line (the folder tasks/ is the default) or use files: "tasks/**/*.{yaml,yml}"',
+    'table "notes": path must be a YAML file; for one record per file use files: "other/**/*.{yaml,yml}"',
+  ]);
+});
+
+test("a path to the root suggests files without a leading slash", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  all:\n    path: ./\n");
+  expect(() => resolveConfig({ root })).toThrow('files: "**/*.{yaml,yml}"');
+});
+
+test.each([
+  ['    path: a.yaml\n    files: "a/*.yaml"\n', 'table "t": use either path or files, not both'],
+  ['    files: "a/*.json"\n', 'table "t": files must end in *.yaml, *.yml or *.{yaml,yml}'],
+  ['    files: "a/**/../*.yaml"\n', 'table "t": files cannot use . or .. after a wildcard'],
+])("rejects files: %j", (entry, message) => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), `tables:\n  t:\n${entry}`);
+  expect(() => resolveConfig({ root })).toThrow(message);
+});
+
+test("a table covering the root stops folder discovery and never claims yamlite.yaml", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "people.yaml"), "x: 2\n");
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "**/*.{yaml,yml}"\n');
+  const tables = resolveConfig({ root }).tables;
+  expect(tables.map((t) => t.name)).toEqual(["docs"]);
+  expect(tables[0]?.exclude).toContainEqual({
+    owner: "yamlite.yaml",
+    path: join(root, "yamlite.yaml"),
+    glob: null,
+    tie: false,
+  });
+});
+
+test("a nested files table is claimed from its parent, a list table wins over a glob, a same-folder glob ties", () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    'tables:\n  tasks:\n    files: "tasks/**/*.yaml"\n  archive:\n    files: "tasks/archive/*.yaml"\n' +
+      '  people:\n    path: tasks/people.yaml\n  other:\n    files: "tasks/*.yaml"\n',
+  );
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(t.tasks?.exclude).toEqual([
+    { owner: 'table "archive"', path: join(root, "tasks/archive"), glob: "*.yaml", tie: false },
+    { owner: 'table "people"', path: join(root, "tasks/people.yaml"), glob: null, tie: false },
+    { owner: 'table "other"', path: join(root, "tasks"), glob: "*.yaml", tie: true },
+  ]);
+  expect(t.archive?.exclude).toEqual([]);
+});
+
+test("filesOf shows a files table the way yamlite.yaml writes it", () => {
+  const root = tmpRoot();
+  const outside = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    `tables:\n  tasks: {}\n  docs:\n    files: "*.yml"\n  away:\n    files: ${outside}/**/*.yaml\n`,
+  );
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(filesOf(root, t.tasks as TableSpec)).toBe("tasks/**/*.{yaml,yml}");
+  expect(filesOf(root, t.docs as TableSpec)).toBe("*.yml");
+  expect(filesOf(root, t.away as TableSpec)).toBe(`${outside}/**/*.yaml`);
 });

@@ -1,15 +1,16 @@
 import { chmodSync, existsSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { DirSource, invalidKey } from "../src/source/dir.ts";
+import { claims, FilesSource, invalidKey, matchesFiles } from "../src/source/files.ts";
+import { YAML_GLOB } from "../src/source/yamldoc.ts";
 import { read, tmpRoot, write } from "./helpers.ts";
 
 const setup = () => {
   const dir = join(tmpRoot(), "tasks");
-  return { dir, src: new DirSource(dir, "id") };
+  return { dir, src: new FilesSource(dir, YAML_GLOB, "id") };
 };
 
-describe("DirSource.read", () => {
+describe("FilesSource.read", () => {
   test("missing directory", () => {
     expect(setup().src.read().exists).toBe(false);
   });
@@ -139,7 +140,7 @@ describe("DirSource.read", () => {
   });
 });
 
-describe("DirSource.apply", () => {
+describe("FilesSource.apply", () => {
   test("creates a new file without null fields", () => {
     const { dir, src } = setup();
     const r = src.read();
@@ -287,7 +288,7 @@ describe("DirSource.apply", () => {
   });
 });
 
-describe("DirSource.apply on unreadable files", () => {
+describe("FilesSource.apply on unreadable files", () => {
   test("never modifies a broken file", () => {
     const { dir, src } = setup();
     write(join(dir, "bad.yaml"), "title: [unclosed\n");
@@ -328,19 +329,23 @@ describe("DirSource.apply on unreadable files", () => {
 test("parse errors are reported on one line", () => {
   const dir = join(tmpRoot(), "tasks");
   write(join(dir, "bad.yaml"), "title: [broken\n");
-  const r = new DirSource(dir, "id").read();
+  const r = new FilesSource(dir, YAML_GLOB, "id").read();
   expect(r.warnings).toHaveLength(1);
   expect(r.warnings[0]).not.toContain("\n");
   expect(r.warnings[0]).toMatch(/bad\.yaml: .+ at line \d+, column \d+; skipped$/);
 });
 
-describe("DirSource with tables nested inside", () => {
+describe("FilesSource with tables nested inside", () => {
   const nested = () => {
     const dir = join(tmpRoot(), "tasks");
-    return { dir, src: new DirSource(dir, "id", [join(dir, "archive"), join(dir, "people.yaml")]) };
+    const exclude = [
+      { owner: 'table "archive"', path: join(dir, "archive"), glob: YAML_GLOB, tie: false },
+      { owner: 'table "people"', path: join(dir, "people.yaml"), glob: null, tie: false },
+    ];
+    return { dir, src: new FilesSource(dir, YAML_GLOB, "id", exclude) };
   };
 
-  test("never reads the folders and files of other tables", () => {
+  test("never reads the files of other tables", () => {
     const { dir, src } = nested();
     write(join(dir, "a.yaml"), "x: 1\n");
     write(join(dir, "archive/old.yaml"), "x: 2\n");
@@ -357,10 +362,72 @@ describe("DirSource with tables nested inside", () => {
       r.stamps,
     );
     expect(out.skipped).toEqual([
-      { key: "archive/x", reason: "key is inside the path of another table" },
-      { key: "people", reason: "key is inside the path of another table" },
+      { key: "archive/x", reason: 'key belongs to table "archive"' },
+      { key: "people", reason: 'key belongs to table "people"' },
     ]);
     expect(existsSync(join(dir, "archive"))).toBe(false);
     expect(read(join(dir, "archived/y.yaml"))).toBe("v: 1\n");
+  });
+
+  test("a nested table takes only the files its glob matches", () => {
+    const dir = join(tmpRoot(), "tasks");
+    const exclude = [{ owner: 'table "archive"', path: join(dir, "archive"), glob: "*.yaml", tie: false }];
+    write(join(dir, "archive/old.yaml"), "x: 1\n");
+    write(join(dir, "archive/deep/kept.yaml"), "x: 2\n");
+    const src = new FilesSource(dir, YAML_GLOB, "id", exclude);
+    expect([...src.read().records.keys()]).toEqual(["archive/deep/kept"]);
+  });
+
+  test("a file two tables with the same folder both match stops the table", () => {
+    const dir = join(tmpRoot(), "x");
+    write(join(dir, "a.yaml"), "x: 1\n");
+    const exclude = [{ owner: 'table "b"', path: dir, glob: "**/*.yaml", tie: true }];
+    const r = new FilesSource(dir, "*.yaml", "id", exclude).read();
+    expect(r.tableError).toBe(`files overlap with table "b": ${join(dir, "a.yaml")}`);
+  });
+});
+
+describe("FilesSource globs", () => {
+  test("only files the glob matches are records", () => {
+    const dir = join(tmpRoot(), "t");
+    write(join(dir, "a.yaml"), "x: 1\n");
+    write(join(dir, "b.yml"), "x: 2\n");
+    write(join(dir, "sub/c.yaml"), "x: 3\n");
+    write(join(dir, "notes.md"), "# hi\n");
+    expect([...new FilesSource(dir, "*.yaml", "id").read().records.keys()]).toEqual(["a"]);
+    expect([...new FilesSource(dir, YAML_GLOB, "id").read().records.keys()]).toEqual(["a", "b", "sub/c"]);
+  });
+
+  test("extensions match whatever their case, as before", () => {
+    const dir = join(tmpRoot(), "t");
+    write(join(dir, "Buy-Milk.YAML"), "x: 1\n");
+    write(join(dir, "sub/Old.Yml"), "x: 2\n");
+    expect([...new FilesSource(dir, YAML_GLOB, "id").read().records.keys()]).toEqual(["Buy-Milk", "sub/Old"]);
+  });
+
+  test("a new key whose file the glob does not match is not written", () => {
+    const dir = join(tmpRoot(), "t");
+    const src = new FilesSource(dir, "*.yaml", "id");
+    const out = src.apply(
+      ["a/b", "c"].map((key) => ({ kind: "put" as const, key, record: { v: 1n } })),
+      src.read().stamps,
+    );
+    expect(out.skipped).toEqual([{ key: "a/b", reason: 'key does not match files "*.yaml"' }]);
+    expect(existsSync(join(dir, "a"))).toBe(false);
+    expect(read(join(dir, "c.yaml"))).toBe("v: 1\n");
+  });
+
+  test("matchesFiles and claims", () => {
+    expect(matchesFiles("a/B.YAML", YAML_GLOB)).toBe(true);
+    expect(matchesFiles("a/.hidden/b.yaml", YAML_GLOB)).toBe(false);
+    expect(matchesFiles("b.md", YAML_GLOB)).toBe(false);
+    const list = { owner: "yamlite.yaml", path: "/r/yamlite.yaml", glob: null, tie: false };
+    expect(claims(list, "/r/yamlite.yaml")).toBe(true);
+    expect(claims(list, "/r/other.yaml")).toBe(false);
+    const folder = { owner: 'table "a"', path: "/r/a", glob: "*.yaml", tie: false };
+    expect(claims(folder, "/r/a/x.yaml")).toBe(true);
+    expect(claims(folder, "/r/a/s/x.yaml")).toBe(false);
+    expect(claims(folder, "/r/ab/x.yaml")).toBe(false);
+    expect(claims(folder, "/r/a")).toBe(false);
   });
 });

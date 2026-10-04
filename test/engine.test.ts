@@ -7,14 +7,14 @@ import { Store } from "../src/store.ts";
 import type { Mode, TableSpec } from "../src/types.ts";
 import { read, sql, tmpRoot, write } from "./helpers.ts";
 
-function setup(mode: Mode = "dir") {
+function setup(mode: Mode = "files") {
   const root = tmpRoot();
   const stateDir = join(root, ".yamlite");
   const db = join(stateDir, "db.sqlite");
   const ctx: EngineContext = { store: new Store(db, { busyTimeoutMs: 0 }), stateDir };
-  const path = mode === "dir" ? join(root, "tasks") : join(root, "people.yaml");
+  const path = mode === "files" ? join(root, "tasks") : join(root, "people.yaml");
   const spec: TableSpec = {
-    name: mode === "dir" ? "tasks" : "people",
+    name: mode === "files" ? "tasks" : "people",
     path,
     mode,
     key: "id",
@@ -23,6 +23,7 @@ function setup(mode: Mode = "dir") {
     indexes: [],
     references: [],
     persisted: false,
+    glob: mode === "files" ? "**/*.{yaml,yml}" : null,
     exclude: [],
     expand: [],
   };
@@ -821,13 +822,13 @@ describe("column type changes", () => {
     expect(read(t.file)).toBe("title: A\n");
   });
 
-  test.each(["dir", "list"] as const)("the key column type is never changed (%s mode)", (mode) => {
+  test.each(["files", "list"] as const)("the key column type is never changed (%s mode)", (mode) => {
     const t = setup(mode);
-    const file = mode === "dir" ? t.file : t.path;
-    const content = mode === "dir" ? "# keep\ntitle: A\n" : "# keep\n- id: 1 # one\n  name: Ann\n";
+    const file = mode === "files" ? t.file : t.path;
+    const content = mode === "files" ? "# keep\ntitle: A\n" : "# keep\n- id: 1 # one\n  name: Ann\n";
     write(file, content);
     t.sync();
-    t.spec.columns = { id: mode === "dir" ? "INTEGER" : "TEXT" };
+    t.spec.columns = { id: mode === "files" ? "INTEGER" : "TEXT" };
     const error = 'cannot change the type of key column "id"; recreate the database (delete .yamlite/) to change it';
     expect(t.sync({ dryRun: true })).toMatchObject({ ok: false, error, schema: [] });
     expect(t.sync()).toMatchObject({ ok: false, error, schema: [] });

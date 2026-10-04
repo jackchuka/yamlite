@@ -72,6 +72,13 @@ function generatedAt(now: () => Date): string {
 
 // a path outside the root would tell readers of a published site about the machine it was built on
 const hidePath = (path: string): string => (isAbsolute(path) ? basename(path) : path);
+// a files pattern from outside the root ("/home/u/inbox/**/*.yaml") keeps only the folder name
+const hideFiles = (files: string): string => {
+  if (!isAbsolute(files)) return files;
+  const parts = files.split("/");
+  const i = parts.findIndex((p) => /[*?[{]/.test(p));
+  return [basename(parts.slice(0, i).join("/")), ...parts.slice(i)].join("/");
+};
 
 function get(router: Router, path: string): Json {
   const m = router.match("GET", path);
@@ -176,7 +183,12 @@ export async function writeSnapshotData(opts: {
           tables: selected.flatMap((name) =>
             served.tables
               .filter((t: Json) => t.name === name)
-              .map((t: Json) => ({ ...t, path: hidePath(t.path), references: exported(t.references) })),
+              .map((t: Json) => ({
+                ...t,
+                path: hidePath(t.path),
+                ...(t.files ? { files: hideFiles(t.files) } : {}),
+                references: exported(t.references),
+              })),
           ),
           views,
           pages: served.pages
@@ -185,7 +197,12 @@ export async function writeSnapshotData(opts: {
         };
         for (const name of selected) {
           const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
-          schemas[name] = { ...schema, path: hidePath(schema.path), references: exported(schema.references) };
+          schemas[name] = {
+            ...schema,
+            path: hidePath(schema.path),
+            ...(schema.files ? { files: hideFiles(schema.files) } : {}),
+            references: exported(schema.references),
+          };
           const spec = y.tables.find((t) => t.name === name);
           const files = new Map<string, string>();
           const keys: Array<[string, string]> = [];

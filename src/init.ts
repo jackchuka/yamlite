@@ -2,11 +2,11 @@ import { existsSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Document, type YAMLSeq } from "yaml";
-import { configPath, expandToRaw, referenceToRaw, resolveConfig } from "./config.ts";
+import { configPath, expandToRaw, filesOf, referenceToRaw, resolveConfig } from "./config.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
 import { checkShapes, inferColumns, logicalType } from "./schema.ts";
-import { STRINGIFY_OPTIONS } from "./source/yamldoc.ts";
+import { STRINGIFY_OPTIONS, YAML_GLOB } from "./source/yamldoc.ts";
 import { q } from "./store.ts";
 import type { ColumnType, IndexSpec, TableSpec } from "./types.ts";
 
@@ -120,12 +120,13 @@ function columnsFor(spec: TableSpec, existing: Map<string, ColumnType> | null): 
     if (!columns.has(column)) columns.set(column, spec.columns[column] ?? type);
   }
   for (const [column, type] of Object.entries(spec.columns)) if (!existing?.has(column)) columns.set(column, type);
-  if (spec.mode === "dir") columns.delete(spec.key);
+  if (spec.mode === "files") columns.delete(spec.key);
   return columns;
 }
 
 function isConventional(root: string, spec: TableSpec): boolean {
-  return [join(root, spec.name), join(root, `${spec.name}.yaml`), join(root, `${spec.name}.yml`)].includes(spec.path);
+  if (spec.mode === "files") return spec.path === join(root, spec.name) && spec.glob === YAML_GLOB;
+  return [join(root, `${spec.name}.yaml`), join(root, `${spec.name}.yml`)].includes(spec.path);
 }
 
 function displayPath(root: string, path: string): string {
@@ -146,7 +147,10 @@ export function generateConfig(opts: InitOptions): string {
     const tables = doc.get("tables", true) as unknown as { set: (k: string, v: unknown) => void };
     for (const spec of [...config.tables].sort((a, b) => a.name.localeCompare(b.name))) {
       const entry: Record<string, unknown> = {};
-      if (!isConventional(root, spec)) entry.path = displayPath(root, spec.path);
+      if (!isConventional(root, spec)) {
+        if (spec.mode === "files") entry.files = filesOf(root, spec);
+        else entry.path = displayPath(root, spec.path);
+      }
       if (spec.key !== "id") entry.key = spec.key;
       const columns = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);

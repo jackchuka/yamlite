@@ -1,10 +1,13 @@
-import { type Document, isMap, isNode, isScalar, parseDocument, type YAMLMap } from "yaml";
+import { Document, isMap, isNode, isScalar, parseDocument, type YAMLMap } from "yaml";
 import { canonical } from "../hash.ts";
 import { own, type Rec } from "../types.ts";
+import type { Codec } from "./types.ts";
 
 export const PARSE_OPTIONS = { intAsBigInt: true } as const;
 export const STRINGIFY_OPTIONS = { flowCollectionPadding: false } as const;
 export const YAML_EXT = /\.ya?ml$/i;
+// the files of a table that was a plain folder: every YAML file below it
+export const YAML_GLOB = "**/*.{yaml,yml}";
 
 // the yaml library appends a multi-line excerpt of the source; keep the first line ("… at line L, column C:")
 export function firstError(doc: { errors: Array<{ message: string }> }): string {
@@ -42,3 +45,20 @@ export function updateMap(doc: Document, map: YAMLMap, record: Rec, keep: (field
 export function stripNulls(record: Rec): Rec {
   return Object.fromEntries(Object.entries(record).filter(([, v]) => v !== null && v !== undefined));
 }
+
+export const yamlCodec: Codec = {
+  ext: ".yaml",
+  match: YAML_EXT,
+  read(content) {
+    const parsed = parseRecordFile(content);
+    return parsed.ok ? { ok: true, record: parsed.record } : { ok: false, error: parsed.error };
+  },
+  write(current, record, keep) {
+    const parsed = current === null ? null : parseRecordFile(current);
+    if (parsed?.ok && isMap(parsed.doc.contents)) {
+      updateMap(parsed.doc, parsed.doc.contents, record, keep);
+      return parsed.doc.toString(STRINGIFY_OPTIONS);
+    }
+    return new Document(stripNulls(record)).toString(STRINGIFY_OPTIONS);
+  },
+};

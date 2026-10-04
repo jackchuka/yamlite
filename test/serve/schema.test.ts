@@ -33,7 +33,14 @@ test("the schema shows declarations, broken references and which indexes exist",
   sql(t.db, "CREATE INDEX by_hand ON tasks (title)");
   await waitForAsync(async () => (await served.api("/api/tables/tasks/schema")).status === 200);
   const { body } = await t.api("/api/tables/tasks/schema");
-  expect(body).toMatchObject({ name: "tasks", mode: "dir", path: "tasks", key: "id", inDb: true });
+  expect(body).toMatchObject({
+    name: "tasks",
+    mode: "files",
+    path: "tasks",
+    files: "tasks/**/*.{yaml,yml}",
+    key: "id",
+    inDb: true,
+  });
   expect(body.columns).toMatchObject({ id: "TEXT", title: "TEXT", project: "TEXT" });
   expect(body.references).toEqual([
     {
@@ -52,7 +59,7 @@ test("the schema shows declarations, broken references and which indexes exist",
 });
 
 test("a table that is not in the database yet has an empty schema", async () => {
-  t = await startServe({}, "tables:\n  later:\n    path: ./later\n    indexes: [[x]]\n");
+  t = await startServe({}, 'tables:\n  later:\n    files: "later/**/*.{yaml,yml}"\n    indexes: [[x]]\n');
   const { status, body } = await t.api("/api/tables/later/schema");
   expect(status).toBe(200);
   expect(body).toMatchObject({ inDb: false, references: [], otherIndexes: [] });

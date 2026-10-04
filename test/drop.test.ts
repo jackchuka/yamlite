@@ -88,7 +88,7 @@ describe("dropping columns", () => {
     const root = tmpRoot();
     write(join(root, "tasks/a.yaml"), "title: A\nold: x\n");
     const db = join(root, "db.sqlite");
-    const tables = [{ name: "tasks", path: join(root, "tasks") }];
+    const tables = [{ name: "tasks", files: join(root, "tasks", "**/*.{yaml,yml}") }];
     let y = await open({ db, tables });
     await y.sync();
     await y.close();
@@ -155,7 +155,8 @@ describe("dropping columns", () => {
     const spec: TableSpec = {
       name: "tasks",
       path: join(root, "tasks"),
-      mode: "dir",
+      mode: "files",
+      glob: "**/*.{yaml,yml}",
       key: "id",
       columns: { title: "TEXT" },
       formats: {},

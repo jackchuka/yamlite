@@ -8,13 +8,12 @@ import {
   statSync,
   unlinkSync,
 } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
-import { Document, isMap } from "yaml";
+import { dirname, isAbsolute, join, matchesGlob, relative, resolve, sep } from "node:path";
 import { type FileStamp, sameStamp, stamp, writeAtomic } from "../fsutil.ts";
 import { hashContent } from "../hash.ts";
-import type { Rec } from "../types.ts";
-import { emptyRead, type FileOp, type Source, type SourceApply, type SourceRead } from "./types.ts";
-import { parseRecordFile, STRINGIFY_OPTIONS, stripNulls, updateMap, YAML_EXT } from "./yamldoc.ts";
+import type { Claim, Rec } from "../types.ts";
+import { type Codec, emptyRead, type FileOp, type Source, type SourceApply, type SourceRead } from "./types.ts";
+import { yamlCodec } from "./yamldoc.ts";
 
 export function invalidKey(key: string): string | null {
   if (key === "") return "empty key cannot be a file name";
@@ -27,6 +26,21 @@ export function invalidKey(key: string): string | null {
     if (Buffer.byteLength(segment) + ".yaml".length > 255) return "key is too long for a file name";
   }
   return null;
+}
+
+// globs are case-sensitive, extensions never were: "A.YAML" is a YAML file
+export function matchesFiles(rel: string, glob: string): boolean {
+  const posix = rel.split(sep).join("/");
+  return matchesGlob(
+    posix.replace(/\.[^./]+$/, (ext) => ext.toLowerCase()),
+    glob,
+  );
+}
+
+export function claims(c: Claim, file: string): boolean {
+  if (c.glob === null) return file === c.path;
+  const rel = relative(c.path, file);
+  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel) && matchesFiles(rel, c.glob);
 }
 
 interface RecordFile {
@@ -58,12 +72,12 @@ function removeEmptyParents(dir: string, root: string): void {
 
 // an entry that cannot be read or stat-ed (a locked folder, a dangling link) throws,
 // so the table stops instead of reading its records as deleted
-function walk(root: string, exclude: ReadonlySet<string>, warnings: string[]): RecordFile[] {
+function walk(root: string, glob: string, exclude: readonly Claim[], codec: Codec, warnings: string[]): RecordFile[] {
   const out: RecordFile[] = [];
   const visit = (dir: string, prefix: string, ancestors: ReadonlySet<string>) => {
     for (const name of readdirSync(dir).sort()) {
       const path = join(dir, name);
-      if (skipName(name) || exclude.has(path)) continue;
+      if (skipName(name)) continue;
       const st = statSync(path);
       if (st.isDirectory()) {
         const real = realpathSync(path);
@@ -72,8 +86,11 @@ function walk(root: string, exclude: ReadonlySet<string>, warnings: string[]): R
           continue;
         }
         visit(path, `${prefix}${name}/`, new Set([...ancestors, real]));
-      } else if (st.isFile() && YAML_EXT.test(name)) {
-        out.push({ key: prefix + name.replace(YAML_EXT, ""), path, mtimeMs: st.mtimeMs });
+      } else if (st.isFile() && matchesFiles(prefix + name, glob)) {
+        const owner = exclude.find((c) => claims(c, path));
+        if (owner?.tie) throw new Error(`files overlap with ${owner.owner}: ${path}`);
+        if (owner) continue;
+        out.push({ key: prefix + name.replace(codec.match, ""), path, mtimeMs: st.mtimeMs });
       }
     }
   };
@@ -81,14 +98,16 @@ function walk(root: string, exclude: ReadonlySet<string>, warnings: string[]): R
   return out;
 }
 
-export class DirSource implements Source {
+export class FilesSource implements Source {
   private paths = new Map<string, string>();
   private skipped = new Set<string>();
 
   constructor(
     private readonly dir: string,
+    private readonly glob: string,
     private readonly keyField: string,
-    private readonly exclude: readonly string[] = [],
+    private readonly exclude: readonly Claim[] = [],
+    private readonly codec: Codec = yamlCodec,
   ) {}
 
   read(): SourceRead {
@@ -99,7 +118,7 @@ export class DirSource implements Source {
     res.exists = true;
     let files: RecordFile[];
     try {
-      files = walk(this.dir, new Set(this.exclude), res.warnings);
+      files = walk(this.dir, this.glob, this.exclude, this.codec, res.warnings);
     } catch (e) {
       res.tableError = e instanceof Error ? e.message : String(e);
       return res;
@@ -115,7 +134,7 @@ export class DirSource implements Source {
       this.paths.set(key, path);
       const content = readFileSync(path, "utf8");
       res.stamps.set(path, { mtimeMs, contentHash: hashContent(content) });
-      const parsed = parseRecordFile(content);
+      const parsed = this.codec.read(content);
       if (!parsed.ok) {
         res.warnings.push(`${path}: ${parsed.error}; skipped`);
         res.skip.add(key);
@@ -172,9 +191,11 @@ export class DirSource implements Source {
         }
       }
     }
-    const path = existing ?? join(this.dir, `${op.key}.yaml`);
-    if (this.exclude.some((e) => path === e || path.startsWith(e + sep))) {
-      return "key is inside the path of another table";
+    const path = existing ?? join(this.dir, `${op.key}${this.codec.ext}`);
+    if (!existing) {
+      if (!matchesFiles(`${op.key}${this.codec.ext}`, this.glob)) return `key does not match files "${this.glob}"`;
+      const owner = this.exclude.find((c) => claims(c, path));
+      if (owner) return `key belongs to ${owner.owner}`;
     }
     if (!sameStamp(stamps.get(path) ?? null, stamp(path))) return "file changed during sync; will retry";
     if (op.kind === "delete") {
@@ -185,7 +206,7 @@ export class DirSource implements Source {
       out.written.set(op.key, null);
       return null;
     }
-    const parsed = parseRecordFile(this.write(path, op.record));
+    const parsed = this.codec.read(this.write(path, op.record));
     const { [this.keyField]: _key, ...record } = parsed.ok ? parsed.record : {};
     this.paths.set(op.key, path);
     lower.set(op.key.toLowerCase(), op.key);
@@ -195,15 +216,8 @@ export class DirSource implements Source {
   }
 
   private write(path: string, record: Rec): string {
-    const current = existsSync(path) ? parseRecordFile(readFileSync(path, "utf8")) : null;
-    let doc: Document;
-    if (current?.ok && isMap(current.doc.contents)) {
-      doc = current.doc;
-      updateMap(doc, current.doc.contents, record, (field) => field === this.keyField);
-    } else {
-      doc = new Document(stripNulls(record));
-    }
-    const content = doc.toString(STRINGIFY_OPTIONS);
+    const current = existsSync(path) ? readFileSync(path, "utf8") : null;
+    const content = this.codec.write(current, record, (field) => field === this.keyField);
     writeAtomic(path, content);
     return content;
   }

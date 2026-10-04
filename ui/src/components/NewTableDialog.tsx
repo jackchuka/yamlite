@@ -25,7 +25,7 @@ export function NewTableDialog({
   const navigate = useNavigate();
   const { connected } = useEvents();
   const [name, setName] = useState(adopt ?? "");
-  const [mode, setMode] = useState<"dir" | "list">("dir");
+  const [mode, setMode] = useState<"files" | "list">("files");
   const [key, setKey] = useState("id");
   const [columns, setColumns] = useState<Array<{ name: string; type: ColumnType }>>([]);
   const create = useMutation({
@@ -64,7 +64,7 @@ export function NewTableDialog({
         {errorFor("name")}
         <fieldset className="flex gap-4 text-[12px]">
           <label>
-            <input type="radio" checked={mode === "dir"} onChange={() => setMode("dir")} /> フォルダ（1 レコード 1
+            <input type="radio" checked={mode === "files"} onChange={() => setMode("files")} /> フォルダ（1 レコード 1
             ファイル: {name || "name"}/*.yaml）
           </label>
           <label>

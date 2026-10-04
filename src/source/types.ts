@@ -34,3 +34,14 @@ export function emptyRead(): SourceRead {
     stamps: new Map(),
   };
 }
+
+// one file ↔ one record, for one file format
+export interface Codec {
+  // extension of new files
+  ext: string;
+  // extensions it reads, case-insensitive; stripped from the file name to make the key
+  match: RegExp;
+  read(content: string): { ok: true; record: Rec } | { ok: false; error: string };
+  // keep(field): fields left in the file even when the record lacks them (the key field)
+  write(current: string | null, record: Rec, keep: (field: string) => boolean): string;
+}

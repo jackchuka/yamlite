@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { encode, recordToRow } from "../../codec.ts";
 import { canonical } from "../../hash.ts";
-import { invalidKey } from "../../source/dir.ts";
+import { invalidKey } from "../../source/files.ts";
 import { q } from "../../store.ts";
 import { type DbRow, own, type TableSpec } from "../../types.ts";
 import { type ApiContext, displayPath, findView, tableSpec, type ViewTarget } from "../context.ts";
@@ -30,7 +30,7 @@ function insideTable(spec: TableSpec, file: string): boolean {
 
 function checkKey(spec: TableSpec, key: unknown): string {
   if (typeof key !== "string" || key === "") throw new HttpError(400, "key is required", { field: "key" });
-  if (spec.mode === "dir") {
+  if (spec.mode === "files") {
     const reason = invalidKey(key);
     if (reason) throw new HttpError(400, reason, { field: "key" });
   }

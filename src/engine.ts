@@ -5,9 +5,10 @@ import { reconcileIndexes, type SchemaChange } from "./indexes.ts";
 import { migrateSchema, type Schema } from "./migrate.ts";
 import { planTable, type Registered, type TablePlan, undeclaredColumns } from "./plan.ts";
 import type { Decision, KeyState } from "./reconcile.ts";
-import { DirSource } from "./source/dir.ts";
+import { FilesSource } from "./source/files.ts";
 import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
+import { YAML_GLOB } from "./source/yamldoc.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
 import type { ColumnType, TableSpec } from "./types.ts";
 import { reconcileViews } from "./views.ts";
@@ -61,7 +62,8 @@ export interface TableResult {
 }
 
 export function makeSource(spec: TableSpec): Source {
-  return spec.mode === "dir" ? new DirSource(spec.path, spec.key, spec.exclude) : new ListSource(spec.path, spec.key);
+  if (spec.mode === "list") return new ListSource(spec.path, spec.key);
+  return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude);
 }
 
 function emptyResult(table: string): TableResult {
@@ -214,7 +216,7 @@ function applyToDb(
       const newRow = recordToRow(fileRecord);
       if (row) newRow[spec.key] = row[spec.key] ?? null;
       else {
-        if (spec.mode === "dir") newRow[spec.key] = key;
+        if (spec.mode === "files") newRow[spec.key] = key;
         // column affinity can convert the key (e.g. "05" to 5) so that it hits another row
         const taken = store.readRow(spec.name, spec.key, newRow[spec.key] ?? null);
         if (taken) {

@@ -54,7 +54,7 @@ const snapshot: Snapshot = {
     tables: [
       {
         name: "tasks",
-        mode: "dir",
+        mode: "files",
         path: "tasks",
         key: "id",
         columns: { ...columns },
@@ -65,7 +65,7 @@ const snapshot: Snapshot = {
       },
       {
         name: "nums",
-        mode: "dir",
+        mode: "files",
         path: "nums",
         key: "id",
         columns: { id: "TEXT", vals: "JSON" },

@@ -39,12 +39,12 @@ function planColumns(
   const types = new Map(existing);
   const inferred = inferColumns(records);
   if (!types.has(spec.key)) {
-    types.set(spec.key, spec.mode === "dir" ? "TEXT" : (spec.columns[spec.key] ?? inferred.get(spec.key) ?? "TEXT"));
+    types.set(spec.key, spec.mode === "files" ? "TEXT" : (spec.columns[spec.key] ?? inferred.get(spec.key) ?? "TEXT"));
   }
   for (const [column, type] of inferred) if (!types.has(column)) types.set(column, spec.columns[column] ?? type);
   // declared columns exist even before any record uses them
   for (const [column, type] of Object.entries(spec.columns)) {
-    if (!types.has(column) && !(spec.mode === "dir" && column === spec.key)) types.set(column, type);
+    if (!types.has(column) && !(spec.mode === "files" && column === spec.key)) types.set(column, type);
   }
   return types;
 }
@@ -90,7 +90,7 @@ export function planTable(
   for (const [key, reason] of [...shapes.skip, ...noWriteBack]) warnings.push(`${key}: ${reason}`);
   const accepted = [...files.records].filter(([key]) => !shapes.skip.has(key)).map(([, record]) => record);
   const types = planColumns(spec, existing, accepted);
-  const omit = spec.mode === "dir" ? spec.key : undefined;
+  const omit = spec.mode === "files" ? spec.key : undefined;
 
   const states = new Map<string, KeyState>();
   for (const key of new Set([...files.records.keys(), ...files.skip, ...db.rows.keys(), ...schema.base.keys()])) {
@@ -123,7 +123,7 @@ export function planTable(
 export function undeclaredColumns(spec: TableSpec, schema: Schema, p: TablePlan, created: boolean): Registered[] {
   return [...p.types]
     .filter(([column]) => !(column in spec.columns) && !schema.recorded.has(column))
-    .filter(([column]) => !(spec.mode === "dir" && column === spec.key))
+    .filter(([column]) => !(spec.mode === "files" && column === spec.key))
     .filter(([column]) => created || schema.existing.has(column))
     .map(([column, type]) => ({ column, type }));
 }

@@ -1,3 +1,4 @@
+import { filesOf } from "../../config.ts";
 import { describeIndex, indexName, MANAGED_PREFIX } from "../../indexes.ts";
 import { checkReferences } from "../../references.ts";
 import { displayPath, findView, tableSpec } from "../context.ts";
@@ -27,6 +28,7 @@ export const schemaRoutes: Routes = (router, ctx) => {
       name: spec.name,
       mode: spec.mode,
       path: displayPath(ctx.root, spec.path),
+      ...(spec.mode === "files" ? { files: filesOf(ctx.root, spec) } : {}),
       key: spec.key,
       inDb,
       columns: inDb ? Object.fromEntries(store.columns(spec.name)) : { [spec.key]: "TEXT", ...spec.columns },

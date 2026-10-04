@@ -9,7 +9,9 @@ export interface Reference {
 
 export interface TableMeta {
   name: string;
-  mode: "dir" | "list";
+  mode: "files" | "list";
+  // files tables: the glob as yamlite.yaml writes it
+  files?: string;
   path: string;
   key: string;
   columns: Record<string, ColumnType>;
@@ -53,7 +55,9 @@ export interface Meta {
 
 export interface TableSchema {
   name: string;
-  mode: "dir" | "list";
+  mode: "files" | "list";
+  // files tables: the glob as yamlite.yaml writes it
+  files?: string;
   path: string;
   key: string;
   inDb: boolean;
