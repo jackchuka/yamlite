@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { emptyValueFor, fieldKind } from "@/lib/form";
+import { useTheme } from "@/lib/theme";
 import type { ColumnFormat, ColumnType, Reference } from "@/lib/types";
 import { RefLink } from "./RefLink";
 
@@ -24,7 +25,6 @@ export interface FieldProps {
 }
 
 const label = (path: Array<string | number>) => path.join(".");
-const isDark = () => document.documentElement.dataset.theme === "dark";
 
 // the markdown parsers are large; load them only when a markdown field shows up
 const MarkdownField = lazy(() => import("./MarkdownField"));
@@ -83,6 +83,7 @@ function ChipsInput({
 function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) {
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
+  const theme = useTheme();
   // the value this editor last handed to its parent; anything else arriving as a prop came from outside
   const emitted = useRef(JSON.stringify(value));
   const validity = useRef(onValidity);
@@ -104,7 +105,7 @@ function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) 
         aria-label={id}
         value={text}
         extensions={[json()]}
-        theme={isDark() ? "dark" : "light"}
+        theme={theme}
         editable={!readOnly}
         basicSetup={{ lineNumbers: false, foldGutter: false }}
         className="overflow-hidden rounded-md border text-[12px]"

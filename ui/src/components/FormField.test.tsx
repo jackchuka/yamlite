@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { expect, test, vi } from "vitest";
 import { FormField } from "./FormField";
@@ -146,4 +146,34 @@ test("a reference field links to the record it names once it has a value", () =>
     table: "people",
     search: JSON.stringify({ key: "ann" }),
   });
+});
+
+test("a markdown preview opens links in a new tab, so following one keeps the app open", async () => {
+  render(
+    wrap(
+      <FormField
+        path={["body"]}
+        value={"[docs](https://example.com)"}
+        type="TEXT"
+        format="markdown"
+        onChange={() => {}}
+      />,
+    ),
+  );
+  const link = await screen.findByRole("link", { name: "docs" });
+  expect(link.getAttribute("target")).toBe("_blank");
+  expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+});
+
+test("a markdown editor follows a theme change made while it is open", async () => {
+  document.documentElement.dataset.theme = "light";
+  render(wrap(<FormField path={["body"]} value={""} type="TEXT" format="markdown" onChange={() => {}} />));
+  const editor = await screen.findByLabelText("body");
+  const root = editor.closest(".cm-editor") ?? editor;
+  const before = root.className;
+  await act(async () => {
+    document.documentElement.dataset.theme = "dark";
+  });
+  await waitFor(() => expect((editor.closest(".cm-editor") ?? editor).className).not.toBe(before));
+  document.documentElement.dataset.theme = "light";
 });
