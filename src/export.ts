@@ -144,7 +144,9 @@ export async function writeSnapshotData(opts: {
           db: "data/db.sqlite",
           configFile: hidePath(served.configFile),
           tables: selected.flatMap((name) =>
-            served.tables.filter((t: Json) => t.name === name).map((t: Json) => ({ ...t, path: hidePath(t.path), references: exported(t.references) })),
+            served.tables
+              .filter((t: Json) => t.name === name)
+              .map((t: Json) => ({ ...t, path: hidePath(t.path), references: exported(t.references) })),
           ),
           views: served.views
             .filter((v: Json) => selected.includes(v.table))
@@ -277,7 +279,8 @@ function checkAgainstRoot(out: string, root: string): void {
   const inside = relative(realRoot, realOut);
   if (escapes(inside)) return;
   const segments = inside.split(sep);
-  if (segments[0] === ".yamlite") throw new Error(`refusing to write to ${out}: it is yamlite's state folder ${join(root, ".yamlite")}`);
+  if (segments[0] === ".yamlite")
+    throw new Error(`refusing to write to ${out}: it is yamlite's state folder ${join(root, ".yamlite")}`);
   if (segments.some((segment) => segment.startsWith("."))) return;
   throw new Error(
     `${out} is inside the data root and would be synced as a table; use a folder outside it or a dot-folder such as .yamlite-export`,

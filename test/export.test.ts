@@ -83,7 +83,8 @@ test("--table drops references to the tables it leaves out", async () => {
   const root = setup({
     "yamlite.yaml":
       "tables:\n  projects:\n    references: { owner: people, note: notes }\n    expand:\n      milestones:\n        references: { lead: people, about: projects }\n  notes: {}\n",
-    "projects/website.yaml": "title: Website\nowner: ann\nnote: x\nmilestones:\n  - title: Design\n    lead: ann\n    about: website\n",
+    "projects/website.yaml":
+      "title: Website\nowner: ann\nnote: x\nmilestones:\n  - title: Design\n    lead: ann\n    about: website\n",
   });
   const dir = tmpRoot();
   await writeSnapshotData({ root, dir, tables: ["projects", "notes"] });
@@ -137,11 +138,17 @@ test("list tables map every key to the list file, whose text is stored once", as
   const dir = tmpRoot();
   await writeSnapshotData({ root, dir });
   const people = readJson(join(dir, "data/yaml/people.json"));
-  expect(people).toEqual({ files: { "people.yaml": files["people.yaml"] }, keys: { ann: "people.yaml", bob: "people.yaml" } });
+  expect(people).toEqual({
+    files: { "people.yaml": files["people.yaml"] },
+    keys: { ann: "people.yaml", bob: "people.yaml" },
+  });
 });
 
 test("a large list table's YAML map grows with the file, not with records times the file", async () => {
-  const items = Array.from({ length: 1000 }, (_, i) => `- id: p${String(i).padStart(4, "0")}\n  name: Person ${i}\n`).join("");
+  const items = Array.from(
+    { length: 1000 },
+    (_, i) => `- id: p${String(i).padStart(4, "0")}\n  name: Person ${i}\n`,
+  ).join("");
   const root = setup({ "people.yaml": items });
   const dir = tmpRoot();
   await writeSnapshotData({ root, dir, tables: ["people"] });
