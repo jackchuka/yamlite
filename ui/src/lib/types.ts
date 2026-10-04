@@ -79,6 +79,7 @@ export interface RecordDetail {
   row: Row;
   file: string;
   yaml: string | null;
+  yamlError?: string;
 }
 
 export type ChangeOp = "toDb" | "toFile" | "deleteDb" | "deleteFile";
@@ -138,3 +139,13 @@ export interface Filter {
 export type SqlResult =
   | { columns: string[]; rows: Row[]; truncated: boolean; ms: number }
   | { changes: number; ms: number; unmanaged?: string };
+
+export interface Snapshot {
+  version: 1;
+  generatedAt: string;
+  meta: Meta;
+  schemas: Record<string, TableSchema>;
+  warnings: Record<string, string[]>;
+}
+
+export type YamlMap = Record<string, { file: string; yaml: string | null }>;
