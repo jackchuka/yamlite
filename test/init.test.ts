@@ -161,3 +161,14 @@ test("init keeps declared references", () => {
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    references:\n      owner: people.slug\n");
   expect(generateConfig({ root, force: true })).toContain("    references:\n      owner: people.slug\n");
 });
+
+test("writes files: and body: for declared Markdown tables, adds none of its own, and no format for the body", () => {
+  const root = tmpRoot();
+  write(join(root, "blog/a.md"), "---\ntitle: A\n---\ntext\n");
+  write(join(root, "yamlite.yaml"), 'tables:\n  posts:\n    files: "src/**/*.md"\n    body: content\n');
+  write(join(root, "src/p.md"), "---\nsummary: s\n---\nx\n");
+  const out = generateConfig({ root, force: true });
+  expect(out).not.toContain("blog");
+  expect(out).toContain("  posts:\n    files: src/**/*.md\n    body: content\n");
+  expect(out).not.toContain("formats");
+});

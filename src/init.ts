@@ -2,11 +2,11 @@ import { existsSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Document, type YAMLSeq } from "yaml";
-import { configPath, expandToRaw, filesOf, referenceToRaw, resolveConfig } from "./config.ts";
+import { configPath, expandToRaw, filesOf, isConventional, referenceToRaw, resolveConfig } from "./config.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
 import { checkShapes, inferColumns, logicalType } from "./schema.ts";
-import { STRINGIFY_OPTIONS, YAML_GLOB } from "./source/yamldoc.ts";
+import { STRINGIFY_OPTIONS } from "./source/yamldoc.ts";
 import { q } from "./store.ts";
 import type { ColumnType, IndexSpec, TableSpec } from "./types.ts";
 
@@ -124,11 +124,6 @@ function columnsFor(spec: TableSpec, existing: Map<string, ColumnType> | null): 
   return columns;
 }
 
-function isConventional(root: string, spec: TableSpec): boolean {
-  if (spec.mode === "files") return spec.path === join(root, spec.name) && spec.glob === YAML_GLOB;
-  return [join(root, `${spec.name}.yaml`), join(root, `${spec.name}.yml`)].includes(spec.path);
-}
-
 function displayPath(root: string, path: string): string {
   const rel = relative(root, path);
   return rel.startsWith("..") || isAbsolute(rel) ? path : rel;
@@ -151,10 +146,15 @@ export function generateConfig(opts: InitOptions): string {
         if (spec.mode === "files") entry.files = filesOf(root, spec);
         else entry.path = displayPath(root, spec.path);
       }
+      if (spec.body !== null && spec.body !== "body") entry.body = spec.body;
       if (spec.key !== "id") entry.key = spec.key;
       const columns = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);
-      if (Object.keys(spec.formats).length > 0) entry.formats = { ...spec.formats };
+      // the body column's markdown format comes with body:, so it is not written out
+      const formats = Object.fromEntries(
+        Object.entries(spec.formats).filter(([column, format]) => !(column === spec.body && format === "markdown")),
+      );
+      if (Object.keys(formats).length > 0) entry.formats = formats;
       if (spec.references.length > 0) {
         entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
       }

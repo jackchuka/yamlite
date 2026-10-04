@@ -27,6 +27,8 @@ test("discovers tables by convention", () => {
     path: join(root, "tasks"),
     mode: "files",
     glob: "**/*.{yaml,yml}",
+    codec: "yaml",
+    body: null,
     key: "id",
     columns: {},
     formats: {},
@@ -346,7 +348,7 @@ test("a path to the root suggests files without a leading slash", () => {
 
 test.each([
   ['    path: a.yaml\n    files: "a/*.yaml"\n', 'table "t": use either path or files, not both'],
-  ['    files: "a/*.json"\n', 'table "t": files must end in *.yaml, *.yml or *.{yaml,yml}'],
+  ['    files: "a/*.json"\n', 'table "t": files must end in *.md, *.yaml, *.yml or *.{yaml,yml}'],
   ['    files: "a/**/../*.yaml"\n', 'table "t": files cannot use . or .. after a wildcard'],
 ])("rejects files: %j", (entry, message) => {
   const root = tmpRoot();
@@ -396,4 +398,65 @@ test("filesOf shows a files table the way yamlite.yaml writes it", () => {
   expect(filesOf(root, t.tasks as TableSpec)).toBe("tasks/**/*.{yaml,yml}");
   expect(filesOf(root, t.docs as TableSpec)).toBe("*.yml");
   expect(filesOf(root, t.away as TableSpec)).toBe(`${outside}/**/*.yaml`);
+});
+
+test("a *.md glob makes a Markdown table whose body column is marked markdown", () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    'tables:\n  notes:\n    files: "**/*.md"\n  posts:\n    files: "blog/*.md"\n    body: content\n    formats: { summary: markdown }\n',
+  );
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(t.notes).toMatchObject({ mode: "files", glob: "**/*.md", codec: "markdown", body: "body" });
+  expect(t.notes?.formats).toEqual({ body: "markdown" });
+  expect(t.posts).toMatchObject({ codec: "markdown", body: "content" });
+  expect(t.posts?.formats).toEqual({ content: "markdown", summary: "markdown" });
+});
+
+test.each([
+  ['    files: "t/**/*.yaml"\n    body: text\n', 'table "t": body is only for *.md files'],
+  ['    files: "t/*.md"\n    body: ""\n', 'table "t": body must be a column name'],
+  ['    files: "t/*.md"\n    key: text\n    body: text\n', 'table "t": body cannot be the key column'],
+])("rejects body: %j", (entry, message) => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), `tables:\n  t:\n${entry}`);
+  expect(() => resolveConfig({ root })).toThrow(message);
+});
+
+test("discovery never makes Markdown tables: Markdown-only folders and notes at the root are left alone", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables: {}\n");
+  write(join(root, "blog/a.md"), "# a\n");
+  write(join(root, "products/a.yaml"), "x: 1\n");
+  write(join(root, "products/README.md"), "# about\n");
+  write(join(root, "inbox.md"), "# inbox\n");
+  write(join(root, ".obsidian/x.md"), "# x\n");
+  expect(resolveConfig({ root }).tables.map((t) => [t.name, t.codec, filesOf(root, t)])).toEqual([
+    ["products", "yaml", "products/**/*.{yaml,yml}"],
+  ]);
+});
+
+test("a declared Markdown table sits beside discovered YAML tables", () => {
+  const root = tmpRoot();
+  write(join(root, "blog/a.md"), "# a\n");
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "yamlite.yaml"), 'tables:\n  notes:\n    files: "**/*.md"\n');
+  expect(resolveConfig({ root }).tables.map((t) => [t.name, t.codec, filesOf(root, t)])).toEqual([
+    ["tasks", "yaml", "tasks/**/*.{yaml,yml}"],
+    ["notes", "markdown", "**/*.md"],
+  ]);
+});
+
+test("a folder holding only non-record files is not a table, an empty folder still is", () => {
+  const root = tmpRoot();
+  write(join(root, "Attachments/a.png"), "x");
+  mkdirSync(join(root, "empty"));
+  write(join(root, "tasks/a.yaml"), "x: 1\n");
+  write(join(root, "yamlite.yaml"), "tables: {}\n");
+
+  const cfg = resolveConfig({ root });
+  expect(cfg.tables.map((t) => [t.name, t.codec])).toEqual([
+    ["empty", "yaml"],
+    ["tasks", "yaml"],
+  ]);
 });

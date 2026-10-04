@@ -157,6 +157,8 @@ describe("dropping columns", () => {
       path: join(root, "tasks"),
       mode: "files",
       glob: "**/*.{yaml,yml}",
+      codec: "yaml",
+      body: null,
       key: "id",
       columns: { title: "TEXT" },
       formats: {},

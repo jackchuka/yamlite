@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { type Dirent, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse } from "yaml";
@@ -26,6 +26,8 @@ export interface TableInput {
   // a glob of files, one record each
   files?: string;
   key?: string;
+  // markdown tables: the column for the text below the front matter
+  body?: string;
   columns?: Record<string, string>;
   formats?: Record<string, string>;
   indexes?: unknown[];
@@ -60,13 +62,15 @@ export function expandPath(p: string, base: string): string {
 }
 
 const WILDCARD = /[*?[{]/;
-const YAML_FILES = /\*\.(?:ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
+const FILE_GLOB_TAIL = /\*\.(?:md|ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
 
 // "content/blog/**/*.yaml" → base "content/blog", glob "**/*.yaml"
 export function splitFiles(where: string, files: string): { base: string; glob: string } {
   const parts = files.split("/");
   const i = parts.findIndex((p) => WILDCARD.test(p));
-  if (i < 0 || !YAML_FILES.test(files)) throw new Error(`${where}files must end in *.yaml, *.yml or *.{yaml,yml}`);
+  if (i < 0 || !FILE_GLOB_TAIL.test(files)) {
+    throw new Error(`${where}files must end in *.md, *.yaml, *.yml or *.{yaml,yml}`);
+  }
   const tail = parts.slice(i);
   if (tail.some((p) => p === "." || p === "..")) throw new Error(`${where}files cannot use . or .. after a wildcard`);
   return { base: parts.slice(0, i).join("/"), glob: tail.join("/") };
@@ -108,6 +112,31 @@ export function filesOf(root: string, spec: TableSpec): string {
   return `${base}/${spec.glob}`;
 }
 
+// whether a folder holds files at some depth but no YAML file among them; stops at the first YAML file
+function hasFilesButNoYaml(dir: string): boolean {
+  let files = false;
+  let yaml = false;
+  const visit = (d: string) => {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (yaml) return;
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
+      if (e.isDirectory()) visit(join(d, e.name));
+      else {
+        files = true;
+        if (YAML_EXT.test(e.name)) yaml = true;
+      }
+    }
+  };
+  visit(dir);
+  return files && !yaml;
+}
+
 function scanRoot(root: string): Located[] {
   const out: Located[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
@@ -122,16 +151,31 @@ function scanRoot(root: string): Located[] {
         continue;
       }
     }
-    if (kind.isDirectory()) out.push({ name, path, glob: YAML_GLOB });
-    else if (kind.isFile() && YAML_EXT.test(name)) out.push({ name: name.replace(YAML_EXT, ""), path, glob: null });
+    if (kind.isDirectory()) {
+      // Markdown tables are only ever declared; a folder of other files (Markdown notes, images) is no table,
+      // while a folder with no files at all still is
+      if (hasFilesButNoYaml(path)) continue;
+      out.push({ name, path, glob: YAML_GLOB });
+    } else if (kind.isFile() && YAML_EXT.test(name)) {
+      out.push({ name: name.replace(YAML_EXT, ""), path, glob: null });
+    }
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// a table yamlite.yaml can list without path: or files: (the conventions find it there)
+export function isConventional(root: string, spec: TableSpec): boolean {
+  if (spec.mode === "files") {
+    return spec.codec === "yaml" && spec.path === join(root, spec.name) && spec.glob === YAML_GLOB;
+  }
+  return [join(root, `${spec.name}.yaml`), join(root, `${spec.name}.yml`)].includes(spec.path);
 }
 
 interface RawTable {
   path?: string;
   files?: string;
   key?: string;
+  body?: string;
   columns?: Record<string, string>;
   formats?: Record<string, string>;
   indexes?: unknown[];
@@ -178,15 +222,25 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
   if (!t.name || t.name.startsWith("_yamlite") || /[/\\\0]/.test(t.name) || t.name === "." || t.name.includes("..")) {
     throw new Error(`invalid table name: "${t.name}"`);
   }
-  const columns = toColumns(`table "${t.name}": `, t.columns);
+  const where = `table "${t.name}": `;
+  const columns = toColumns(where, t.columns);
+  const codec = t.glob !== null && t.glob.endsWith(".md") ? "markdown" : "yaml";
+  if (t.body !== undefined) {
+    if (codec !== "markdown") throw new Error(`${where}body is only for *.md files`);
+    if (typeof t.body !== "string" || t.body === "") throw new Error(`${where}body must be a column name`);
+    if (t.body === (t.key ?? "id")) throw new Error(`${where}body cannot be the key column`);
+  }
+  const body = codec === "markdown" ? (t.body ?? "body") : null;
   return {
     name: t.name,
     path: t.path,
     mode: t.glob === null ? "list" : "files",
     glob: t.glob,
+    codec,
+    body,
     key: t.key ?? "id",
     columns,
-    formats: toFormats(`table "${t.name}": `, t.formats, columns),
+    formats: toFormats(where, body === null ? t.formats : { [body]: "markdown", ...t.formats }, columns),
     indexes: (t.indexes ?? []).map((raw, i) => toIndex(t.name, raw, i)),
     references: Object.entries(t.references ?? {}).map(([column, raw]) =>
       toReference(`table "${t.name}": `, column, raw),
@@ -440,6 +494,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         name: o.name,
         ...loc,
         key: o.key,
+        body: o.body,
         columns: o.columns,
         formats: o.formats,
         indexes: o.indexes,
@@ -454,10 +509,13 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       inCode.add(t.name);
     }
     // a declared files table covering a folder or file keeps the conventions from making it a table of its own
+    const codecOf = (glob: string | null) => (glob !== null && glob.endsWith(".md") ? "markdown" : "yaml");
     const globs = [...declared.values()].filter((d) => d.glob !== null);
     const covered = (s: Located) =>
       s.glob !== null
-        ? globs.some((d) => s.path === d.path || s.path.startsWith(d.path + sep))
+        ? globs.some(
+            (d) => codecOf(d.glob) === codecOf(s.glob) && (s.path === d.path || s.path.startsWith(d.path + sep)),
+          )
         : globs.some((d) => claims({ owner: "", path: d.path, glob: d.glob, tie: false }, s.path));
     const merged = new Map<string, Located>();
     for (const s of scanned) {

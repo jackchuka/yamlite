@@ -217,3 +217,14 @@ test("a table covering the root syncs every YAML file but yamlite.yaml, and leav
   expect(read(join(root, "yamlite.yaml"))).toBe(config);
   await y.close();
 });
+
+test("Markdown files are never added to yamlite.yaml on their own", async () => {
+  const root = dataRoot();
+  write(join(root, "blog/a.md"), "# a\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "tasks/README.md"), "# about\n");
+  const y = await open({ root });
+  expect((await y.sync()).map((r) => r.table)).toEqual(["tasks"]);
+  await y.close();
+  expect(read(join(root, "yamlite.yaml"))).not.toMatch(/blog|_md|notes/);
+});

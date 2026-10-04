@@ -1,4 +1,5 @@
-import { configPath, listedTables, type OpenOptions, resolveConfig } from "./config.ts";
+import { resolve } from "node:path";
+import { configPath, filesOf, isConventional, listedTables, type OpenOptions, resolveConfig } from "./config.ts";
 import { registerInConfig } from "./configfile.ts";
 import { type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { acquireLock } from "./lock.ts";
@@ -45,7 +46,13 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
   const registerTables = () => {
     if (!file) return;
     const listed = new Set(Object.keys(listedTables(file)));
-    const missing = config.tables.filter((t) => t.persisted && !listed.has(t.name)).map((t) => ({ table: t.name }));
+    const root = resolve(options.root as string);
+    const missing = config.tables
+      .filter((t) => t.persisted && !listed.has(t.name))
+      .map((t) => ({
+        table: t.name,
+        files: t.mode === "files" && !isConventional(root, t) ? filesOf(root, t) : undefined,
+      }));
     if (missing.length > 0) registerInConfig(file, missing);
   };
   let release: (() => void) | undefined;

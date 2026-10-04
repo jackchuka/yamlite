@@ -63,6 +63,10 @@ export interface TableSpec {
   mode: Mode;
   // files: the pattern below path ("**/*.{yaml,yml}"); list: null
   glob: string | null;
+  // files tables: how one file maps to a record; list tables are always yaml
+  codec: "yaml" | "markdown";
+  // markdown tables: the column holding the text below the front matter
+  body: string | null;
   key: string;
   columns: Record<string, ColumnType>;
   formats: Record<string, ColumnFormat>;
