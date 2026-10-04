@@ -1,6 +1,18 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { configPath } from "./config.ts";
 import { q } from "./ident.ts";
@@ -181,5 +193,53 @@ function snapshotDb(from: string, to: string, selected: string[]): void {
     db.exec("VACUUM");
   } finally {
     db.close();
+  }
+}
+
+const DEFAULT_UI = fileURLToPath(new URL("./ui/", import.meta.url));
+const STATIC_META = '<meta name="yamlite-mode" content="static" />';
+
+function checkOut(out: string, force: boolean): void {
+  if (!existsSync(out)) return;
+  if (!statSync(out).isDirectory()) {
+    if (force) return;
+    throw new Error(`${out} is a file; pass --force to replace it`);
+  }
+  if (force || existsSync(join(out, "data", "snapshot.json")) || readdirSync(out).length === 0) return;
+  throw new Error(`${out} is not a yamlite export and not empty; pass --force to replace it`);
+}
+
+export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
+  const out = resolve(opts.out);
+  checkOut(out, opts.force ?? false);
+  const uiDir = opts.uiDir ?? DEFAULT_UI;
+  const indexPath = join(uiDir, "index.html");
+  if (!existsSync(indexPath)) throw new Error(`no index.html in ${uiDir}; build the UI first`);
+  mkdirSync(dirname(out), { recursive: true });
+  // next to the output so the final rename stays on one file system
+  const staging = mkdtempSync(join(dirname(out), ".yamlite-export-"));
+  try {
+    cpSync(uiDir, staging, { recursive: true });
+    const html = readFileSync(indexPath, "utf8");
+    if (!html.includes("<head>")) throw new Error(`${indexPath} has no <head>`);
+    writeFileSync(join(staging, "index.html"), html.replace("<head>", `<head>\n    ${STATIC_META}`));
+    const { tables, warnings } = await writeSnapshotData({
+      root: opts.root,
+      tables: opts.tables,
+      dir: staging,
+      now: opts.now,
+    });
+    if (existsSync(out)) {
+      const old = `${staging}-old`;
+      renameSync(out, old);
+      renameSync(staging, out);
+      rmSync(old, { recursive: true, force: true });
+    } else {
+      renameSync(staging, out);
+    }
+    return { out, tables, warnings };
+  } catch (e) {
+    rmSync(staging, { recursive: true, force: true });
+    throw e;
   }
 }

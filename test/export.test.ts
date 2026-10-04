@@ -1,8 +1,8 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, test } from "vitest";
-import { writeSnapshotData } from "../src/export.ts";
+import { exportSite, writeSnapshotData } from "../src/export.ts";
 import { acquireLock } from "../src/lock.ts";
 import { startServe } from "./serve/helpers.ts";
 import { dataRoot, tmpRoot, write } from "./helpers.ts";
@@ -165,4 +165,74 @@ test("warnings never reveal the machine path of the root", async () => {
   const all = (r.warnings.projects ?? []).join("\n");
   expect(all).toContain("projects/bad.yaml");
   expect(JSON.stringify(r.warnings)).not.toContain(root);
+});
+
+function ui(): string {
+  const dir = tmpRoot();
+  write(join(dir, "index.html"), '<!doctype html><html><head><meta charset="UTF-8" /></head><body></body></html>');
+  write(join(dir, "assets/app.js"), "console.log(1)");
+  write(join(dir, "favicon.svg"), "<svg/>");
+  return dir;
+}
+
+test("exportSite writes the UI marked static next to the data", async () => {
+  const out = join(tmpRoot(), "site");
+  const r = await exportSite({ root: setup(), out, uiDir: ui() });
+  expect(r.out).toBe(out);
+  expect(readFileSync(join(out, "index.html"), "utf8")).toContain('<meta name="yamlite-mode" content="static" />');
+  for (const p of ["assets/app.js", "favicon.svg", "data/snapshot.json", "data/db.sqlite", "data/yaml/people.json"]) {
+    expect(existsSync(join(out, p)), p).toBe(true);
+  }
+});
+
+test("a previous export is replaced, another folder is refused unless forced", async () => {
+  const root = setup();
+  const out = join(tmpRoot(), "site");
+  await exportSite({ root, out, uiDir: ui() });
+  write(join(out, "data/yaml/stale.json"), "{}");
+  await exportSite({ root, out, uiDir: ui() });
+  expect(existsSync(join(out, "data/yaml/stale.json"))).toBe(false);
+
+  const other = tmpRoot();
+  write(join(other, "keep.txt"), "mine");
+  await expect(exportSite({ root, out: other, uiDir: ui() })).rejects.toThrow("not a yamlite export");
+  expect(readFileSync(join(other, "keep.txt"), "utf8")).toBe("mine");
+  await exportSite({ root, out: other, uiDir: ui(), force: true });
+  expect(existsSync(join(other, "keep.txt"))).toBe(false);
+
+  const empty = join(tmpRoot(), "empty");
+  mkdirSync(empty);
+  await expect(exportSite({ root, out: empty, uiDir: ui() })).resolves.toBeDefined();
+});
+
+test("a failed export leaves the previous one untouched and no temp folder behind", async () => {
+  const root = setup();
+  const parent = tmpRoot();
+  const out = join(parent, "site");
+  await exportSite({ root, out, uiDir: ui() });
+  const before = tree(out);
+  await expect(exportSite({ root, out, uiDir: ui(), tables: ["nope"] })).rejects.toThrow("unknown table");
+  expect(tree(out)).toEqual(before);
+  expect(readdirSync(parent)).toEqual(["site"]);
+});
+
+test("a UI folder without index.html is refused", async () => {
+  await expect(exportSite({ root: setup(), out: join(tmpRoot(), "s"), uiDir: tmpRoot() })).rejects.toThrow(
+    "index.html",
+  );
+});
+
+test("SOURCE_DATE_EPOCH makes two exports byte-identical", async () => {
+  const root = setup();
+  const a = join(tmpRoot(), "a");
+  const b = join(tmpRoot(), "b");
+  process.env.SOURCE_DATE_EPOCH = "1790000000";
+  try {
+    await exportSite({ root, out: a, uiDir: ui() });
+    await exportSite({ root, out: b, uiDir: ui() });
+  } finally {
+    delete process.env.SOURCE_DATE_EPOCH;
+  }
+  expect(tree(b)).toEqual(tree(a));
+  expect(readJson(join(a, "data/snapshot.json")).generatedAt).toBe(new Date(1790000000 * 1000).toISOString());
 });

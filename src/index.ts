@@ -8,6 +8,7 @@ import type { TableSpec } from "./types.ts";
 import { startWatch, type Watcher, type WatchHandlers, type WatchOptions } from "./watch.ts";
 
 export type { OpenOptions, TableInput } from "./config.ts";
+export { exportSite, type ExportOptions, type ExportResult } from "./export.ts";
 export { generateConfig, init, type InitOptions } from "./init.ts";
 export type { Change, ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
 export type { SchemaChange } from "./indexes.ts";

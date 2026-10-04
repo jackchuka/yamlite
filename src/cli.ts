@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { displayPath, painter, reloadLine, report, watchEvents, watchHeader } from "./format.ts";
-import { generateConfig, init, open } from "./index.ts";
+import { exportSite, generateConfig, init, open } from "./index.ts";
 import { serve } from "./serve/index.ts";
 import { isLoopback } from "./serve/security.ts";
 
@@ -162,6 +162,23 @@ withRoot(program.command("serve").description("open the web UI and sync continuo
     };
     process.on("SIGINT", stop);
     process.on("SIGTERM", stop);
+  });
+
+program
+  .command("export")
+  .description("write the web UI as a read-only static site")
+  .argument("[root]", "data directory", ".")
+  .option("--out <dir>", "output folder", "yamlite-export")
+  .option("--table <name>", "only this table (repeatable)", collect, [])
+  .option("--force", "replace an output folder that is not a previous export")
+  .action(async (root: string, o: { out: string; table: string[]; force?: boolean }) => {
+    const r = await exportSite({ root, out: o.out, tables: o.table, force: o.force });
+    const count = `${r.tables.length} ${r.tables.length === 1 ? "table" : "tables"}`;
+    console.log(`${out("green", "✓")} exported ${count} to ${displayPath(r.out)}`);
+    for (const [table, warnings] of Object.entries(r.warnings)) {
+      for (const w of warnings) console.log(`  ${out("yellow", "!")} ${table}: ${w}`);
+    }
+    console.log(out("dim", "  serve the folder over HTTP to open it; file:// does not work"));
   });
 
 program.parseAsync().catch((e: unknown) => {
