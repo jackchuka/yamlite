@@ -9,6 +9,7 @@ import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
 import { EventHub } from "./events.ts";
+import { PageWatch } from "./pagewatch.ts";
 import { createHandler, Router } from "./http.ts";
 import { ROUTES } from "./routes/index.ts";
 import { type AccessPolicy, isLoopback, loopbackHosts } from "./security.ts";
@@ -48,10 +49,23 @@ export async function serve(opts: ServeOptions): Promise<Server> {
   if (configFile === null) throw new Error(`no yamlite.yaml in ${opts.root}; run yamlite init first`);
   const y = await open({ root: opts.root, db: opts.db });
   let store: Store | undefined;
+  let pageWatch: PageWatch | undefined;
   try {
     const hub = new EventHub();
-    const watcher = y.watch(hub.handlers, opts.watch);
+    pageWatch = new PageWatch((pages) => hub.pagesChanged(pages), opts.watch?.debounceMs);
+    const pages = pageWatch;
+    const watcher = y.watch(
+      {
+        ...hub.handlers,
+        onReload: (tables) => {
+          hub.handlers.onReload?.(tables);
+          pages.update(y.pages);
+        },
+      },
+      opts.watch,
+    );
     await watcher.ready;
+    pages.update(y.pages);
     store = new Store(config.db);
     const ctx: ApiContext = {
       y,
@@ -79,6 +93,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
       close() {
         closing ??= (async () => {
           try {
+            await pages.close();
             hub.close();
             http.closeAllConnections();
             await new Promise<void>((done) => http.close(() => done()));
@@ -94,6 +109,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
       },
     };
   } catch (e) {
+    await pageWatch?.close();
     store?.close();
     await y.close();
     throw e;

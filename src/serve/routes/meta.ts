@@ -27,6 +27,14 @@ export const metaRoutes: Routes = (router, ctx) => {
         inDb,
       };
     }),
+    pages: ctx.y.pages.map((p) => ({
+      name: p.name,
+      title: p.title,
+      path: display(p.path),
+      access: p.access,
+      sql: p.sql,
+      network: p.network,
+    })),
     views: ctx.y.tables.flatMap((t) =>
       declaredViews(t).map(({ spec, parent, depth }) => {
         const record = findView(ctx, spec.name)?.record;
