@@ -4,8 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 import type { BaseHashes } from "./reconcile.ts";
 import { logicalType } from "./schema.ts";
 import { type ColumnType, type DbRow, type DbValue, own, type ViewRecord } from "./types.ts";
+import { q } from "./ident.ts";
 
-export const q = (id: string): string => `"${id.replaceAll('"', '""')}"`;
+export { q };
 
 interface RawView {
   name: string;

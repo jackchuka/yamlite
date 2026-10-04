@@ -1,4 +1,4 @@
-import { decode } from "../codec.ts";
+import { decode } from "../value.ts";
 import type { ColumnType, DbRow, Rec } from "../types.ts";
 
 // JSON.parse in the browser would round big integers, so they travel as decimal strings
