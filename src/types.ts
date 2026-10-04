@@ -45,6 +45,17 @@ export interface ViewRecord {
   identity: string[];
 }
 
+// another table's hold on files inside a files table's folder
+export interface Claim {
+  // 'table "archive"' or "yamlite.yaml"; quoted in skip reasons and errors
+  owner: string;
+  // absolute: the claiming table's folder (glob set) or its one file (glob null)
+  path: string;
+  glob: string | null;
+  // same folder as the reading table: a file both match is an error, not a skip
+  tie: boolean;
+}
+
 export interface TableSpec {
   name: string;
   path: string;

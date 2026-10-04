@@ -5,9 +5,10 @@ import { reconcileIndexes, type SchemaChange } from "./indexes.ts";
 import { migrateSchema, type Schema } from "./migrate.ts";
 import { planTable, type Registered, type TablePlan, undeclaredColumns } from "./plan.ts";
 import type { Decision, KeyState } from "./reconcile.ts";
-import { DirSource } from "./source/dir.ts";
+import { FilesSource } from "./source/files.ts";
 import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
+import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
 import type { ColumnType, TableSpec } from "./types.ts";
 import { reconcileViews } from "./views.ts";
@@ -61,7 +62,15 @@ export interface TableResult {
 }
 
 export function makeSource(spec: TableSpec): Source {
-  return spec.mode === "dir" ? new DirSource(spec.path, spec.key, spec.exclude) : new ListSource(spec.path, spec.key);
+  if (spec.mode === "list") return new ListSource(spec.path, spec.key);
+  // until Task 2 makes exclude a Claim[]: a nested list table owns its file, a nested folder table everything below it
+  const exclude = spec.exclude.map((path) => ({
+    owner: "another table",
+    path,
+    glob: YAML_EXT.test(path) ? null : YAML_GLOB,
+    tie: false,
+  }));
+  return new FilesSource(spec.path, YAML_GLOB, spec.key, exclude);
 }
 
 function emptyResult(table: string): TableResult {
