@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, symlinkSync } from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, test } from "vitest";
 import { exportSite, writeSnapshotData } from "../src/export.ts";
@@ -278,4 +278,51 @@ test("the output folder may not contain the data root or be a table inside it", 
   const snapshot = readJson(join(out, "data/snapshot.json"));
   expect(Object.keys(snapshot.schemas)).not.toContain(".site");
   expect(Object.keys(snapshot.schemas)).not.toContain("site");
+});
+
+test("an output folder reached through a symlink may not be the data root or contain it, even with --force", async () => {
+  const root = setup();
+  const links = tmpRoot();
+  symlinkSync(root, join(links, "root"));
+  symlinkSync(dirname(root), join(links, "parent"));
+  for (const out of [join(links, "root"), join(links, "parent", basename(root)), join(links, "parent")]) {
+    await expect(exportSite({ root, out, uiDir: ui(), force: true }), out).rejects.toThrow("contains the data root");
+    expect(readFileSync(join(root, "people.yaml"), "utf8")).toContain("Ann");
+  }
+  await expect(exportSite({ root, out: join(links, "root", "site"), uiDir: ui() })).rejects.toThrow(
+    "inside the data root",
+  );
+  expect(existsSync(join(root, "site"))).toBe(false);
+});
+
+const caseInsensitive = (() => {
+  const dir = join(tmpRoot(), "Probe");
+  mkdirSync(dir);
+  return existsSync(join(dirname(dir), "probe"));
+})();
+
+test.skipIf(!caseInsensitive)(
+  "an output folder differing from the root only in letter case is refused on a case-insensitive file system",
+  async () => {
+    const parent = tmpRoot();
+    const root = join(parent, "ci", "Notes");
+    for (const [p, c] of Object.entries(files)) write(join(root, p), c);
+    for (const out of [join(parent, "ci", "notes"), join(parent, "CI")]) {
+      await expect(exportSite({ root, out, uiDir: ui(), force: true }), out).rejects.toThrow("contains the data root");
+      expect(readFileSync(join(root, "people.yaml"), "utf8")).toContain("Ann");
+    }
+    await expect(exportSite({ root, out: join(parent, "ci", "NOTES", "site"), uiDir: ui() })).rejects.toThrow(
+      "inside the data root",
+    );
+  },
+);
+
+test("a root folder whose name starts with two dots is still protected from its parent", async () => {
+  const parent = tmpRoot();
+  const root = join(parent, "..data");
+  for (const [p, c] of Object.entries(files)) write(join(root, p), c);
+  await expect(exportSite({ root, out: parent, uiDir: ui(), force: true })).rejects.toThrow("contains the data root");
+  expect(readFileSync(join(root, "people.yaml"), "utf8")).toContain("Ann");
+  write(join(parent, "yamlite.yaml"), "tables: {}\n");
+  await expect(exportSite({ root: parent, out: join(parent, "..site"), uiDir: ui() })).resolves.toBeDefined();
 });

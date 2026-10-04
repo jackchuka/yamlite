@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   statSync,
@@ -239,14 +240,32 @@ function checkOut(out: string, force: boolean): void {
   throw new Error(`${out} is not a yamlite export and not empty; pass --force to replace it`);
 }
 
+// symlinks and letter case (on case-insensitive volumes) resolved, so another spelling of the root cannot slip past
+function realPath(path: string): string {
+  const tail: string[] = [];
+  let head = path;
+  while (!existsSync(head)) {
+    const up = dirname(head);
+    if (up === head) break;
+    tail.unshift(basename(head));
+    head = up;
+  }
+  return join(realpathSync.native(head), ...tail);
+}
+
+const escapes = (rel: string) => rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel);
+
 function checkAgainstRoot(out: string, root: string): void {
-  const fromOut = relative(out, root);
-  if (fromOut === "" || (!fromOut.startsWith("..") && !isAbsolute(fromOut))) {
+  const realOut = realPath(out);
+  const realRoot = realPath(root);
+  const fromOut = relative(realOut, realRoot);
+  if (fromOut === "" || !escapes(fromOut)) {
     throw new Error(`refusing to write to ${out}: it contains the data root ${root}`);
   }
-  const inside = relative(root, out);
-  if (inside.startsWith("..") || isAbsolute(inside)) return;
-  if (inside.split(sep).some((segment) => segment.startsWith("."))) return;
+  const inside = relative(realRoot, realOut);
+  if (escapes(inside)) return;
+  const segments = inside.split(sep);
+  if (segments.some((segment) => segment.startsWith("."))) return;
   throw new Error(
     `${out} is inside the data root and would be synced as a table; use a folder outside it or a dot-folder such as .yamlite-export`,
   );
