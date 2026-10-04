@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
-import type { ServeEvent, SqlResult } from "@/lib/types";
+import { enterStatic } from "@/lib/mode";
+import type { ServeEvent, Snapshot, SqlResult } from "@/lib/types";
 import { SqlConsole } from "./SqlConsole";
 
 let emit: (e: ServeEvent) => void = () => {};
@@ -49,4 +50,29 @@ test("a file changed before the response arrives is still listed", async () => {
   await act(async () => resolve({ changes: 1, ms: 1 }));
   expect(await screen.findByText("tasks/a.yaml")).toBeTruthy();
   expect(screen.getByText(/1 row changed/)).toBeTruthy();
+});
+
+afterEach(() => enterStatic(null));
+
+async function runUnmanagedWrite() {
+  vi.mocked(api.sql).mockResolvedValue({ changes: 1, ms: 1, unmanaged: "x" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SqlConsole />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /Run/ }));
+  await screen.findByText(/1 row changed/);
+}
+
+test("the adopt-table banner is offered when the server can write", async () => {
+  await runUnmanagedWrite();
+  expect(screen.getByRole("button", { name: "yamlite.yaml に追加" })).toBeTruthy();
+});
+
+test("the adopt-table banner is hidden in a static export", async () => {
+  enterStatic({} as Snapshot);
+  await runUnmanagedWrite();
+  expect(screen.queryByRole("button", { name: "yamlite.yaml に追加" })).toBeNull();
+  expect(screen.queryByText(/同期されません/)).toBeNull();
 });
