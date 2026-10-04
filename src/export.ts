@@ -19,11 +19,12 @@ import { configPath } from "./config.ts";
 import { q } from "./ident.ts";
 import { open } from "./index.ts";
 import { Store } from "./store.ts";
-import type { ApiContext } from "./serve/context.ts";
+import { type ApiContext, displayPath } from "./serve/context.ts";
 import { EventHub } from "./serve/events.ts";
 import { PageSql } from "./serve/pagesql.ts";
 import { Router } from "./serve/http.ts";
 import { ROUTES } from "./serve/routes/index.ts";
+import { readPageHtml } from "./serve/routes/pages.ts";
 import { recordFile } from "./serve/routes/rows.ts";
 
 export interface Snapshot {
@@ -47,6 +48,8 @@ export interface ExportResult {
   out: string;
   tables: string[];
   warnings: Record<string, string[]>;
+  pages: string[];
+  skippedPages: Record<string, string>;
 }
 
 type Json = Record<string, any>;
@@ -95,7 +98,12 @@ export async function writeSnapshotData(opts: {
   tables?: string[];
   dir: string;
   now?: () => Date;
-}): Promise<{ tables: string[]; warnings: Record<string, string[]> }> {
+}): Promise<{
+  tables: string[];
+  warnings: Record<string, string[]>;
+  pages: string[];
+  skippedPages: Record<string, string>;
+}> {
   const root = resolve(opts.root);
   const stamp = generatedAt(opts.now ?? (() => new Date()));
   const work = mkdtempSync(join(tmpdir(), "yamlite-export-"));
@@ -107,6 +115,8 @@ export async function writeSnapshotData(opts: {
     let meta: Json;
     const schemas: Record<string, unknown> = {};
     const yaml: Array<[string, YamlMap]> = [];
+    const pages: Array<[string, string]> = [];
+    const skippedPages: Record<string, string> = {};
     try {
       const all = y.tables.map((t) => t.name);
       const unknown = (opts.tables ?? []).filter((n) => !all.includes(n));
@@ -141,6 +151,23 @@ export async function writeSnapshotData(opts: {
         const served = get(router, "/api/meta");
         // a link to a table left out of the export would lead nowhere
         const exported = (refs: Json[]) => refs.filter((r) => selected.includes(r.table));
+        const views = served.views
+          .filter((v: Json) => selected.includes(v.table))
+          .map((v: Json) => ({ ...v, references: exported(v.references) }));
+        const included = new Set([...selected, ...views.map((v: Json) => v.name as string)]);
+        for (const p of y.pages) {
+          const missing = Object.keys(p.access).filter((n) => !included.has(n));
+          if (missing.length > 0) {
+            skippedPages[p.name] = `uses ${missing.join(", ")}, which the export leaves out`;
+            continue;
+          }
+          try {
+            pages.push([p.name, readPageHtml(p.path, hidePath(displayPath(root, p.path)))]);
+          } catch (e) {
+            skippedPages[p.name] = e instanceof Error ? e.message : String(e);
+          }
+        }
+        const kept = new Set(pages.map(([name]) => name));
         meta = {
           ...served,
           root: basename(root),
@@ -151,9 +178,10 @@ export async function writeSnapshotData(opts: {
               .filter((t: Json) => t.name === name)
               .map((t: Json) => ({ ...t, path: hidePath(t.path), references: exported(t.references) })),
           ),
-          views: served.views
-            .filter((v: Json) => selected.includes(v.table))
-            .map((v: Json) => ({ ...v, references: exported(v.references) })),
+          views,
+          pages: served.pages
+            .filter((p: Json) => kept.has(p.name))
+            .map((p: Json) => ({ ...p, path: hidePath(p.path) })),
         };
         for (const name of selected) {
           const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
@@ -199,7 +227,9 @@ export async function writeSnapshotData(opts: {
     };
     writeJson(join(opts.dir, "data", "snapshot.json"), snapshot);
     for (const [name, map] of yaml) writeJson(join(opts.dir, "data", "yaml", `${name}.json`), map);
-    return { tables: selected, warnings };
+    if (pages.length > 0) mkdirSync(join(opts.dir, "data", "pages"), { recursive: true });
+    for (const [name, html] of pages) writeFileSync(join(opts.dir, "data", "pages", `${name}.html`), html);
+    return { tables: selected, warnings, pages: pages.map(([name]) => name), skippedPages };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
@@ -306,7 +336,7 @@ export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
     const html = readFileSync(indexPath, "utf8");
     if (!html.includes("<head>")) throw new Error(`${indexPath} has no <head>`);
     writeFileSync(join(staging, "index.html"), html.replace("<head>", `<head>\n    ${STATIC_META}\n    ${FILE_GUARD}`));
-    const { tables, warnings } = await writeSnapshotData({
+    const { tables, warnings, pages, skippedPages } = await writeSnapshotData({
       root: opts.root,
       tables: opts.tables,
       dir: staging,
@@ -325,7 +355,7 @@ export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
     } else {
       renameSync(staging, out);
     }
-    return { out, tables, warnings };
+    return { out, tables, warnings, pages, skippedPages };
   } catch (e) {
     rmSync(staging, { recursive: true, force: true });
     throw e;
