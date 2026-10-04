@@ -8,6 +8,7 @@ import type { TableSpec } from "./types.ts";
 import { startWatch, type Watcher, type WatchHandlers, type WatchOptions } from "./watch.ts";
 
 export type { OpenOptions, TableInput } from "./config.ts";
+export { exportSite, type ExportOptions, type ExportResult } from "./export.ts";
 export { generateConfig, init, type InitOptions } from "./init.ts";
 export type { Change, ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
 export type { SchemaChange } from "./indexes.ts";
@@ -26,17 +27,18 @@ export interface Yamlite {
 export async function open(options: OpenOptions): Promise<Yamlite> {
   const config = resolveConfig(options);
   const store = new Store(config.db);
-  const file = options.root === undefined ? null : configPath(options.root);
+  const file = options.root === undefined || options.persistConfig === false ? null : configPath(options.root);
   const ctx: EngineContext = {
     store,
     stateDir: config.stateDir,
-    register: file
-      ? (table, columns) => {
-          registerInConfig(file, [{ table, columns }]);
-          const spec = config.tables.find((t) => t.name === table);
-          if (spec) Object.assign(spec.columns, columns);
-        }
-      : undefined,
+    register:
+      options.root === undefined
+        ? undefined
+        : (table, columns) => {
+            if (file) registerInConfig(file, [{ table, columns }]);
+            const spec = config.tables.find((t) => t.name === table);
+            if (spec) Object.assign(spec.columns, columns);
+          },
   };
   // tables found by the folder conventions but missing from yamlite.yaml are added to it
   const registerTables = () => {

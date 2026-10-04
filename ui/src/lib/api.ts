@@ -87,15 +87,17 @@ export interface RowsParams {
   prefix?: string;
 }
 
-export const api = {
+export function rowsQuery(p: RowsParams): URLSearchParams {
+  const qs = new URLSearchParams({ limit: String(p.limit), offset: String(p.offset) });
+  if (p.sort) qs.set("sort", p.sort);
+  if (p.filters.length > 0) qs.set("filter", JSON.stringify(p.filters));
+  if (p.prefix) qs.set("prefix", p.prefix);
+  return qs;
+}
+
+export const httpApi = {
   meta: () => request<Meta>("GET", "/api/meta"),
-  rows(table: string, p: RowsParams) {
-    const qs = new URLSearchParams({ limit: String(p.limit), offset: String(p.offset) });
-    if (p.sort) qs.set("sort", p.sort);
-    if (p.filters.length > 0) qs.set("filter", JSON.stringify(p.filters));
-    if (p.prefix) qs.set("prefix", p.prefix);
-    return request<RowsPage>("GET", `${rowsPath(table)}?${qs}`);
-  },
+  rows: (table: string, p: RowsParams) => request<RowsPage>("GET", `${rowsPath(table)}?${rowsQuery(p)}`),
   schema: (table: string) => request<TableSchema>("GET", `/api/tables/${enc(table)}/schema`),
   record: (table: string, key: string) => request<RecordDetail>("GET", rowPath(table, key)),
   create: (table: string, key: string, values: Row) =>
@@ -117,4 +119,30 @@ export const api = {
       expected === undefined ? undefined : { expected },
     ),
   dismiss: (id: string) => request<{ ok: true }>("POST", `/api/conflicts/${enc(id)}/dismiss`),
+};
+
+export type Api = typeof httpApi;
+
+let backend: Api = httpApi;
+
+// the static export swaps in a backend that answers from the snapshot
+export function setBackend(b: Api): void {
+  backend = b;
+}
+
+export const api: Api = {
+  meta: () => backend.meta(),
+  rows: (table, p) => backend.rows(table, p),
+  schema: (table) => backend.schema(table),
+  record: (table, key) => backend.record(table, key),
+  create: (table, key, values) => backend.create(table, key, values),
+  update: (table, key, values, base) => backend.update(table, key, values, base),
+  rename: (table, key, to) => backend.rename(table, key, to),
+  remove: (table, key) => backend.remove(table, key),
+  createTable: (body) => backend.createTable(body),
+  sql: (sql) => backend.sql(sql),
+  conflicts: () => backend.conflicts(),
+  conflict: (id) => backend.conflict(id),
+  restore: (id, expected) => backend.restore(id, expected),
+  dismiss: (id) => backend.dismiss(id),
 };

@@ -18,6 +18,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { ApiError, api } from "./api";
+import { staticSnapshot } from "./mode";
 import { EventStore } from "./events";
 import { invalidationsFor } from "./invalidate";
 import { type ReflectAction, type ReflectMap, recordFileOf, reflectKey, reflectReducer } from "./reflect";
@@ -76,7 +77,10 @@ function Wiring({ store, children }: { store: EventStore; children: ReactNode })
       for (const queryKey of invalidationsFor(e)) void client.invalidateQueries({ queryKey });
       if (e.type !== "hello") dispatch({ type: "event", event: e });
     });
-    store.connect();
+    const snapshot = staticSnapshot();
+    // a snapshot has no server to stream from; its warnings are part of the export
+    if (snapshot) store.hello({ activity: [], warnings: snapshot.warnings, configError: null });
+    else store.connect();
     return () => {
       off();
       store.close();

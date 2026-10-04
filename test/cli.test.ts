@@ -84,3 +84,18 @@ test("serve rejects a bad port", () => {
   expect(r.status).toBe(1);
   expect(r.stderr).toContain("invalid port: nope");
 });
+
+test("export writes a static site and lists what it wrote", () => {
+  const root = dataRoot();
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  const out = join(tmpRoot(), "site");
+  const r = run("export", root, "--out", out);
+  expect(r.status).toBe(0);
+  expect(r.stdout).toContain("✓ exported 1 table");
+  expect(r.stdout).toContain(out);
+  expect(readFileSync(join(out, "index.html"), "utf8")).toContain('content="static"');
+  expect(JSON.parse(readFileSync(join(out, "data/yaml/tasks.json"), "utf8"))).toEqual({
+    files: { "tasks/a.yaml": "title: A\n" },
+    keys: { a: "tasks/a.yaml" },
+  });
+});

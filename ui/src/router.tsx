@@ -9,6 +9,7 @@ import { Shell } from "./components/Shell";
 import { SqlConsole } from "./components/SqlConsole";
 import { SyncView } from "./components/SyncView";
 import { TableView } from "./components/TableView";
+import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import type { TableMeta } from "./lib/types";
 import { rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
@@ -63,13 +64,13 @@ function TablePage() {
   return (
     <TableView
       key={table}
-      headerActions={(t) => <NewRecordButton table={t} />}
+      headerActions={isReadOnly() ? undefined : (t) => <NewRecordButton table={t} />}
       drawer={(t, key) => (
         <RecordDrawer
           key={`${t.name}:${key}`}
           table={t}
           recordKey={key}
-          headerActions={<RenameButton table={t} recordKey={key} />}
+          headerActions={isReadOnly() ? undefined : <RenameButton table={t} recordKey={key} />}
         />
       )}
     />
@@ -79,7 +80,7 @@ function TablePage() {
 rootRoute.update({ component: Shell });
 tableRoute.update({ component: TablePage });
 sqlRoute.update({ component: SqlConsole });
-syncRoute.update({ component: SyncView });
+syncRoute.update({ component: () => (isReadOnly() ? <Navigate to="/" /> : <SyncView />) });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
 
 export const router = createRouter({

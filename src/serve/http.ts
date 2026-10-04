@@ -4,16 +4,9 @@ import { extname, resolve, sep } from "node:path";
 import { pipeline } from "node:stream";
 import { BusyError, isConstraintError } from "../store.ts";
 import { type AccessPolicy, checkAccess, loginCookie } from "./security.ts";
+import { HttpError } from "./errors.ts";
 
-export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-    readonly extra: Record<string, unknown> = {},
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
 
 export class Reply {
   constructor(

@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { staticSnapshot } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
 import { applyTheme, nextChoice, readChoice, type ThemeChoice } from "@/lib/theme";
 
@@ -15,7 +16,8 @@ function ago(at: string | null, now: number): string {
 export function StatusBar() {
   const { connected, lastSyncAt, warnings } = useEvents();
   const { data: meta } = useMeta();
-  const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts });
+  const snapshot = staticSnapshot();
+  const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts, enabled: snapshot === null });
   const [now, setNow] = useState(Date.now());
   const [theme, setTheme] = useState<ThemeChoice>(readChoice);
   useEffect(() => {
@@ -27,18 +29,27 @@ export function StatusBar() {
   const ThemeIcon = theme === "system" ? Monitor : theme === "light" ? Sun : Moon;
   return (
     <footer className="flex items-center gap-4 border-t bg-panel px-3 text-[11px] text-muted-foreground">
-      <span className="flex items-center gap-1.5" aria-live="polite">
-        <span className={`size-[7px] rounded-full ${connected ? "bg-ok" : "bg-err"}`} />
-        {connected ? `watching ${meta?.root ?? ""}` : "disconnected"}
-      </span>
-      <span>last sync {ago(lastSyncAt, now)}</span>
-      <span>{location.host}</span>
+      {snapshot ? (
+        <span>Read-only snapshot · {snapshot.generatedAt.slice(0, 16).replace("T", " ")} UTC</span>
+      ) : (
+        <>
+          <span className="flex items-center gap-1.5" aria-live="polite">
+            <span className={`size-[7px] rounded-full ${connected ? "bg-ok" : "bg-err"}`} />
+            {connected ? `watching ${meta?.root ?? ""}` : "disconnected"}
+          </span>
+          <span>last sync {ago(lastSyncAt, now)}</span>
+          <span>{location.host}</span>
+        </>
+      )}
       <span className="ml-auto flex items-center gap-3.5">
-        {warningCount > 0 && (
-          <Link to="/sync" className="text-warn hover:underline">
-            ⚠ {warningCount} warnings
-          </Link>
-        )}
+        {warningCount > 0 &&
+          (snapshot ? (
+            <span className="text-warn">⚠ {warningCount} warnings</span>
+          ) : (
+            <Link to="/sync" className="text-warn hover:underline">
+              ⚠ {warningCount} warnings
+            </Link>
+          ))}
         {conflictCount > 0 && <span className="text-err">● {conflictCount} conflicts</span>}
         <button
           type="button"

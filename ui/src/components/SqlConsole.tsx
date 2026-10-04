@@ -24,6 +24,7 @@ import { api } from "@/lib/api";
 import { loadHistory, pushHistory } from "@/lib/history";
 import { useEventStore, useMeta } from "@/lib/providers";
 import { recordFileOf } from "@/lib/reflect";
+import { isReadOnly } from "@/lib/mode";
 import { needsConfirm } from "@/lib/sqlguard";
 import type { ChangeOp } from "@/lib/types";
 import { Grid } from "./Grid";
@@ -77,7 +78,7 @@ export function SqlConsole() {
   const submitRef = useRef<() => void>(() => {});
   submitRef.current = () => {
     if (run.isPending) return;
-    const reason = needsConfirm(text);
+    const reason = isReadOnly() ? null : needsConfirm(text);
     if (reason) setConfirm(reason);
     else run.mutate(text);
   };
@@ -149,7 +150,7 @@ export function SqlConsole() {
               </span>
               <span>{result.ms} ms</span>
             </div>
-            {result.unmanaged && (
+            {!isReadOnly() && result.unmanaged && (
               <div className="flex items-center gap-3 rounded-md bg-warn-soft px-3 py-2 text-[12px] text-warn">
                 {result.unmanaged} は yamlite.yaml にないため同期されません。
                 <Button size="sm" variant="outline" onClick={() => setAdopt(result.unmanaged ?? null)}>
