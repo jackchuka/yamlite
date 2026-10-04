@@ -60,3 +60,16 @@ export interface TableSpec {
   exclude: string[];
   expand: ExpandSpec[];
 }
+
+export type PageAccess = "read" | "write";
+
+export interface PageSpec {
+  name: string;
+  path: string;
+  title: string;
+  // table or view name → what the page may do with it
+  access: Record<string, PageAccess>;
+  sql: boolean;
+  // origins the page may load from and connect to
+  network: string[];
+}

@@ -4,7 +4,7 @@ import { type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { acquireLock } from "./lock.ts";
 import { checkReferences } from "./references.ts";
 import { Store } from "./store.ts";
-import type { TableSpec } from "./types.ts";
+import type { PageSpec, TableSpec } from "./types.ts";
 import { startWatch, type Watcher, type WatchHandlers, type WatchOptions } from "./watch.ts";
 
 export type { OpenOptions, TableInput } from "./config.ts";
@@ -13,11 +13,12 @@ export { generateConfig, init, type InitOptions } from "./init.ts";
 export type { Change, ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
 export type { SchemaChange } from "./indexes.ts";
 export type { Decision } from "./reconcile.ts";
-export type { ColumnType, IndexSpec, TableSpec } from "./types.ts";
+export type { ColumnType, IndexSpec, PageSpec, TableSpec } from "./types.ts";
 export type { Watcher, WatchHandlers, WatchOptions } from "./watch.ts";
 
 export interface Yamlite {
   readonly tables: readonly TableSpec[];
+  readonly pages: readonly PageSpec[];
   status(opts?: { tables?: string[] }): Promise<TableResult[]>;
   sync(opts?: { tables?: string[]; force?: boolean; forceConvert?: boolean }): Promise<TableResult[]>;
   watch(handlers?: WatchHandlers, options?: WatchOptions): Watcher;
@@ -74,6 +75,9 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
     get tables() {
       return config.tables;
     },
+    get pages() {
+      return config.pages;
+    },
     async status(opts = {}) {
       if (closed) throw new Error("yamlite is closed");
       const dbTime = store.lastWriteMs();
@@ -100,7 +104,9 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
           : {
               root: options.root,
               reload: () => {
-                config.tables = resolveConfig(options).tables;
+                const next = resolveConfig(options);
+                config.tables = next.tables;
+                config.pages = next.pages;
                 registerTables();
                 return config.tables;
               },

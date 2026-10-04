@@ -11,6 +11,8 @@ import {
   type ExpandSpec,
   type IndexSpec,
   type Mode,
+  type PageAccess,
+  type PageSpec,
   type Reference,
   type TableSpec,
 } from "./types.ts";
@@ -39,6 +41,7 @@ export interface ResolvedConfig {
   db: string;
   stateDir: string;
   tables: TableSpec[];
+  pages: PageSpec[];
 }
 
 const CONFIG_NAMES = ["yamlite.yaml", "yamlite.yml"];
@@ -105,17 +108,17 @@ export function listedTables(path: string): Record<string, unknown> {
   return raw?.tables ?? {};
 }
 
-function readRootConfig(root: string): Array<{ name: string } & RawTable> {
+function readRootConfig(root: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
   const path = configPath(root);
-  if (path === null) return [];
-  let raw: { tables?: Record<string, RawTable | null> } | null;
+  if (path === null) return { tables: [], pages: undefined };
+  let raw: { tables?: Record<string, RawTable | null>; pages?: unknown } | null;
   try {
     raw = parse(readFileSync(path, "utf8"));
   } catch (e) {
     const first = (e instanceof Error ? e.message : String(e)).split("\n")[0];
     throw new Error(`invalid ${path}: ${first}`);
   }
-  return Object.entries(raw?.tables ?? {}).map(([name, t]) => ({ name, ...t }));
+  return { tables: Object.entries(raw?.tables ?? {}).map(([name, t]) => ({ name, ...t })), pages: raw?.pages };
 }
 
 function toSpec(t: TableInput, persisted: boolean): TableSpec {
@@ -251,6 +254,73 @@ function checkViewNames(tables: TableSpec[]): TableSpec[] {
   return tables;
 }
 
+const PAGE_KEYS = ["path", "title", "access", "sql", "network"];
+const PAGE_NAME = /^[a-z0-9][a-z0-9_-]*$/;
+
+function toOrigin(where: string, raw: unknown): string {
+  const invalid = () =>
+    new Error(`${where}network entries must be origins like https://cdn.example.com, not ${JSON.stringify(raw)}`);
+  if (typeof raw !== "string" || raw.includes("*")) throw invalid();
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw invalid();
+  }
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || raw.replace(/\/$/, "") !== url.origin) throw invalid();
+  return url.origin;
+}
+
+function toPages(raw: unknown, root: string, tables: TableSpec[]): PageSpec[] {
+  if (raw === undefined || raw === null) return [];
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new Error("pages must be a map of page names");
+  const tableNames = new Set(tables.map((t) => t.name));
+  const viewNames = new Set(tables.flatMap((t) => declaredViews(t).map((d) => d.spec.name)));
+  return Object.entries(raw).map(([name, value]) => {
+    if (!PAGE_NAME.test(name)) {
+      throw new Error(`invalid page name: "${name}"; use lowercase letters, digits, - and _`);
+    }
+    const where = `page "${name}": `;
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`${where}must be a map with a path`);
+    }
+    const v = value as Record<string, unknown>;
+    const unknown = Object.keys(v).find((k) => !PAGE_KEYS.includes(k));
+    if (unknown !== undefined) throw new Error(`${where}unknown key "${unknown}"`);
+    if (typeof v.path !== "string" || v.path === "") throw new Error(`${where}path is required`);
+    if (!/\.html$/i.test(v.path)) throw new Error(`${where}path must be an .html file`);
+    if (v.title !== undefined && typeof v.title !== "string") throw new Error(`${where}title must be a string`);
+    if (v.sql !== undefined && typeof v.sql !== "boolean") throw new Error(`${where}sql must be true or false`);
+    if (v.network !== undefined && !Array.isArray(v.network)) {
+      throw new Error(`${where}network must be a list of origins`);
+    }
+    if (v.access !== undefined && v.access !== null && (typeof v.access !== "object" || Array.isArray(v.access))) {
+      throw new Error(`${where}access must be a map of tables to read or write`);
+    }
+    const access: Record<string, PageAccess> = {};
+    for (const [target, level] of Object.entries((v.access ?? {}) as Record<string, unknown>)) {
+      if (target.startsWith("_yamlite")) {
+        throw new Error(`${where}${target} is yamlite's bookkeeping and cannot be in access`);
+      }
+      if (level !== "read" && level !== "write") throw new Error(`${where}access.${target} must be read or write`);
+      if (viewNames.has(target)) {
+        if (level === "write") throw new Error(`${where}view "${target}" can only be read`);
+      } else if (!tableNames.has(target)) {
+        throw new Error(`${where}unknown table or view "${target}" in access`);
+      }
+      access[target] = level;
+    }
+    return {
+      name,
+      path: expandPath(v.path, root),
+      title: (v.title as string | undefined) ?? name,
+      access,
+      sql: v.sql === true,
+      network: ((v.network ?? []) as unknown[]).map((o) => toOrigin(where, o)),
+    };
+  });
+}
+
 const isStringList = (v: unknown): v is string[] =>
   Array.isArray(v) && v.length > 0 && v.every((c) => typeof c === "string" && c !== "");
 
@@ -279,7 +349,8 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
     const merged = new Map(scanRoot(root).map((t) => [t.name, t]));
-    for (const o of readRootConfig(root)) {
+    const raw = readRootConfig(root);
+    for (const o of raw.tables) {
       const prev = merged.get(o.name);
       const path = o.path ? expandPath(o.path, root) : (prev?.path ?? defaultPath(root, o.name));
       merged.set(o.name, {
@@ -298,10 +369,12 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       merged.set(t.name, { ...t, path: expandPath(t.path, root) });
       inCode.add(t.name);
     }
+    const tables = checkViewNames(withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name)))));
     return {
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
       stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(root, ".yamlite"),
-      tables: checkViewNames(withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))))),
+      tables,
+      pages: toPages(raw.pages, root, tables),
     };
   }
   if (!opts.db) throw new Error("either root or db is required");
@@ -312,5 +385,6 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     tables: checkViewNames(
       withExcludes((opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false))),
     ),
+    pages: [],
   };
 }
