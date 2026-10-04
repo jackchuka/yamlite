@@ -61,13 +61,13 @@ export async function serve(opts: ServeOptions): Promise<Server> {
         ...hub.handlers,
         onReload: (tables) => {
           hub.handlers.onReload?.(tables);
-          pages.update(y.pages);
+          void pages.update(y.pages);
         },
       },
       opts.watch,
     );
     await watcher.ready;
-    pages.update(y.pages);
+    await pages.update(y.pages);
     store = new Store(config.db);
     pageSql = new PageSql(config.db);
     const ctx: ApiContext = {

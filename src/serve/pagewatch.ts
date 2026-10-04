@@ -2,6 +2,8 @@ import { dirname } from "node:path";
 import { type FSWatcher, watch } from "chokidar";
 import type { PageSpec } from "../types.ts";
 
+const SETTLE_MS = 100;
+
 export class PageWatch {
   private watcher: FSWatcher | undefined;
   private names = new Map<string, string[]>();
@@ -13,7 +15,8 @@ export class PageWatch {
     private readonly debounceMs = 100,
   ) {}
 
-  update(pages: readonly PageSpec[]): void {
+  // resolves once the new targets are watched, so a save made right after it is seen
+  update(pages: readonly PageSpec[]): Promise<void> {
     const next = new Map<string, string[]>();
     for (const p of pages) next.set(p.path, [...(next.get(p.path) ?? []), p.name]);
     const before = this.targets();
@@ -22,13 +25,16 @@ export class PageWatch {
     const gone = [...before].filter((target) => !after.has(target));
     const added = [...after].filter((target) => !before.has(target));
     if (!this.watcher) {
-      if (added.length === 0) return;
-      this.watcher = watch(added, { ignoreInitial: true, depth: 0 });
-      this.watcher.on("all", (event, path) => this.seen(event, path));
-      return;
+      if (added.length === 0) return Promise.resolve();
+      const watcher = watch(added, { ignoreInitial: true, depth: 0 });
+      this.watcher = watcher;
+      watcher.on("all", (event, path) => this.seen(event, path));
+      // chokidar reports ready before the OS watcher (FSEvents on macOS) delivers events, as in src/watch.ts
+      return new Promise((r) => watcher.once("ready", () => setTimeout(r, SETTLE_MS)));
     }
     if (gone.length > 0) this.watcher.unwatch(gone);
     if (added.length > 0) this.watcher.add(added);
+    return Promise.resolve();
   }
 
   private seen(event: string, path: string): void {
