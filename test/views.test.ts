@@ -11,6 +11,7 @@ const expand = (field: string, extra: Partial<ExpandSpec> = {}): ExpandSpec => (
   field,
   name: `projects__${field}`,
   columns: {},
+  formats: {},
   references: [],
   expand: [],
   ...extra,
@@ -131,7 +132,7 @@ describe("buildView", () => {
   test("a nested view inherits its parent's identity", () => {
     const milestones = buildView(expand("milestones"), root, [[{ tasks: [{ owner: "ann" }] }]]);
     const tasks = buildView(
-      { field: "tasks", name: "projects__milestones__tasks", columns: {}, references: [], expand: [] },
+      { field: "tasks", name: "projects__milestones__tasks", columns: {}, formats: {}, references: [], expand: [] },
       milestones.next,
       milestones.fields.get("tasks") ?? [],
     );
@@ -141,7 +142,14 @@ describe("buildView", () => {
   });
 
   test("a view nested under a view of the same field gets unique identity names", () => {
-    const child = (name: string): ExpandSpec => ({ field: "children", name, columns: {}, references: [], expand: [] });
+    const child = (name: string): ExpandSpec => ({
+      field: "children",
+      name,
+      columns: {},
+      formats: {},
+      references: [],
+      expand: [],
+    });
     const one = buildView(child("projects__children"), root, [[{ children: [{ children: [{ name: "x" }] }] }]]);
     const two = buildView(child("projects__children__children"), one.next, one.fields.get("children") ?? []);
     const three = buildView(
@@ -171,6 +179,7 @@ function setup(list: ExpandSpec[]) {
     mode: "dir",
     key: "id",
     columns: {},
+    formats: {},
     indexes: [],
     references: [],
     persisted: false,
@@ -189,6 +198,7 @@ const tasks: ExpandSpec = {
   field: "tasks",
   name: "projects__milestones__tasks",
   columns: {},
+  formats: {},
   references: [],
   expand: [],
 };
@@ -338,11 +348,12 @@ describe("reconcileViews", () => {
       mode: "list",
       key: "id",
       columns: {},
+      formats: {},
       indexes: [],
       references: [],
       persisted: false,
       exclude: [],
-      expand: [{ field: "roles", name: "people__roles", columns: {}, references: [], expand: [] }],
+      expand: [{ field: "roles", name: "people__roles", columns: {}, formats: {}, references: [], expand: [] }],
     };
     write(spec.path, "- id: 1\n  roles: [admin, editor]\n");
     syncTable({ store: new Store(db, { busyTimeoutMs: 0 }), stateDir }, spec);
@@ -357,6 +368,7 @@ describe("reconcileViews", () => {
       field: "children",
       name,
       columns: {},
+      formats: {},
       references: [],
       expand,
     });

@@ -150,6 +150,7 @@ export function generateConfig(opts: InitOptions): string {
       if (spec.key !== "id") entry.key = spec.key;
       const columns = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);
+      if (Object.keys(spec.formats).length > 0) entry.formats = { ...spec.formats };
       if (spec.references.length > 0) {
         entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
       }

@@ -21,6 +21,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         path: display(t.path),
         key: t.key,
         columns,
+        formats: t.formats,
         references: t.references,
         count,
         inDb,

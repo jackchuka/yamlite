@@ -31,6 +31,15 @@ test("meta lists the tables with columns, counts and relative paths", async () =
   });
 });
 
+test("meta marks markdown columns", async () => {
+  t = await startServe(
+    { "faqs.yaml": "- id: 1\n  answer: hi\n" },
+    "tables:\n  faqs:\n    formats: { answer: markdown }\n",
+  );
+  const { body } = await t.api("/api/meta");
+  expect(body.tables[0]).toMatchObject({ columns: { answer: "TEXT" }, formats: { answer: "markdown" } });
+});
+
 test("hello carries recent activity, then file edits stream as sync events", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" });
   const ev = await events(t);
