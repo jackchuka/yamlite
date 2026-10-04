@@ -48,7 +48,7 @@ export function NewRecordDialog({
           <DialogTitle>{table.name} に追加</DialogTitle>
         </DialogHeader>
         <label className="text-[11.5px] font-semibold text-muted-foreground">
-          {table.key}（{table.mode === "dir" ? "ファイル名になります" : "キー"}）
+          {table.key}（{table.mode === "files" ? "ファイル名になります" : "キー"}）
           <Input aria-label="new key" value={key} onChange={(e) => setKey(e.target.value)} className="mt-1 font-mono" />
         </label>
         {err?.field === "key" && <p className="text-[11px] text-err">{err.message}</p>}

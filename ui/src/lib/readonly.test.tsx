@@ -18,7 +18,7 @@ vi.mock("./api", async (orig) => ({
 
 const table: TableMeta = {
   name: "tasks",
-  mode: "dir",
+  mode: "files",
   path: "tasks",
   key: "id",
   columns: { id: "TEXT", title: "TEXT" },

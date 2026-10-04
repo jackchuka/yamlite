@@ -107,7 +107,7 @@ export const httpApi = {
   rename: (table: string, key: string, to: string) =>
     request<{ key: string }>("POST", `${rowPath(table, key)}/rename`, { to }),
   remove: (table: string, key: string) => request<{ ok: true }>("DELETE", rowPath(table, key)),
-  createTable: (body: { name: string; mode?: "dir" | "list"; key?: string; columns?: Record<string, string> }) =>
+  createTable: (body: { name: string; mode?: "files" | "list"; key?: string; columns?: Record<string, string> }) =>
     request<{ name: string }>("POST", "/api/tables", body),
   sql: (sql: string) => request<SqlResult>("POST", "/api/sql", { sql }),
   pageHtml: (name: string) => request<{ html: string }>("GET", `/api/pages/${enc(name)}/html`).then((r) => r.html),

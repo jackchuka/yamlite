@@ -12,8 +12,9 @@ vi.mock("@/lib/api", async (orig) => ({
 test("references show their problems and indexes show whether they exist", async () => {
   vi.mocked(api.schema).mockResolvedValue({
     name: "tasks",
-    mode: "dir",
+    mode: "files",
     path: "tasks",
+    files: "tasks/**/*.{yaml,yml}",
     key: "id",
     inDb: true,
     columns: { id: "TEXT", title: "TEXT", project: "TEXT" },
@@ -39,12 +40,13 @@ test("references show their problems and indexes show whether they exist", async
   expect(screen.getAllByText("作成済み")).toHaveLength(1);
   expect(screen.getByText("未作成")).toBeTruthy();
   expect(screen.getByText("by_hand")).toBeTruthy();
+  expect(screen.getByText("tasks/**/*.{yaml,yml}")).toBeTruthy();
 });
 
 test("a table's expanded views link to them and show their problems", async () => {
   vi.mocked(api.schema).mockResolvedValue({
     name: "projects",
-    mode: "dir",
+    mode: "files",
     path: "projects",
     key: "id",
     inDb: true,

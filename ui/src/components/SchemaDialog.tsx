@@ -85,7 +85,7 @@ export function SchemaDialog({
                 <Section title="Table">
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
                     <dt className="text-muted-foreground">path</dt>
-                    <dd className="font-mono">{data.mode === "dir" ? `${data.path}/*.yaml` : data.path}</dd>
+                    <dd className="font-mono">{data.mode === "files" ? data.files : data.path}</dd>
                     <dt className="text-muted-foreground">key</dt>
                     <dd className="font-mono">{data.key}</dd>
                     <dt className="text-muted-foreground">DB</dt>

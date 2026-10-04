@@ -9,7 +9,7 @@ import { SqlConsole } from "./SqlConsole";
 let emit: (e: ServeEvent) => void = () => {};
 vi.mock("@/lib/providers", () => ({
   useMeta: () => ({
-    data: { tables: [{ name: "tasks", mode: "dir", path: "tasks", key: "id", columns: { id: "TEXT" } }] },
+    data: { tables: [{ name: "tasks", mode: "files", path: "tasks", key: "id", columns: { id: "TEXT" } }] },
   }),
   useEventStore: () => ({
     listen: (fn: (e: ServeEvent) => void) => {
