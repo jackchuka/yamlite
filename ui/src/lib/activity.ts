@@ -66,3 +66,13 @@ export function warningsByKey(links: WarningLink[]): Map<string, string[]> {
   for (const w of links) if (w.key !== null) out.set(w.key, [...(out.get(w.key) ?? []), w.text]);
   return out;
 }
+
+// how many warnings each table and expanded view has, counted the way the sidebar shows them
+export function warningCounts(warnings: Record<string, string[]>, views: ReadonlySet<string>): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const w of warningLinks(warnings, views)) {
+    const name = w.view ?? w.table;
+    out.set(name, (out.get(name) ?? 0) + 1);
+  }
+  return out;
+}

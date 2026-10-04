@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { activityLines, warningLinks, warningsByKey } from "./activity";
+import { activityLines, warningCounts, warningLinks, warningsByKey } from "./activity";
 
 test("activity is newest first, one line per change", () => {
   const lines = activityLines([
@@ -64,6 +64,19 @@ test("a record's warnings are grouped by its key", () => {
     new Map([
       ["a", ["one", "two"]],
       ["b", ["three"]],
+    ]),
+  );
+});
+
+test("warning counts are per table, with a view's own warnings counted on the view", () => {
+  const counts = warningCounts(
+    { tasks: ["b: owner missing", "tasks__subtasks: bad", "sync slow"] },
+    new Set(["tasks__subtasks"]),
+  );
+  expect(counts).toEqual(
+    new Map([
+      ["tasks", 2],
+      ["tasks__subtasks", 1],
     ]),
   );
 });
