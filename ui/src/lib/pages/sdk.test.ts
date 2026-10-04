@@ -1,22 +1,24 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { pageSdk } from "./sdk";
 
-function fake() {
+function fake(theme?: "light" | "dark") {
   const sent: Array<Record<string, unknown>> = [];
   let onMessage: (e: { source: unknown; data: unknown }) => void = () => {};
   let onViolation: (e: { blockedURI: string }) => void = () => {};
   const parent = { postMessage: (m: Record<string, unknown>) => sent.push(m) };
+  const root = { dataset: {} as Record<string, string> };
   const win = {
     parent,
     setInterval: (fn: () => void, ms: number) => setInterval(fn, ms),
     clearInterval: (h: ReturnType<typeof setInterval>) => clearInterval(h),
     addEventListener: (_t: string, fn: typeof onMessage) => (onMessage = fn),
-    document: { addEventListener: (_t: string, fn: typeof onViolation) => (onViolation = fn) },
+    document: { addEventListener: (_t: string, fn: typeof onViolation) => (onViolation = fn), documentElement: root },
   } as Record<string, any>;
-  pageSdk(win as never);
+  pageSdk(win as never, theme);
   return {
     yamlite: win.yamlite,
     sent,
+    root,
     reply: (data: unknown) => onMessage({ source: parent, data }),
     fromOther: (data: unknown) => onMessage({ source: {}, data }),
     violate: (url: string) => onViolation({ blockedURI: url }),
@@ -89,7 +91,7 @@ test("change events reach subscribers until they unsubscribe", () => {
   off();
   f.reply({ yamlite: 1, event: "change", data: { tables: ["people"] } });
   expect(got).toEqual([{ tables: ["tasks"] }]);
-  expect(() => f.yamlite.on("other", () => {})).toThrow('only "change" can be subscribed to');
+  expect(() => f.yamlite.on("other", () => {})).toThrow('only "change" and "theme" can be subscribed to');
 });
 
 test("a blocked request is reported to the parent", () => {
@@ -100,4 +102,43 @@ test("a blocked request is reported to the parent", () => {
 
 test("the SDK can be inlined in a script tag", () => {
   expect(String(pageSdk)).not.toMatch(/<\/script/i);
+});
+
+test("the initial theme is on the root and readable", () => {
+  const f = fake("dark");
+  expect(f.root.dataset.theme).toBe("dark");
+  expect(f.yamlite.theme).toBe("dark");
+  expect(fake().yamlite.theme).toBe("light");
+});
+
+test("a theme event from the parent switches the root and tells subscribers", () => {
+  const f = fake("light");
+  const seen: string[] = [];
+  f.yamlite.on("theme", (d: { theme: string }) => seen.push(d.theme));
+  f.root.dataset.theme = "light-custom";
+  f.reply({ yamlite: 1, event: "theme", data: { theme: "dark" } });
+  expect(f.root.dataset.theme).toBe("dark");
+  expect(f.yamlite.theme).toBe("dark");
+  expect(seen).toEqual(["dark"]);
+  f.fromOther({ yamlite: 1, event: "theme", data: { theme: "light" } });
+  expect(f.yamlite.theme).toBe("dark");
+});
+
+test("a theme event that changes nothing is a no-op, and an invalid one is ignored", () => {
+  const f = fake("dark");
+  const seen: string[] = [];
+  f.yamlite.on("theme", (d: { theme: string }) => seen.push(d.theme));
+  f.root.dataset.theme = "mine";
+  f.reply({ yamlite: 1, event: "theme", data: { theme: "dark" } });
+  expect(f.root.dataset.theme).toBe("mine");
+  expect(seen).toEqual([]);
+  f.reply({ yamlite: 1, event: "theme", data: { theme: "blue" } });
+  f.reply({ yamlite: 1, event: "theme" });
+  expect(f.root.dataset.theme).toBe("mine");
+  expect(f.yamlite.theme).toBe("dark");
+  expect(seen).toEqual([]);
+});
+
+test("only change and theme can be subscribed to", () => {
+  expect(() => fake().yamlite.on("other", () => {})).toThrow('only "change" and "theme" can be subscribed to');
 });

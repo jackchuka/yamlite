@@ -15,7 +15,8 @@ test.each([
   expect(first?.tagName).toBe("META");
   expect(first?.getAttribute("http-equiv")).toBe("Content-Security-Policy");
   expect(first?.getAttribute("content")).toBe(pageCsp([]));
-  expect(first?.nextElementSibling?.tagName).toBe("SCRIPT");
+  expect(first?.nextElementSibling?.tagName).toBe("STYLE");
+  expect(first?.nextElementSibling?.nextElementSibling?.tagName).toBe("SCRIPT");
 });
 
 test("a doctype stays first, so the page keeps standards mode", () => {
@@ -39,4 +40,13 @@ test("many leading comments without a doctype do not stall the injection", () =>
   const out = injectPage(html, []);
   expect(performance.now() - started).toBeLessThan(100);
   expect(parse(out).head.firstElementChild?.getAttribute("http-equiv")).toBe("Content-Security-Policy");
+});
+
+test("the theme style follows the policy and the sdk is told the initial theme", () => {
+  const doc = parse(injectPage("<!doctype html><p>x</p>", [], "dark"));
+  const [meta, style, script] = [...doc.head.children];
+  expect(meta?.getAttribute("http-equiv")).toBe("Content-Security-Policy");
+  expect(style?.tagName).toBe("STYLE");
+  expect(style?.id).toBe("yamlite-theme");
+  expect(script?.textContent).toContain('"dark"');
 });

@@ -48,3 +48,17 @@ export function accessSummary(page: PageRules): string {
   for (const origin of page.network) parts.push(new URL(origin).host);
   return parts.length > 0 ? parts.join(" · ") : "no access";
 }
+
+// the header shows counts; the full list stays in its tooltip
+export function accessBrief(page: PageRules): string {
+  const levels = Object.values(page.access);
+  const writes = levels.filter((l) => l === "write").length;
+  const reads = levels.length - writes;
+  const parts: string[] = [];
+  if (writes > 0) parts.push(`write ${writes}`);
+  if (reads > 0) parts.push(`read ${reads}`);
+  if (page.sql) parts.push("SQL");
+  const n = page.network.length;
+  if (n > 0) parts.push(`${n} ${n === 1 ? "origin" : "origins"}`);
+  return parts.length > 0 ? parts.join(" · ") : "no access";
+}

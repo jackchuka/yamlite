@@ -59,7 +59,9 @@ test("the page runs in a sandboxed frame behind the injected policy", async () =
   const doc = frame.getAttribute("srcdoc") ?? "";
   expect(doc.startsWith('<meta http-equiv="Content-Security-Policy"')).toBe(true);
   expect(doc).toContain("<p>hello page</p>");
-  expect(screen.getByText("tasks: write · sql · cdn.example.com")).toBeTruthy();
+  const brief = screen.getByText("write 1 · SQL · 1 origin");
+  expect(brief.getAttribute("title")).toBe(".pages/b.html\ntasks: write · sql · cdn.example.com");
+  expect(screen.getByRole("heading", { name: "Board" }).className).toContain("whitespace-nowrap");
 });
 
 test("an unknown page says so", async () => {
@@ -102,8 +104,37 @@ test("a change to the page's access in the config replaces the frame", async () 
   await waitFor(() => expect(screen.getByTitle("Board")).not.toBe(frame));
 });
 
+test("a frame rebuilt after a theme switch starts with the current theme", async () => {
+  document.documentElement.dataset.theme = "light";
+  await show("board");
+  const frame = await screen.findByTitle("Board");
+  document.documentElement.dataset.theme = "dark";
+  const { queryClient } = await import("@/lib/providers");
+  const page = snapshot.meta.pages[0] as (typeof snapshot.meta.pages)[number];
+  queryClient.setQueryData(["meta"], { ...snapshot.meta, pages: [{ ...page, access: { tasks: "read" } }] });
+  await waitFor(() => expect(screen.getByTitle("Board")).not.toBe(frame));
+  expect(screen.getByTitle("Board").getAttribute("srcdoc")).toContain('(undefined, "dark")');
+});
+
 test("a page that cannot be loaded shows why", async () => {
   vi.mocked(api.pageHtml).mockRejectedValueOnce(new Error("page file not found: .pages/b.html"));
   await show("board");
   expect((await screen.findByRole("alert")).textContent).toContain("page file not found: .pages/b.html");
+});
+
+test("switching the theme tells the page without rebuilding the frame", async () => {
+  document.documentElement.dataset.theme = "light";
+  await show("board");
+  const frame = (await screen.findByTitle("Board")) as HTMLIFrameElement;
+  expect(frame.getAttribute("srcdoc")).toContain('(undefined, "light")');
+  const posted: unknown[] = [];
+  const win = frame.contentWindow as Window;
+  const original = win.postMessage.bind(win);
+  win.postMessage = ((m: unknown, o: string) => {
+    posted.push(m);
+    original(m, o);
+  }) as typeof win.postMessage;
+  document.documentElement.dataset.theme = "dark";
+  await waitFor(() => expect(posted).toContainEqual({ yamlite: 1, event: "theme", data: { theme: "dark" } }));
+  expect(screen.getByTitle("Board")).toBe(frame);
 });

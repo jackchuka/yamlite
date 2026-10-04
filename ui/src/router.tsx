@@ -3,7 +3,6 @@ import { createHashHistory, createRoute, createRouter, lazyRouteComponent, Navig
 import { Button } from "@/components/ui/button";
 import { NewRecordDialog } from "./components/NewRecordDialog";
 import { Placeholder } from "./components/Placeholder";
-import { PageView } from "./components/PageView";
 import { RecordDrawer } from "./components/RecordDrawer";
 import { RenameKeyDialog } from "./components/RenameKeyDialog";
 import { Shell } from "./components/Shell";
@@ -78,9 +77,11 @@ function TablePage() {
   );
 }
 
+const LazyPageView = lazyRouteComponent(() => import("./components/PageView"), "PageView");
+
 function PagePage() {
   const { page } = pageRoute.useParams();
-  return <PageView key={page} name={page} />;
+  return <LazyPageView key={page} name={page} />;
 }
 
 rootRoute.update({ component: Shell });

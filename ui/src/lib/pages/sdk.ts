@@ -3,7 +3,10 @@ interface SdkWindow {
   addEventListener(type: "message", listener: (e: { source: unknown; data: any }) => void): void;
   setInterval(fn: () => void, ms: number): unknown;
   clearInterval(handle: unknown): void;
-  document: { addEventListener(type: "securitypolicyviolation", listener: (e: { blockedURI: string }) => void): void };
+  document: {
+    addEventListener(type: "securitypolicyviolation", listener: (e: { blockedURI: string }) => void): void;
+    documentElement: { dataset: Record<string, string | undefined> };
+  };
 }
 
 interface WireError {
@@ -13,7 +16,10 @@ interface WireError {
 }
 
 // runs inside the page's iframe as the source text of this function: it must not use anything from outside its body
-export function pageSdk(win: SdkWindow = window as unknown as SdkWindow): void {
+export function pageSdk(
+  win: SdkWindow = window as unknown as SdkWindow,
+  initialTheme: "light" | "dark" = "light",
+): void {
   class YamliteError extends Error {
     readonly status: number;
     readonly extra: Record<string, unknown>;
@@ -27,6 +33,9 @@ export function pageSdk(win: SdkWindow = window as unknown as SdkWindow): void {
   const parent = win.parent;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: unknown) => void }>();
   const listeners = new Set<(data: { tables: string[] }) => void>();
+  let theme: "light" | "dark" = initialTheme === "dark" ? "dark" : "light";
+  win.document.documentElement.dataset.theme = theme;
+  const themeListeners = new Set<(data: { theme: "light" | "dark" }) => void>();
   let next = 0;
   const call = (method: string, ...args: unknown[]) =>
     new Promise<any>((resolve, reject) => {
@@ -39,6 +48,14 @@ export function pageSdk(win: SdkWindow = window as unknown as SdkWindow): void {
     if (e.source !== parent || m === null || typeof m !== "object" || m.yamlite !== 1) return;
     if (m.event === "change") {
       for (const listener of listeners) listener(m.data);
+      return;
+    }
+    if (m.event === "theme") {
+      if (m.data?.theme !== "light" && m.data?.theme !== "dark") return;
+      if (m.data.theme === theme) return;
+      theme = m.data.theme;
+      win.document.documentElement.dataset.theme = theme;
+      for (const listener of themeListeners) listener({ theme });
       return;
     }
     const waiting = pending.get(m.id);
@@ -65,10 +82,19 @@ export function pageSdk(win: SdkWindow = window as unknown as SdkWindow): void {
     remove: (table: string, key: string) => call("remove", table, key),
     sql: (sql: string) => call("sql", sql),
     open: (table: string, key: string) => call("open", table, key),
-    on(type: string, listener: (data: { tables: string[] }) => void) {
-      if (type !== "change") throw new Error('only "change" can be subscribed to');
-      listeners.add(listener);
-      return () => listeners.delete(listener);
+    get theme() {
+      return theme;
+    },
+    on(type: string, listener: (data: any) => void) {
+      if (type === "change") {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }
+      if (type === "theme") {
+        themeListeners.add(listener);
+        return () => themeListeners.delete(listener);
+      }
+      throw new Error('only "change" and "theme" can be subscribed to');
     },
     YamliteError,
   });
