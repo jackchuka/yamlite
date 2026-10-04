@@ -31,7 +31,12 @@ const TYPES: Record<string, string> = {
 let server: Server | undefined;
 let work: string | undefined;
 test.afterEach(async () => {
-  await new Promise<void>((done) => (server ? server.close(() => done()) : done()));
+  // Node 24 keeps a connection the browser opened but never sent a request on, so close() alone can wait for minutes
+  await new Promise<void>((done) => {
+    if (!server) return done();
+    server.close(() => done());
+    server.closeAllConnections();
+  });
   server = undefined;
   if (work) rmSync(work, { recursive: true, force: true });
 });
