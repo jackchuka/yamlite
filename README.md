@@ -189,7 +189,7 @@ yamlite export notes --out ../notes-site
 - Machine paths are hidden: the root is shown as its folder name, and paths outside the root as their base names.
 - `--out` defaults to `.yamlite-export`. It cannot be the data root or an ancestor of it, and inside the root it must sit in a dot-folder (yamlite ignores those; a plain folder would become a table on the next sync).
 - An existing `--out` folder is replaced only if it holds a previous export or is empty; `--force` replaces anything else, but never the root or its ancestors.
-- Open it over HTTP (`npx serve ../notes-site`); browsers do not load the data from `file://`.
+- Open it over HTTP (`npx serve ../notes-site`); browsers do not load the app from `file://`, so the page opened that way only says to use a web server.
 - Set `SOURCE_DATE_EPOCH` to make the output byte-for-byte reproducible.
 
 Publishing to GitHub Pages:

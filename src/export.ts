@@ -215,6 +215,19 @@ function snapshotDb(from: string, to: string, selected: string[]): void {
 
 const DEFAULT_UI = fileURLToPath(new URL("./ui/", import.meta.url));
 const STATIC_META = '<meta name="yamlite-mode" content="static" />';
+const FILE_MESSAGE =
+  "スナップショットを開くには Web サーバーが必要です。このフォルダを Web サーバー経由で開いてください（例: npx serve）";
+// browsers block module scripts over file://, so the app never starts to say why; a classic script still runs
+const FILE_GUARD = `<script>
+      if (location.protocol === "file:") {
+        document.addEventListener("DOMContentLoaded", function () {
+          var p = document.createElement("p");
+          p.style.cssText = "font: 16px/1.6 system-ui, sans-serif; margin: 2rem;";
+          p.textContent = ${JSON.stringify(FILE_MESSAGE)};
+          document.body.replaceChildren(p);
+        });
+      }
+    </script>`;
 
 function checkOut(out: string, force: boolean): void {
   if (!existsSync(out)) return;
@@ -253,7 +266,7 @@ export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
     cpSync(uiDir, staging, { recursive: true });
     const html = readFileSync(indexPath, "utf8");
     if (!html.includes("<head>")) throw new Error(`${indexPath} has no <head>`);
-    writeFileSync(join(staging, "index.html"), html.replace("<head>", `<head>\n    ${STATIC_META}`));
+    writeFileSync(join(staging, "index.html"), html.replace("<head>", `<head>\n    ${STATIC_META}\n    ${FILE_GUARD}`));
     const { tables, warnings } = await writeSnapshotData({
       root: opts.root,
       tables: opts.tables,

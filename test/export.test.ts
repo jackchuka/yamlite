@@ -196,6 +196,19 @@ test("exportSite writes the UI marked static next to the data", async () => {
   }
 });
 
+test("index.html tells a file:// visitor to use a web server, in a classic script that runs there", async () => {
+  const out = join(tmpRoot(), "site");
+  await exportSite({ root: setup(), out, uiDir: ui() });
+  const html = readFileSync(join(out, "index.html"), "utf8");
+  const scripts = [...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];
+  const guard = scripts.find((m) => m[2]?.includes('location.protocol === "file:"'));
+  expect(guard).toBeDefined();
+  expect(guard?.[1]).not.toMatch(/type=["']?module/);
+  expect(guard?.[1]).not.toMatch(/src=/);
+  expect(guard?.[2]).toContain("スナップショットを開くには Web サーバーが必要です。");
+  expect(guard?.[2]).toContain("このフォルダを Web サーバー経由で開いてください（例: npx serve）");
+});
+
 test("a previous export is replaced, another folder is refused unless forced", async () => {
   const root = setup();
   const out = join(tmpRoot(), "site");

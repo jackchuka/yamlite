@@ -4,6 +4,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, extname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { expect, test } from "@playwright/test";
 
 const bin = resolve(import.meta.dirname, "../../dist/cli.mjs");
@@ -90,4 +91,10 @@ test("an export browses, queries and refuses writes from a subdirectory", async 
   await page.keyboard.type("update projects set title = 'x'");
   await page.getByRole("button", { name: /Run/ }).click();
   await expect(page.getByText(/read-only snapshot/)).toBeVisible();
+});
+
+test("an export opened from file:// says it needs a web server", async ({ page }) => {
+  const out = exportFixture();
+  await page.goto(pathToFileURL(join(out, "index.html")).toString());
+  await expect(page.getByText(/スナップショットを開くには Web サーバーが必要です。/)).toBeVisible();
 });
