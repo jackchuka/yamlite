@@ -50,6 +50,16 @@ function get(router: Router, path: string): Json {
   return m.handler({ params: m.params, query: new URLSearchParams(), body: undefined } as never) as Json;
 }
 
+// warnings quote the absolute paths sync read: root-relative inside the root, base name outside it
+function warningScrubber(root: string, specPaths: string[]): (warning: string) => string {
+  const outside = specPaths.map((p) => resolve(root, p)).filter((p) => p !== root && !p.startsWith(`${root}/`));
+  return (warning) => {
+    let out = warning;
+    for (const p of outside.sort((a, b) => b.length - a.length)) out = out.split(p).join(basename(p));
+    return out.split(`${root}/`).join("");
+  };
+}
+
 const writeJson = (path: string, value: unknown) => writeFileSync(path, JSON.stringify(value));
 
 export async function writeSnapshotData(opts: {
@@ -76,7 +86,13 @@ export async function writeSnapshotData(opts: {
       const results = await y.sync();
       const failed = results.filter((r) => !r.ok);
       if (failed.length > 0) throw new Error(failed.map((r) => `${r.table}: ${r.error}`).join("\n"));
-      for (const r of results) if (selected.includes(r.table) && r.warnings.length > 0) warnings[r.table] = r.warnings;
+      const scrub = warningScrubber(
+        root,
+        y.tables.map((t) => t.path),
+      );
+      for (const r of results) {
+        if (selected.includes(r.table) && r.warnings.length > 0) warnings[r.table] = r.warnings.map(scrub);
+      }
 
       const store = new Store(dbPath);
       try {

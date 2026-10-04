@@ -158,3 +158,11 @@ test("an unknown --table fails", async () => {
     "unknown table: nope",
   );
 });
+
+test("warnings never reveal the machine path of the root", async () => {
+  const root = setup({ "projects/bad.yaml": "a: [1, 2\n" });
+  const r = await writeSnapshotData({ root, dir: tmpRoot() });
+  const all = (r.warnings.projects ?? []).join("\n");
+  expect(all).toContain("projects/bad.yaml");
+  expect(JSON.stringify(r.warnings)).not.toContain(root);
+});
