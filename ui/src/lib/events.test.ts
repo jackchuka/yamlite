@@ -54,3 +54,12 @@ test("a stream that closed for good probes the API so a 401 shows the expired se
     vi.unstubAllGlobals();
   }
 });
+
+test("a page event reaches listeners but not the activity", () => {
+  const store = new EventStore();
+  const seen: string[] = [];
+  store.listen((e) => seen.push(e.type));
+  store.apply({ type: "page", at: "2026-10-04T00:00:00Z", pages: ["board"] });
+  expect(seen).toEqual(["page"]);
+  expect(store.getSnapshot().activity).toEqual([]);
+});

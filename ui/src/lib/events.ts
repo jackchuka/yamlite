@@ -20,7 +20,7 @@ const INITIAL: EventState = {
 };
 const CLOSED = 2; // EventSource.CLOSED
 const KEEP = 200;
-const TYPES = ["sync", "conflict", "error", "reload"] as const;
+const TYPES = ["sync", "conflict", "error", "reload", "page"] as const;
 
 // EventSource also fires a data-less `error` Event on connection trouble, which shares the name of the server's `error` event
 function parseFrame<T>(m: Event): T | null {
@@ -91,6 +91,10 @@ export class EventStore {
   }
 
   apply(e: ServeEvent): void {
+    if (e.type === "page") {
+      this.emit(e);
+      return;
+    }
     const patch: Partial<EventState> = { activity: [...this.state.activity, e].slice(-KEEP) };
     if (e.type === "sync") {
       patch.warnings = { ...this.state.warnings, [e.table]: e.warnings };

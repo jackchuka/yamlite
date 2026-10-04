@@ -1,6 +1,6 @@
 // Only good enough to guard the console: it does not parse SQL, it hides comments and string literals
 // so that keywords, ";" and table names are looked for in code only.
-export function stripSql(sql: string, keepQuoted = true): string {
+export function stripSql(sql: string, keepQuoted = true, keepStrings = false): string {
   let out = "";
   let i = 0;
   while (i < sql.length) {
@@ -29,7 +29,7 @@ export function stripSql(sql: string, keepQuoted = true): string {
         }
         break;
       }
-      out += c === "'" || !keepQuoted ? "''" : sql.slice(i, j + 1);
+      out += (c === "'" && !keepStrings) || !keepQuoted ? "''" : sql.slice(i, j + 1);
       i = j + 1;
       continue;
     }
@@ -49,6 +49,13 @@ export const firstKeyword = (sql: string): string => /^\s*([A-Za-z]+)/.exec(stri
 const READS = new Set(["SELECT", "EXPLAIN", "VALUES"]);
 export const isRead = (sql: string): boolean => READS.has(firstKeyword(sql));
 
+// replace() the function is a read; REPLACE INTO is not
+const WRITES = /\b(?:INSERT|UPDATE|DELETE|REPLACE(?!\s*\())\b/i;
+
+// what a page may run, in serve and in an export alike: a read, or a WITH whose code never writes
+export const isPageStatement = (sql: string): boolean =>
+  isRead(sql) || (firstKeyword(sql) === "WITH" && !WRITES.test(stripSql(sql, false)));
+
 export const touchesInternal = (sql: string): boolean => /_yamlite_(state|columns|views)\b/i.test(stripSql(sql));
 
 const CREATE_TABLE =
@@ -58,4 +65,36 @@ export function createdTable(sql: string): string | null {
   const m = CREATE_TABLE.exec(stripSql(sql));
   if (!m) return null;
   return m[1]?.replaceAll('""', '"') ?? m[2] ?? m[3] ?? m[4] ?? null;
+}
+
+const QUOTED = `"(?:[^"]|"")*"|\`[^\`]*\`|\\[[^\\]]*\\]|'(?:[^']|'')*'`;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// a name as SQLite would read it: bare (on word boundaries) or in any quoting style, with its quotes doubled
+function identifier(name: string): string {
+  const e = escapeRe(name);
+  return `(?:(?<![\\w$])${e}(?![\\w$])|"${escapeRe(name.replaceAll('"', '""'))}"|\`${e}\`|\\[${e}\\]|'${escapeRe(name.replaceAll("'", "''"))}')`;
+}
+
+// any reference to one of these names, bare or quoted: over-refuses (a column or a string that spells the name) rather than miss one
+export function mentionsName(sql: string, names: Iterable<string>): string | null {
+  const code = stripSql(sql, true, true);
+  for (const name of names) {
+    if (new RegExp(identifier(name), "i").test(code)) return name;
+  }
+  return null;
+}
+
+// `name AS (` or `name(cols) AS (`, bare or quoted: a WITH clause that would stand in for one of these names
+export function definesName(sql: string, names: Iterable<string>): string | null {
+  const code = stripSql(sql, true, true);
+  for (const name of names) {
+    const ident = identifier(name);
+    const columns = `\\((?:${QUOTED}|[^)"\`\\['])*\\)`;
+    const definition = `${ident}\\s*(?:${columns}\\s*)?AS\\s*(?:NOT\\s+)?(?:MATERIALIZED\\s*)?\\(`;
+    // quoted tokens that are not a definition are consumed whole, so text inside a string is never read as code
+    const scan = new RegExp(`(${definition})|${QUOTED}`, "gi");
+    if (Array.from(code.matchAll(scan)).some((m) => m[1] !== undefined)) return name;
+  }
+  return null;
 }

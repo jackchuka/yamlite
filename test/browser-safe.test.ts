@@ -20,7 +20,13 @@ function nodeImports(entry: string, seen = new Set<string>()): string[] {
 }
 
 test("the modules the static UI shares with the server import nothing from node", () => {
-  for (const entry of ["src/serve/query.ts", "src/serve/wire.ts", "src/serve/sqltext.ts", "src/serve/errors.ts"]) {
+  for (const entry of [
+    "src/serve/query.ts",
+    "src/serve/wire.ts",
+    "src/serve/sqltext.ts",
+    "src/serve/errors.ts",
+    "src/pages/access.ts",
+  ]) {
     expect(nodeImports(resolve(repo, entry)), entry).toEqual([]);
   }
 });

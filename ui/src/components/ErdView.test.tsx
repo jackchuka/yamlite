@@ -77,6 +77,7 @@ const meta = (taskCount = 3): Meta => ({
       inDb: true,
     },
   ],
+  pages: [],
 });
 
 const diagram = (m: Meta) => (

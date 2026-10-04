@@ -388,3 +388,35 @@ test("a warning naming the bare root shows the root's folder name", () => {
   expect(scrub("see /home/me/notes-old/x.yaml")).toBe("see notes-old/x.yaml");
   expect(scrub("see /elsewhere/people.yaml")).toBe("see people.yaml");
 });
+
+test("pages are written next to the data, and pages that cannot be exported are reported", async () => {
+  const root = setup({
+    "yamlite.yaml":
+      files["yamlite.yaml"] +
+      "pages:\n  board:\n    path: .pages/board.html\n    access: { projects: read, projects__milestones: read }\n" +
+      "  people-page:\n    path: .pages/people.html\n    access: { people: read }\n" +
+      "  gone:\n    path: .pages/missing.html\n",
+    ".pages/board.html": "<p>board</p>",
+    ".pages/people.html": "<p>people</p>",
+  });
+  const dir = tmpRoot();
+  const r = await writeSnapshotData({ root, dir, tables: ["projects", "notes"] });
+  expect(readFileSync(join(dir, "data/pages/board.html"), "utf8")).toBe("<p>board</p>");
+  expect(existsSync(join(dir, "data/pages/people-page.html"))).toBe(false);
+  const snap = readJson(join(dir, "data/snapshot.json"));
+  expect(snap.meta.pages).toEqual([
+    {
+      name: "board",
+      title: "board",
+      path: ".pages/board.html",
+      access: { projects: "read", projects__milestones: "read" },
+      sql: false,
+      network: [],
+    },
+  ]);
+  expect(r.pages).toEqual(["board"]);
+  expect(r.skippedPages).toEqual({
+    "people-page": "uses people, which the export leaves out",
+    gone: "page file not found: .pages/missing.html",
+  });
+});

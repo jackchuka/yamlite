@@ -41,10 +41,12 @@ export function RecordDrawer({
   table,
   recordKey,
   headerActions,
+  onClose,
 }: {
   table: TableMeta;
   recordKey: string;
   headerActions?: ReactNode;
+  onClose?: () => void;
 }) {
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -112,7 +114,8 @@ export function RecordDrawer({
     onMutate: () => dispatch({ type: "saved", table: table.name, key: recordKey, at: Date.now() }),
     onError: () => dispatch({ type: "cancelled", table: table.name, key: recordKey }),
     onSuccess: () => {
-      void navigate({ to: "/t/$table", params: { table: table.name }, search: {} });
+      if (onClose) onClose();
+      else void navigate({ to: "/t/$table", params: { table: table.name }, search: {} });
     },
   });
 
@@ -122,7 +125,9 @@ export function RecordDrawer({
   };
 
   const close = () =>
-    void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: undefined }) });
+    onClose
+      ? onClose()
+      : void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: undefined }) });
 
   // Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
   useEffect(() => {

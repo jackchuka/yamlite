@@ -3,6 +3,7 @@ import { createHashHistory, createRoute, createRouter, lazyRouteComponent, Navig
 import { Button } from "@/components/ui/button";
 import { NewRecordDialog } from "./components/NewRecordDialog";
 import { Placeholder } from "./components/Placeholder";
+import { PageView } from "./components/PageView";
 import { RecordDrawer } from "./components/RecordDrawer";
 import { RenameKeyDialog } from "./components/RenameKeyDialog";
 import { Shell } from "./components/Shell";
@@ -12,7 +13,7 @@ import { TableView } from "./components/TableView";
 import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import type { TableMeta } from "./lib/types";
-import { erdRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
+import { erdRoute, pageRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
 
 function Home() {
   const { data } = useMeta();
@@ -77,16 +78,22 @@ function TablePage() {
   );
 }
 
+function PagePage() {
+  const { page } = pageRoute.useParams();
+  return <PageView key={page} name={page} />;
+}
+
 rootRoute.update({ component: Shell });
 tableRoute.update({ component: TablePage });
 sqlRoute.update({ component: SqlConsole });
+pageRoute.update({ component: PagePage });
 syncRoute.update({ component: () => (isReadOnly() ? <Navigate to="/" /> : <SyncView />) });
 // React Flow and dagre load only when the ERD opens
 erdRoute.update({ component: lazyRouteComponent(() => import("./components/ErdView"), "ErdView") });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute, pageRoute]),
   history: createHashHistory(),
 });
 

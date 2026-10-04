@@ -37,6 +37,7 @@ const snapshot: Snapshot = {
     configError: null,
     tables: [table],
     views: [],
+    pages: [],
   },
   schemas: {},
   warnings: { tasks: ["title: something"] },

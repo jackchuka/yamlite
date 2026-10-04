@@ -10,7 +10,9 @@ export function invalidationsFor(e: ServeEvent | { type: "hello" }): QueryKey[] 
       if (e.changes.length === 0 && e.schema.length === 0) return [];
       return [["rows", e.table], ["record", e.table], ["refKeys", e.table], ["schema"], ["meta"]];
     case "reload":
-      return [["meta"]];
+      return [["meta"], ["page"]];
+    case "page":
+      return e.pages.map((name) => ["page", name]);
     case "conflict":
       return [["conflicts"]];
     case "error":

@@ -14,7 +14,8 @@ export type ServeEvent =
     }
   | ({ type: "conflict"; at: string } & ConflictInfo)
   | { type: "error"; at: string; table?: string; message: string }
-  | { type: "reload"; at: string; tables: string[] };
+  | { type: "reload"; at: string; tables: string[] }
+  | { type: "page"; at: string; pages: string[] };
 
 const KEEP = 200;
 const KEEPALIVE_MS = 15_000;
@@ -55,6 +56,12 @@ export class EventHub {
 
   configError(): string | null {
     return this.brokenConfig;
+  }
+
+  // nothing to keep in the activity: an open page just reloads
+  pagesChanged(pages: string[]): void {
+    const event: ServeEvent = { type: "page", at: now(), pages };
+    for (const res of this.clients.keys()) this.send(res, event.type, event);
   }
 
   subscribe(res: ServerResponse): void {

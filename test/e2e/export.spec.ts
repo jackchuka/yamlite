@@ -1,5 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -106,4 +115,25 @@ test("an export draws the ERD with its expanded views", async ({ page }) => {
   await expect(page.getByTestId("erd-node-projects")).toBeVisible();
   await expect(page.getByTestId("erd-node-projects__milestones")).toBeVisible();
   await expect(page.getByTestId("rf__edge-parent:projects__milestones")).toBeAttached();
+});
+
+test("an exported kanban page shows the cards and does not let them move", async ({ page }) => {
+  work = mkdtempSync(join(tmpdir(), "yamlite-export-e2e-"));
+  const root = join(work, "data");
+  const files: Record<string, string> = {
+    "yamlite.yaml":
+      "tables: {}\npages:\n  board:\n    path: .pages/board.html\n    title: Board\n    access: { tasks: write }\n",
+    ".pages/board.html": readFileSync(resolve(import.meta.dirname, "../../examples/pages/kanban.html"), "utf8"),
+    "tasks/a.yaml": "title: Buy milk\nstatus: todo\n",
+  };
+  for (const [p, c] of Object.entries(files)) {
+    mkdirSync(dirname(join(root, p)), { recursive: true });
+    writeFileSync(join(root, p), c);
+  }
+  const out = join(work, "site");
+  execFileSync(process.execPath, [bin, "export", root, "--out", out]);
+  await page.goto(`${await host(out)}#/p/board`);
+  const card = page.frameLocator('iframe[title="Board"]').getByText("Buy milk");
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute("draggable", "false");
 });

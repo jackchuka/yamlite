@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { LoadFailure } from "@/components/LoadFailure";
 import { isStaticPage } from "../mode";
-import { LoadError, loadStatic } from "./load";
+import { buildPageLoader, LoadError, loadStatic } from "./load";
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 
@@ -41,4 +41,11 @@ test("a file:// page explains that a web server is needed", () => {
   render(<LoadFailure error={new LoadError("data/snapshot.json", "Failed to fetch")} protocol="file:" />);
   expect(screen.getByRole("alert").textContent).toContain("data/snapshot.json");
   expect(screen.getByRole("alert").textContent).toContain("Web サーバー");
+});
+
+test("loadPage fetches the page's html next to the data", async () => {
+  const fetcher = vi.fn(async () => new Response("<p>x</p>", { status: 200 }));
+  const load = buildPageLoader("https://x.test/repo/", fetcher as typeof fetch);
+  expect(await load("board")).toBe("<p>x</p>");
+  expect(fetcher).toHaveBeenCalledWith("https://x.test/repo/data/pages/board.html");
 });

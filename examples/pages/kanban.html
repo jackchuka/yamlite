@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kanban</title>
+    <style>
+      body {
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        margin: 0;
+        padding: 16px;
+        background: #faf7f2;
+        color: #222;
+      }
+      .board {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        overflow-x: auto;
+      }
+      .column {
+        flex: 0 0 240px;
+        background: #efe9df;
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 120px;
+      }
+      .column.over {
+        outline: 2px dashed #e5533d;
+      }
+      .column h2 {
+        font-size: 13px;
+        margin: 4px 4px 8px;
+        display: flex;
+        justify-content: space-between;
+      }
+      .card {
+        background: #fff;
+        border-radius: 6px;
+        padding: 8px 10px;
+        margin-bottom: 8px;
+        box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+        cursor: pointer;
+      }
+      .card[draggable="true"] {
+        cursor: grab;
+      }
+      .error {
+        color: #b42318;
+        margin-bottom: 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #16140f;
+          color: #eee;
+        }
+        .column {
+          background: #26231c;
+        }
+        .card {
+          background: #322e25;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="error" class="error" hidden></div>
+    <div id="board" class="board"></div>
+    <script>
+      // fit these to your table
+      const TABLE = "tasks";
+      const KEY = "id";
+      const GROUP = "status";
+      const TITLE = "title";
+      const COLUMNS = ["todo", "doing", "done"];
+
+      const board = document.getElementById("board");
+      const error = document.getElementById("error");
+      let readOnly = true;
+
+      function showError(message) {
+        error.textContent = message;
+        error.hidden = !message;
+      }
+
+      async function load() {
+        const rows = [];
+        for (let offset = 0; ; offset += 500) {
+          const page = await yamlite.rows(TABLE, { limit: 500, offset });
+          rows.push(...page.rows);
+          if (rows.length >= page.total || page.rows.length === 0) break;
+        }
+        render(rows);
+      }
+
+      function render(rows) {
+        const values = [...COLUMNS];
+        for (const row of rows) {
+          const v = row[GROUP] ?? null;
+          if (v !== null && !values.includes(v)) values.push(v);
+        }
+        if (rows.some((row) => (row[GROUP] ?? null) === null)) values.push(null);
+        board.replaceChildren(
+          ...values.map((value) => {
+            const column = document.createElement("section");
+            column.className = "column";
+            column.dataset.status = value ?? "";
+            const cards = rows.filter((row) => (row[GROUP] ?? null) === value);
+            const heading = document.createElement("h2");
+            heading.textContent = value ?? "(none)";
+            const count = document.createElement("span");
+            count.textContent = String(cards.length);
+            heading.append(count);
+            column.append(heading, ...cards.map(card));
+            column.addEventListener("dragover", (e) => {
+              if (readOnly) return;
+              e.preventDefault();
+              column.classList.add("over");
+            });
+            column.addEventListener("dragleave", () => column.classList.remove("over"));
+            column.addEventListener("drop", (e) => {
+              e.preventDefault();
+              column.classList.remove("over");
+              const { key, from } = JSON.parse(e.dataTransfer.getData("application/json"));
+              if (from !== value) void move(key, from, value);
+            });
+            return column;
+          }),
+        );
+      }
+
+      function card(row) {
+        const el = document.createElement("div");
+        el.className = "card";
+        el.textContent = row[TITLE] ?? row[KEY];
+        el.draggable = !readOnly;
+        el.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("application/json", JSON.stringify({ key: row[KEY], from: row[GROUP] ?? null }));
+        });
+        el.addEventListener("click", () => void yamlite.open(TABLE, row[KEY]));
+        return el;
+      }
+
+      async function move(key, from, to) {
+        try {
+          await yamlite.update(TABLE, key, { [GROUP]: to }, { [GROUP]: from });
+          showError("");
+        } catch (e) {
+          showError(e.status === 409 ? "This card changed elsewhere; the board was reloaded." : e.message);
+        }
+        await load();
+      }
+
+      yamlite.ready
+        .then(async (me) => {
+          readOnly = me.readOnly;
+          yamlite.on("change", ({ tables }) => {
+            if (tables.includes(TABLE)) void load();
+          });
+          await load();
+        })
+        .catch((e) => showError(e.message));
+    </script>
+  </body>
+</html>

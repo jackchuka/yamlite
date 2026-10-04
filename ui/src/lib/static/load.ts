@@ -38,6 +38,10 @@ export function buildYamlLoader(base: string, fetcher: typeof fetch): (table: st
   };
 }
 
+export function buildPageLoader(base: string, fetcher: typeof fetch): (name: string) => Promise<string> {
+  return async (name) => (await fetchOk(base, `data/pages/${encodeURIComponent(name)}.html`, fetcher)).text();
+}
+
 export async function loadStatic(
   opts: { base?: string; fetcher?: typeof fetch } = {},
 ): Promise<{ api: Api; snapshot: Snapshot }> {
@@ -57,5 +61,13 @@ export async function loadStatic(
     throw new LoadError("sql-wasm.wasm", e instanceof Error ? e.message : String(e));
   }
   const db = new SQL.Database(bytes);
-  return { api: createStaticApi({ db, snapshot, loadYaml: buildYamlLoader(base, fetcher) }), snapshot };
+  return {
+    api: createStaticApi({
+      db,
+      snapshot,
+      loadYaml: buildYamlLoader(base, fetcher),
+      loadPage: buildPageLoader(base, fetcher),
+    }),
+    snapshot,
+  };
 }

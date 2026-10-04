@@ -110,6 +110,8 @@ export const httpApi = {
   createTable: (body: { name: string; mode?: "dir" | "list"; key?: string; columns?: Record<string, string> }) =>
     request<{ name: string }>("POST", "/api/tables", body),
   sql: (sql: string) => request<SqlResult>("POST", "/api/sql", { sql }),
+  pageHtml: (name: string) => request<{ html: string }>("GET", `/api/pages/${enc(name)}/html`).then((r) => r.html),
+  pageSql: (name: string, sql: string) => request<SqlResult>("POST", "/api/sql", { sql, page: name }),
   conflicts: () => request<{ conflicts: ConflictEntry[] }>("GET", "/api/conflicts"),
   conflict: (id: string) => request<ConflictDetail>("GET", `/api/conflicts/${enc(id)}`),
   restore: (id: string, expected?: Row | null) =>
@@ -141,6 +143,8 @@ export const api: Api = {
   remove: (table, key) => backend.remove(table, key),
   createTable: (body) => backend.createTable(body),
   sql: (sql) => backend.sql(sql),
+  pageHtml: (name) => backend.pageHtml(name),
+  pageSql: (name, sql) => backend.pageSql(name, sql),
   conflicts: () => backend.conflicts(),
   conflict: (id) => backend.conflict(id),
   restore: (id, expected) => backend.restore(id, expected),
