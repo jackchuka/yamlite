@@ -13,8 +13,12 @@ const MAX_ROWS = 1000;
 
 const refuse = (): Promise<never> => Promise.reject(new ApiError(403, READ_ONLY_MESSAGE, { error: READ_ONLY_MESSAGE }));
 
-// sql.js binds bigint as a lossy double, so integers travel as text and SQLite compares them numerically
-const bindValue = (v: DbValue): SqlValue => (typeof v === "bigint" ? v.toString() : (v as SqlValue));
+// sql.js binds bigint as a double: safe integers go as numbers, which compare like the server's native integers
+// on columns without affinity; unsafe ones go as text so INTEGER columns still compare them exactly
+const bindValue = (v: DbValue): SqlValue => {
+  if (typeof v !== "bigint") return v as SqlValue;
+  return v >= BigInt(Number.MIN_SAFE_INTEGER) && v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v.toString();
+};
 
 function toApiError(e: unknown): ApiError {
   if (e instanceof ApiError) return e;

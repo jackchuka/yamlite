@@ -28,6 +28,8 @@ function fixture(): Database {
   db.run(
     `CREATE VIEW tasks__tags AS SELECT tasks.id AS tasks_id, j.key AS idx, j.value AS value FROM tasks, json_each(tasks.tags) j`,
   );
+  db.run(`CREATE TABLE nums ("id" TEXT PRIMARY KEY, "vals" JSON)`);
+  db.run(`INSERT INTO nums VALUES ('n1', '[3]'), ('n2', '[4]')`);
   return db;
 }
 
@@ -191,4 +193,12 @@ test("writes are refused", async () => {
   ]) {
     await expect(call()).rejects.toMatchObject({ status: 403 });
   }
+});
+
+test("integer filters match on columns without affinity like the server", async () => {
+  const api = make();
+  const has = await api.rows("nums", { limit: 10, offset: 0, filters: [{ col: "vals", op: "has", value: 3 }] });
+  expect(ids(has.rows)).toEqual(["n1"]);
+  const idx = await api.rows("tasks__tags", { limit: 10, offset: 0, filters: [{ col: "idx", op: "eq", value: 0 }] });
+  expect(idx.total).toBe(3);
 });
