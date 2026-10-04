@@ -17,7 +17,7 @@ test("meta lists the tables with columns, counts and relative paths", async () =
   const tasks = body.tables.find((x: { name: string }) => x.name === "tasks");
   expect(tasks).toMatchObject({
     name: "tasks",
-    mode: "dir",
+    mode: "files",
     path: "tasks",
     key: "id",
     count: 1,

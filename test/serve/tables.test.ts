@@ -19,7 +19,7 @@ test("a directory table is registered, created and synced", async () => {
   t = await startServe();
   const res = await t.api("/api/tables", { method: "POST", body: { name: "books", columns: { title: "TEXT" } } });
   expect(res).toEqual({ status: 201, body: { name: "books" } });
-  expect(config(t).tables.books).toEqual({ path: "./books", key: "id", columns: { title: "TEXT" } });
+  expect(config(t).tables.books).toEqual({ key: "id", columns: { title: "TEXT" } });
   expect(sql(t.db, "SELECT name, type, pk FROM pragma_table_info('books')")).toEqual([
     { name: "id", type: "TEXT", pk: 1 },
     { name: "title", type: "TEXT", pk: 0 },
@@ -79,4 +79,17 @@ test("a name taken by a declared view is refused before yamlite.yaml changes", a
     body: { error: 'a view named "projects__milestones" already exists', field: "name" },
   });
   expect(read(join(t.root, "yamlite.yaml"))).toBe(before);
+});
+
+test("mode is files or list", async () => {
+  t = await startServe();
+  expect(await t.api("/api/tables", { method: "POST", body: { name: "x", mode: "dir" } })).toEqual({
+    status: 400,
+    body: { error: 'mode is "files" or "list"', field: "mode" },
+  });
+  expect(await t.api("/api/tables", { method: "POST", body: { name: "y", mode: "files" } })).toEqual({
+    status: 201,
+    body: { name: "y" },
+  });
+  expect(config(t).tables.y).toEqual({ key: "id" });
 });

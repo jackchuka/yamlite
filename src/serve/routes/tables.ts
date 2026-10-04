@@ -18,8 +18,8 @@ export const tableRoutes: Routes = (router, ctx) => {
         field: "name",
       });
     }
-    const mode = b.mode ?? "dir";
-    if (mode !== "dir" && mode !== "list") throw new HttpError(400, 'mode is "dir" or "list"', { field: "mode" });
+    const mode = b.mode ?? "files";
+    if (mode !== "files" && mode !== "list") throw new HttpError(400, 'mode is "files" or "list"', { field: "mode" });
     const key = b.key ?? "id";
     if (typeof key !== "string" || key === "") throw new HttpError(400, "key must be a column name", { field: "key" });
     const columns = objectBody(b.columns, "columns") as Record<string, ColumnType>;
@@ -37,10 +37,14 @@ export const tableRoutes: Routes = (router, ctx) => {
     if (adopt && !ctx.store.columns(name).has(key)) {
       throw new HttpError(400, `${name} has no column "${key}" to use as the key`, { field: "key" });
     }
-    const path = mode === "list" ? `./${name}.yaml` : `./${name}`;
     try {
       registerInConfig(ctx.configFile, [
-        { table: name, path, key, columns: Object.keys(columns).length > 0 ? columns : undefined },
+        {
+          table: name,
+          path: mode === "list" ? `./${name}.yaml` : undefined,
+          key,
+          columns: Object.keys(columns).length > 0 ? columns : undefined,
+        },
       ]);
     } catch (e) {
       throw new HttpError(400, e instanceof Error ? e.message : String(e));

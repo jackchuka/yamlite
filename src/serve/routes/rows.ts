@@ -30,7 +30,7 @@ function insideTable(spec: TableSpec, file: string): boolean {
 
 function checkKey(spec: TableSpec, key: unknown): string {
   if (typeof key !== "string" || key === "") throw new HttpError(400, "key is required", { field: "key" });
-  if (spec.mode === "dir") {
+  if (spec.mode === "files") {
     const reason = invalidKey(key);
     if (reason) throw new HttpError(400, reason, { field: "key" });
   }

@@ -91,7 +91,7 @@ test("a record in a list table points at the list file", async () => {
 });
 
 test("a table without a database table yet is empty", async () => {
-  t = await startServe({}, "tables:\n  later:\n    path: ./later\n");
+  t = await startServe({}, 'tables:\n  later:\n    files: "later/**/*.{yaml,yml}"\n');
   const { status, body } = await t.api("/api/tables/later/rows");
   expect(status).toBe(200);
   expect(body).toEqual({ rows: [], total: 0 });

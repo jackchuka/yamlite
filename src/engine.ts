@@ -8,7 +8,7 @@ import type { Decision, KeyState } from "./reconcile.ts";
 import { FilesSource } from "./source/files.ts";
 import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
-import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
+import { YAML_GLOB } from "./source/yamldoc.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
 import type { ColumnType, TableSpec } from "./types.ts";
 import { reconcileViews } from "./views.ts";
@@ -63,14 +63,7 @@ export interface TableResult {
 
 export function makeSource(spec: TableSpec): Source {
   if (spec.mode === "list") return new ListSource(spec.path, spec.key);
-  // until Task 2 makes exclude a Claim[]: a nested list table owns its file, a nested folder table everything below it
-  const exclude = spec.exclude.map((path) => ({
-    owner: "another table",
-    path,
-    glob: YAML_EXT.test(path) ? null : YAML_GLOB,
-    tie: false,
-  }));
-  return new FilesSource(spec.path, YAML_GLOB, spec.key, exclude);
+  return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude);
 }
 
 function emptyResult(table: string): TableResult {
@@ -223,7 +216,7 @@ function applyToDb(
       const newRow = recordToRow(fileRecord);
       if (row) newRow[spec.key] = row[spec.key] ?? null;
       else {
-        if (spec.mode === "dir") newRow[spec.key] = key;
+        if (spec.mode === "files") newRow[spec.key] = key;
         // column affinity can convert the key (e.g. "05" to 5) so that it hits another row
         const taken = store.readRow(spec.name, spec.key, newRow[spec.key] ?? null);
         if (taken) {

@@ -173,7 +173,7 @@ test("tables passed in code in root mode are not written to yamlite.yaml", async
   const outside = tmpRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   write(join(outside, "n.yaml"), "body: hi\n");
-  let y = await open({ root, tables: [{ name: "inbox", path: outside }] });
+  let y = await open({ root, tables: [{ name: "inbox", files: `${outside}/**/*.yaml` }] });
   expect((await y.sync()).map((r) => [r.table, r.ok])).toEqual([
     ["tasks", true],
     ["inbox", true],
@@ -189,7 +189,7 @@ test("a table nested inside another table's folder is not read twice", async () 
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   write(join(root, "tasks/archive/old.yaml"), "title: Old\n");
-  write(join(root, "yamlite.yaml"), "tables:\n  tasks: {}\n  archive:\n    path: tasks/archive\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks: {}\n  archive:\n    files: tasks/archive/*.yaml\n");
   const y = await open({ root });
   expect((await y.sync()).every((r) => r.ok)).toBe(true);
   expect(sql(dbOf(root), "SELECT id FROM tasks")).toEqual([{ id: "a" }]);
@@ -197,5 +197,23 @@ test("a table nested inside another table's folder is not read twice", async () 
   sql(dbOf(root), "DELETE FROM archive WHERE id = 'old'");
   await y.sync();
   expect(sql(dbOf(root), "SELECT id FROM tasks")).toEqual([{ id: "a" }]);
+  await y.close();
+});
+
+test("a table covering the root syncs every YAML file but yamlite.yaml, and leaves .yamlite alone", async () => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "**/*.{yaml,yml}"\n');
+  write(join(root, "a.yaml"), "title: A\n");
+  write(join(root, "sub/b.yml"), "title: B\n");
+  const y = await open({ root });
+  const [r] = await y.sync();
+  expect(r?.ok).toBe(true);
+  const config = read(join(root, "yamlite.yaml"));
+  const db = join(root, ".yamlite", "db.sqlite");
+  expect(sql(db, "SELECT id FROM docs ORDER BY id").map((x) => x.id)).toEqual(["a", "sub/b"]);
+  sql(db, "INSERT INTO docs (id, title) VALUES ('yamlite', 'X')");
+  const [again] = await y.sync();
+  expect(again?.warnings.join("\n")).toContain("key belongs to yamlite.yaml");
+  expect(read(join(root, "yamlite.yaml"))).toBe(config);
   await y.close();
 });

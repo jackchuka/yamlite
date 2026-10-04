@@ -176,7 +176,8 @@ function setup(list: ExpandSpec[]) {
   const spec: TableSpec = {
     name: "projects",
     path: join(root, "projects"),
-    mode: "dir",
+    mode: "files",
+    glob: "**/*.{yaml,yml}",
     key: "id",
     columns: {},
     formats: {},
@@ -346,6 +347,7 @@ describe("reconcileViews", () => {
       name: "people",
       path: join(root, "people.yaml"),
       mode: "list",
+      glob: null,
       key: "id",
       columns: {},
       formats: {},

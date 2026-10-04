@@ -1,3 +1,4 @@
+import { filesOf } from "../../config.ts";
 import { q } from "../../store.ts";
 import { displayPath, findView } from "../context.ts";
 import { declaredViews } from "../../views.ts";
@@ -19,6 +20,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         name: t.name,
         mode: t.mode,
         path: display(t.path),
+        ...(t.mode === "files" ? { files: filesOf(ctx.root, t) } : {}),
         key: t.key,
         columns,
         formats: t.formats,

@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
-import { basename, dirname, resolve, sep } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
 import { type ConflictInfo, type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { checkReferences, referrersOf } from "./references.ts";
+import { matchesFiles } from "./source/files.ts";
 import type { TableSpec } from "./types.ts";
 
 export interface WatchHandlers {
@@ -57,8 +58,8 @@ export function startWatch(
 
   // a directory table watches its folder tree; the root and list tables watch one level
   const watchTarget = (t: TableSpec) => ({
-    dir: resolve(t.mode === "dir" ? t.path : dirname(t.path)),
-    deep: t.mode === "dir",
+    dir: resolve(t.mode === "files" ? t.path : dirname(t.path)),
+    deep: t.mode === "files",
   });
   const watched = new Set<string>();
   const watchedDirs = new Set<string>();
@@ -85,7 +86,15 @@ export function startWatch(
       if (CONFIG_FILES.has(name) || entry) scheduleReload();
     }
     for (const t of all()) {
-      const inTable = t.mode === "dir" ? p.startsWith(resolve(t.path) + sep) : p === resolve(t.path);
+      // a files table ignores paths its glob does not match, such as its own database inside the folder
+      const folder = resolve(t.path);
+      const inTable =
+        t.mode === "files"
+          ? p.startsWith(folder + sep) &&
+            (event === "addDir" ||
+              event === "unlinkDir" ||
+              (t.glob !== null && matchesFiles(relative(folder, p), t.glob)))
+          : p === folder;
       if (inTable) schedule(t.name);
     }
   };
