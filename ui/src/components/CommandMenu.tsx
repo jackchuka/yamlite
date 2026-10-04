@@ -8,6 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { isReadOnly } from "@/lib/mode";
 import { useMeta } from "@/lib/providers";
 
 export function CommandMenu() {
@@ -57,7 +58,7 @@ export function CommandMenu() {
         )}
         <CommandGroup heading="Tools">
           <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
-          <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>
+          {!isReadOnly() && <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

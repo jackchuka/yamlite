@@ -4,6 +4,7 @@ import { ArrowLeftRight, Layers, Plus, Table2, Terminal, TriangleAlert } from "l
 import { Fragment, type ReactNode } from "react";
 import { warningLinks } from "@/lib/activity";
 import { api } from "@/lib/api";
+import { isReadOnly } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,8 @@ function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
 export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
   const { data: meta } = useMeta();
   const { warnings, connected } = useEvents();
-  const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts });
+  const readOnly = isReadOnly();
+  const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts, enabled: !readOnly });
   const conflictCount = conflicts?.conflicts.length ?? 0;
   const viewNames = new Set(meta?.views.map((v) => v.name));
   return (
@@ -80,15 +82,17 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
             </Fragment>
           );
         })}
-        <button
-          type="button"
-          disabled={!connected}
-          title={connected ? undefined : "disconnected"}
-          className={cn(item, "text-muted-foreground disabled:opacity-50")}
-          onClick={onNewTable}
-        >
-          <Plus className="size-3.5" /> New table
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            disabled={!connected}
+            title={connected ? undefined : "disconnected"}
+            className={cn(item, "text-muted-foreground disabled:opacity-50")}
+            onClick={onNewTable}
+          >
+            <Plus className="size-3.5" /> New table
+          </button>
+        )}
       </nav>
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
         Tools
@@ -97,14 +101,16 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
         <Link to="/sql" className={item} activeProps={active}>
           <Terminal className="size-3.5 opacity-70" /> SQL console
         </Link>
-        <Link to="/sync" className={item} activeProps={active}>
-          <ArrowLeftRight className="size-3.5 opacity-70" /> Sync
-          {conflictCount > 0 && (
-            <span className="ml-auto rounded-full bg-err-soft px-1.5 text-[10.5px] font-semibold text-err">
-              {conflictCount}
-            </span>
-          )}
-        </Link>
+        {!readOnly && (
+          <Link to="/sync" className={item} activeProps={active}>
+            <ArrowLeftRight className="size-3.5 opacity-70" /> Sync
+            {conflictCount > 0 && (
+              <span className="ml-auto rounded-full bg-err-soft px-1.5 text-[10.5px] font-semibold text-err">
+                {conflictCount}
+              </span>
+            )}
+          </Link>
+        )}
       </nav>
       <div className="mt-auto border-t px-3.5 py-2.5 text-[11px] text-muted-foreground">
         {meta?.configFile} · {meta?.tables.length ?? 0} tables

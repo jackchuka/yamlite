@@ -18,6 +18,7 @@ import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
 import { cn } from "@/lib/utils";
 import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
+import { isReadOnly } from "@/lib/mode";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
 import type { ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
@@ -48,6 +49,7 @@ export function RecordDrawer({
   const dispatch = useReflectDispatch();
   // while the event stream is down, a save could not be followed to its file
   const { connected } = useEvents();
+  const editable = connected && !isReadOnly();
   const { data, error } = useQuery({
     queryKey: ["record", table.name, recordKey],
     queryFn: () => api.record(table.name, recordKey),
@@ -148,7 +150,7 @@ export function RecordDrawer({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "s" && (e.metaKey || e.ctrlKey) && !isReadOnly()) {
         e.preventDefault();
         submit();
       }
@@ -198,7 +200,7 @@ export function RecordDrawer({
         <div className="px-4 pt-3 font-mono text-[11px] text-muted-foreground">{data.file}</div>
         <TabsContent value="form" className="min-h-0 flex-1 overflow-auto px-4 py-3">
           {!connected && <p className="mb-2 text-[11.5px] text-err">接続が切れています</p>}
-          <fieldset disabled={!connected} className="m-0 min-w-0 border-0 p-0">
+          <fieldset disabled={!editable} className="m-0 min-w-0 border-0 p-0">
             {[...fields, ...extra].map((f) => {
               const reference = table.references.find((r) => r.column === f);
               return (
@@ -211,7 +213,7 @@ export function RecordDrawer({
                   </div>
                   <FormField
                     key={`${f}:${version}`}
-                    readOnly={!connected}
+                    readOnly={!editable}
                     path={[f]}
                     value={draft[f]}
                     type={columnType(table, f)}
@@ -237,7 +239,7 @@ export function RecordDrawer({
             value={JSON.stringify(draft, null, 2)}
             extensions={[json()]}
             theme={isDark() ? "dark" : "light"}
-            editable={connected}
+            editable={editable}
             onChange={(text) => {
               try {
                 const parsed: unknown = JSON.parse(text);
@@ -256,6 +258,7 @@ export function RecordDrawer({
           {jsonError && <p className="mt-1 text-[11px] text-err">{jsonError}</p>}
         </TabsContent>
         <TabsContent value="yaml" className="min-h-0 flex-1 overflow-auto px-4 py-3">
+          {data.yamlError && <p className="mb-2 text-[11.5px] text-err">{data.yamlError}</p>}
           <CodeMirror
             aria-label="record YAML"
             value={data.yaml ?? "# not written to a file yet"}
@@ -265,38 +268,40 @@ export function RecordDrawer({
           />
         </TabsContent>
       </Tabs>
-      <div className="flex items-center gap-2 border-t px-4 py-2.5">
-        <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground">
-          {changes > 0 ? (
-            `変更 ${changes} 件 · 保存すると YAML に反映`
-          ) : (
-            <ReflectBadge table={table.name} recordKey={recordKey} />
-          )}
-          {save.isError && !(save.error instanceof ApiError && save.error.status === 409) && (
-            <span className="text-err">{save.error.message}</span>
-          )}
-        </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label="delete record"
-          disabled={!connected}
-          onClick={() => setConfirmDelete(true)}
-        >
-          <Trash2 className="size-4" />
-        </Button>
-        <Button variant="outline" size="sm" disabled={!dirty} onClick={() => reset(base)}>
-          Discard
-        </Button>
-        <Button
-          size="sm"
-          disabled={!dirty || invalid.size > 0 || save.isPending || !connected}
-          title={connected ? undefined : "disconnected"}
-          onClick={submit}
-        >
-          Save ⌘S
-        </Button>
-      </div>
+      {!isReadOnly() && (
+        <div className="flex items-center gap-2 border-t px-4 py-2.5">
+          <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground">
+            {changes > 0 ? (
+              `変更 ${changes} 件 · 保存すると YAML に反映`
+            ) : (
+              <ReflectBadge table={table.name} recordKey={recordKey} />
+            )}
+            {save.isError && !(save.error instanceof ApiError && save.error.status === 409) && (
+              <span className="text-err">{save.error.message}</span>
+            )}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="delete record"
+            disabled={!connected}
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+          <Button variant="outline" size="sm" disabled={!dirty} onClick={() => reset(base)}>
+            Discard
+          </Button>
+          <Button
+            size="sm"
+            disabled={!dirty || invalid.size > 0 || save.isPending || !connected}
+            title={connected ? undefined : "disconnected"}
+            onClick={submit}
+          >
+            Save ⌘S
+          </Button>
+        </div>
+      )}
       {stale && (
         <StaleDialog
           stale={stale.fields}
