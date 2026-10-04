@@ -56,6 +56,18 @@ export function CommandMenu() {
             ))}
           </CommandGroup>
         )}
+        {meta && meta.pages.length > 0 && (
+          <CommandGroup heading="Pages">
+            {meta.pages.map((p) => (
+              <CommandItem
+                key={p.name}
+                onSelect={() => go(() => navigate({ to: "/p/$page", params: { page: p.name } }))}
+              >
+                {p.title}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
         <CommandGroup heading="Tools">
           <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/erd" }))}>ERD</CommandItem>

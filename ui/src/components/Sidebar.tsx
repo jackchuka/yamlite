@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Layers, Network, Plus, Table2, Terminal, TriangleAlert } from "lucide-react";
+import { ArrowLeftRight, Layers, LayoutDashboard, Network, Plus, Table2, Terminal, TriangleAlert } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { warningLinks } from "@/lib/activity";
 import { api } from "@/lib/api";
@@ -94,6 +94,21 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
           </button>
         )}
       </nav>
+      {meta && meta.pages.length > 0 && (
+        <>
+          <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Pages
+          </div>
+          <nav className="flex flex-col gap-px">
+            {meta.pages.map((p) => (
+              <Link key={p.name} to="/p/$page" params={{ page: p.name }} className={item} activeProps={active}>
+                <LayoutDashboard className="size-3.5 opacity-70" />
+                <span className="truncate">{p.title}</span>
+              </Link>
+            ))}
+          </nav>
+        </>
+      )}
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
         Tools
       </div>

@@ -24,3 +24,4 @@ export const tableRoute = createRoute({
 export const sqlRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sql" });
 export const syncRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sync" });
 export const erdRoute = createRoute({ getParentRoute: () => rootRoute, path: "/erd" });
+export const pageRoute = createRoute({ getParentRoute: () => rootRoute, path: "/p/$page" });
