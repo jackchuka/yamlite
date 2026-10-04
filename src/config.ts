@@ -28,6 +28,8 @@ export interface OpenOptions {
   root?: string;
   db?: string;
   tables?: TableInput[];
+  stateDir?: string;
+  persistConfig?: boolean;
 }
 
 export interface ResolvedConfig {
@@ -269,7 +271,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     }
     return {
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
-      stateDir: join(root, ".yamlite"),
+      stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(root, ".yamlite"),
       tables: checkViewNames(withExcludes([...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))))),
     };
   }
@@ -277,7 +279,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
   const db = expandPath(opts.db, process.cwd());
   return {
     db,
-    stateDir: join(dirname(db), ".yamlite"),
+    stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(dirname(db), ".yamlite"),
     tables: checkViewNames(
       withExcludes((opts.tables ?? []).map((t) => toSpec({ ...t, path: expandPath(t.path, process.cwd()) }, false))),
     ),
