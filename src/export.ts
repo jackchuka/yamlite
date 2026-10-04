@@ -21,6 +21,7 @@ import { open } from "./index.ts";
 import { Store } from "./store.ts";
 import type { ApiContext } from "./serve/context.ts";
 import { EventHub } from "./serve/events.ts";
+import { PageSql } from "./serve/pagesql.ts";
 import { Router } from "./serve/http.ts";
 import { ROUTES } from "./serve/routes/index.ts";
 import { recordFile } from "./serve/routes/rows.ts";
@@ -123,10 +124,12 @@ export async function writeSnapshotData(opts: {
       }
 
       const store = new Store(dbPath);
+      const pageSql = new PageSql(dbPath);
       try {
         const ctx: ApiContext = {
           y,
           store,
+          pageSql,
           root,
           stateDir: join(work, "state"),
           configFile: configPath(root) ?? join(root, "yamlite.yaml"),
@@ -178,6 +181,7 @@ export async function writeSnapshotData(opts: {
           yaml.push([name, { files: Object.fromEntries(files), keys: Object.fromEntries(keys) }]);
         }
       } finally {
+        pageSql.close();
         store.close();
       }
     } finally {

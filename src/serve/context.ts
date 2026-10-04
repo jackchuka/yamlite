@@ -5,11 +5,13 @@ import type { TableSpec, ViewRecord } from "../types.ts";
 import { declaredViews } from "../views.ts";
 import type { EventHub } from "./events.ts";
 import { HttpError } from "./http.ts";
+import type { PageSql } from "./pagesql.ts";
 
 export interface ApiContext {
   y: Yamlite;
   // the UI's own connection: its commits change data_version, which the watcher picks up
   store: Store;
+  pageSql: PageSql;
   root: string;
   stateDir: string;
   configFile: string;

@@ -63,6 +63,17 @@ export function createdTable(sql: string): string | null {
 const QUOTED = `"(?:[^"]|"")*"|\`[^\`]*\`|\\[[^\\]]*\\]|'(?:[^']|'')*'`;
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+// any reference to one of these names, bare or quoted: over-refuses (a column or a string that spells the name) rather than miss one
+export function mentionsName(sql: string, names: Iterable<string>): string | null {
+  const code = stripSql(sql, true, true);
+  for (const name of names) {
+    const e = escapeRe(name);
+    const ident = `(?:(?<![\\w$])${e}(?![\\w$])|"${escapeRe(name.replaceAll('"', '""'))}"|\`${e}\`|\\[${e}\\]|'${escapeRe(name.replaceAll("'", "''"))}')`;
+    if (new RegExp(ident, "i").test(code)) return name;
+  }
+  return null;
+}
+
 // `name AS (` or `name(cols) AS (`, bare or quoted: a WITH clause that would stand in for one of these names
 export function definesName(sql: string, names: Iterable<string>): string | null {
   const code = stripSql(sql, true, true);

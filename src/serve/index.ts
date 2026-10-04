@@ -9,6 +9,7 @@ import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
 import { EventHub } from "./events.ts";
+import { PageSql } from "./pagesql.ts";
 import { PageWatch } from "./pagewatch.ts";
 import { createHandler, Router } from "./http.ts";
 import { ROUTES } from "./routes/index.ts";
@@ -49,6 +50,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
   if (configFile === null) throw new Error(`no yamlite.yaml in ${opts.root}; run yamlite init first`);
   const y = await open({ root: opts.root, db: opts.db });
   let store: Store | undefined;
+  let pageSql: PageSql | undefined;
   let pageWatch: PageWatch | undefined;
   try {
     const hub = new EventHub();
@@ -67,9 +69,11 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     await watcher.ready;
     pages.update(y.pages);
     store = new Store(config.db);
+    pageSql = new PageSql(config.db);
     const ctx: ApiContext = {
       y,
       store,
+      pageSql,
       root: resolve(opts.root),
       stateDir: config.stateDir,
       configFile,
@@ -85,6 +89,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     policy = { token, allowedHosts: isLoopback(host) ? loopbackHosts(port) : null };
     const urlHost = host.includes(":") ? `[${host}]` : host;
     const ui = store;
+    const pq = pageSql;
     let closing: Promise<void> | undefined;
     return {
       url: `http://${urlHost}:${port}/?token=${token}`,
@@ -99,7 +104,11 @@ export async function serve(opts: ServeOptions): Promise<Server> {
             await new Promise<void>((done) => http.close(() => done()));
           } finally {
             try {
-              ui.close();
+              try {
+                pq.close();
+              } finally {
+                ui.close();
+              }
             } finally {
               await y.close();
             }
@@ -110,6 +119,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     };
   } catch (e) {
     await pageWatch?.close();
+    pageSql?.close();
     store?.close();
     await y.close();
     throw e;
