@@ -1,5 +1,8 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
 export const COLUMN_TYPES: readonly ColumnType[] = ["INTEGER", "REAL", "TEXT", "BOOLEAN", "JSON"];
+// how the UI edits a TEXT column, declared under `formats` in yamlite.yaml
+export type ColumnFormat = "markdown";
+export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown"];
 
 export type Mode = "dir" | "list";
 export type Rec = Record<string, unknown>;
@@ -29,6 +32,7 @@ export interface ExpandSpec {
   // <parent name>__<field>
   name: string;
   columns: Record<string, ColumnType>;
+  formats: Record<string, ColumnFormat>;
   references: Reference[];
   expand: ExpandSpec[];
 }
@@ -47,6 +51,7 @@ export interface TableSpec {
   mode: Mode;
   key: string;
   columns: Record<string, ColumnType>;
+  formats: Record<string, ColumnFormat>;
   indexes: IndexSpec[];
   references: Reference[];
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)

@@ -139,3 +139,70 @@
     font-size: 13px;
   }
 }
+
+/* rendered markdown in a form field; preflight strips the defaults */
+.md-preview {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  & > * + * {
+    margin-top: 0.6em;
+  }
+  & h1 {
+    font-size: 1.4em;
+    font-weight: 700;
+  }
+  & h2 {
+    font-size: 1.2em;
+    font-weight: 700;
+  }
+  & h3,
+  & h4,
+  & h5,
+  & h6 {
+    font-weight: 600;
+  }
+  & ul {
+    list-style: disc;
+    padding-left: 1.4em;
+  }
+  & ol {
+    list-style: decimal;
+    padding-left: 1.4em;
+  }
+  & a {
+    color: var(--y-accent);
+    text-decoration: underline;
+  }
+  & code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    background: var(--y-panel);
+    border-radius: 3px;
+    padding: 0 0.25em;
+  }
+  & pre {
+    background: var(--y-panel);
+    border-radius: 6px;
+    padding: 0.6em 0.8em;
+    overflow-x: auto;
+    & code {
+      padding: 0;
+    }
+  }
+  & blockquote {
+    border-left: 3px solid var(--y-line);
+    padding-left: 0.8em;
+    color: var(--y-muted);
+  }
+  & table {
+    border-collapse: collapse;
+  }
+  & th,
+  & td {
+    border: 1px solid var(--y-line);
+    padding: 0.2em 0.5em;
+  }
+  & hr {
+    border-color: var(--y-line);
+  }
+}

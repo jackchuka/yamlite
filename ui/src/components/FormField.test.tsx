@@ -71,6 +71,26 @@ test("a JSON field shows a value that changed from outside", () => {
   expect(screen.getByLabelText("j").textContent).not.toContain("1");
 });
 
+test("a markdown field opens on the rendered preview and edits the source", async () => {
+  render(
+    wrap(<FormField path={["body"]} value={"# Title\n\n- one"} type="TEXT" format="markdown" onChange={() => {}} />),
+  );
+  expect(await screen.findByRole("heading", { name: "Title" })).toBeTruthy();
+  expect(screen.getByRole("listitem").textContent).toBe("one");
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Edit" }));
+  expect(screen.getByLabelText("body").textContent).toContain("# Title");
+});
+
+test("an unset markdown field opens on the editor, since there is nothing to preview", async () => {
+  function Unset() {
+    const [v, setV] = useState<unknown>(null);
+    return <FormField path={["body"]} value={v} type="TEXT" format="markdown" onChange={setV} />;
+  }
+  render(wrap(<Unset />));
+  fireEvent.click(screen.getByLabelText("body"));
+  expect((await screen.findByRole("tab", { name: "Edit" })).getAttribute("data-state")).toBe("active");
+});
+
 function UnsetJson({ onChange }: { onChange?: (v: unknown) => void }) {
   const [v, setV] = useState<unknown>(null);
   return (

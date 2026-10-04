@@ -158,6 +158,7 @@ describe("dropping columns", () => {
       mode: "dir",
       key: "id",
       columns: { title: "TEXT" },
+      formats: {},
       indexes: [],
       references: [],
       persisted: true,

@@ -33,6 +33,18 @@ describe("generateConfig", () => {
     );
   });
 
+  test("keeps formats when it rewrites yamlite.yaml", () => {
+    const root = tmpRoot();
+    write(join(root, "faqs.yaml"), '- id: 1\n  answer: "# Hi"\n');
+    write(
+      join(root, "yamlite.yaml"),
+      "tables:\n  faqs:\n    formats: { answer: markdown }\n    expand: { tags: { formats: { value: markdown } } }\n",
+    );
+    const out = generateConfig({ root, force: true });
+    expect(out).toContain(["      answer: TEXT", "    formats:", "      answer: markdown", ""].join("\n"));
+    expect(out).toContain(["      tags:", "        formats:", "          value: markdown", ""].join("\n"));
+  });
+
   test("infers from YAML when there is no database", () => {
     const root = tmpRoot();
     write(join(root, "tasks/a.yaml"), "title: A\ndone: false\ntags: [x]\n");

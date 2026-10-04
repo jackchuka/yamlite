@@ -292,6 +292,7 @@ tables:
   people:
     key: slug # default: id
     columns: { age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
+    formats: { bio: markdown } # how the web UI edits a TEXT column
     expand: { tags: {} } # lists as views — see Expanded views
     indexes:
       - [team, age] # composite index
@@ -313,6 +314,10 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 - A value that can't be converted is cleared and refilled from YAML, which stays the source of truth. If that value was changed in SQL and never synced, the rebuild stops instead; fix the row or pass `--force-convert` to clear it.
 - Tables with triggers, CHECK, UNIQUE or foreign-key constraints, COLLATE, AUTOINCREMENT, generated columns, `STRICT` or `WITHOUT ROWID`, indexes yamlite doesn't manage, or other tables referencing them are never rebuilt; yamlite reports an error and leaves the migration to you.
 - The key column's type is never changed; to change it, recreate the database (delete `.yamlite/`).
+
+### Formats
+
+`formats` tells the web UI how to edit a `TEXT` column; it never changes the database. `markdown` shows the field as rendered Markdown, with an Edit tab for the source. The editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A format on a column declared with another type is an error. `expand` entries take `formats` too.
 
 ### References
 

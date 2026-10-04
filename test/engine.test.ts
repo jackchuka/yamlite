@@ -19,6 +19,7 @@ function setup(mode: Mode = "dir") {
     mode,
     key: "id",
     columns: {},
+    formats: {},
     indexes: [],
     references: [],
     persisted: false,

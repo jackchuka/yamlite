@@ -27,6 +27,7 @@ test("discovers tables by convention", () => {
     mode: "dir",
     key: "id",
     columns: {},
+    formats: {},
     indexes: [],
     references: [],
     persisted: true,
@@ -53,6 +54,39 @@ test("yamlite.yaml overrides discovered tables and adds outside ones", () => {
   });
   expect(t.inbox).toMatchObject({ path: outside, mode: "dir" });
   expect(t.rel).toMatchObject({ path: resolve(root, "../x.yaml"), mode: "list" });
+});
+
+test("formats mark columns the UI edits as markdown, apart from their types", () => {
+  const root = tmpRoot();
+  write(join(root, "faqs.yaml"), "[]\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  faqs:\n    formats: { answer: Markdown, note: markdown }\n    columns: { answer: TEXT, rank: integer }\n",
+  );
+  const t = resolveConfig({ root }).tables[0];
+  expect(t?.columns).toEqual({ answer: "TEXT", rank: "INTEGER" });
+  expect(t?.formats).toEqual({ answer: "markdown", note: "markdown" });
+});
+
+test("markdown is not a column type", () => {
+  const root = tmpRoot();
+  write(join(root, "faqs.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  faqs:\n    columns: { answer: markdown }\n");
+  expect(() => resolveConfig({ root })).toThrow(/unknown column type markdown/);
+});
+
+test.each([
+  ["formats: { answer: html }", /unknown format html for "answer"/],
+  [
+    "formats: { rank: markdown }\n    columns: { rank: INTEGER }",
+    /formats\.rank: markdown needs a TEXT column, not INTEGER/,
+  ],
+  ["formats: [answer]", /formats must be a map of columns to formats/],
+])("rejects a bad format: %s", (body, error) => {
+  const root = tmpRoot();
+  write(join(root, "faqs.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), `tables:\n  faqs:\n    ${body}\n`);
+  expect(() => resolveConfig({ root })).toThrow(error);
 });
 
 test("--db overrides the default database path", () => {
@@ -212,7 +246,7 @@ test("expand declares views over JSON columns, nested", () => {
   const root = dataRoot();
   write(
     join(root, "yamlite.yaml"),
-    "tables:\n  projects:\n    expand:\n      milestones:\n        columns: { points: integer }\n        expand:\n          tasks:\n            references: { owner: people.slug }\n      tags: ~\n",
+    "tables:\n  projects:\n    expand:\n      milestones:\n        formats: { notes: markdown }\n        columns: { points: integer }\n        expand:\n          tasks:\n            references: { owner: people.slug }\n      tags: ~\n",
   );
   const t = resolveConfig({ root }).tables.find((x) => x.name === "projects");
   expect(t?.expand).toEqual([
@@ -220,18 +254,20 @@ test("expand declares views over JSON columns, nested", () => {
       field: "milestones",
       name: "projects__milestones",
       columns: { points: "INTEGER" },
+      formats: { notes: "markdown" },
       references: [],
       expand: [
         {
           field: "tasks",
           name: "projects__milestones__tasks",
           columns: {},
+          formats: {},
           references: [{ column: "owner", table: "people", target: "slug" }],
           expand: [],
         },
       ],
     },
-    { field: "tags", name: "projects__tags", columns: {}, references: [], expand: [] },
+    { field: "tags", name: "projects__tags", columns: {}, formats: {}, references: [], expand: [] },
   ]);
 });
 
