@@ -326,3 +326,13 @@ test("a root folder whose name starts with two dots is still protected from its 
   write(join(parent, "yamlite.yaml"), "tables: {}\n");
   await expect(exportSite({ root: parent, out: join(parent, "..site"), uiDir: ui() })).resolves.toBeDefined();
 });
+
+test("the output folder may not be the state folder or inside it, even with --force", async () => {
+  const root = setup();
+  write(join(root, ".yamlite/db.sqlite"), "db");
+  for (const out of [join(root, ".yamlite"), join(root, ".yamlite", "site")]) {
+    await expect(exportSite({ root, out, uiDir: ui(), force: true }), out).rejects.toThrow(".yamlite");
+  }
+  expect(readFileSync(join(root, ".yamlite/db.sqlite"), "utf8")).toBe("db");
+  expect(existsSync(join(root, ".yamlite", "site"))).toBe(false);
+});

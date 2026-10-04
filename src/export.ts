@@ -265,6 +265,7 @@ function checkAgainstRoot(out: string, root: string): void {
   const inside = relative(realRoot, realOut);
   if (escapes(inside)) return;
   const segments = inside.split(sep);
+  if (segments[0] === ".yamlite") throw new Error(`refusing to write to ${out}: it is yamlite's state folder ${join(root, ".yamlite")}`);
   if (segments.some((segment) => segment.startsWith("."))) return;
   throw new Error(
     `${out} is inside the data root and would be synced as a table; use a folder outside it or a dot-folder such as .yamlite-export`,
