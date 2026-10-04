@@ -2,7 +2,7 @@ import type { BindParams, Database, SqlValue } from "sql.js";
 import { q } from "../../../../src/ident.ts";
 import { HttpError } from "../../../../src/serve/errors.ts";
 import { buildWhere, orderBy, parseRowQuery } from "../../../../src/serve/query.ts";
-import { firstKeyword, isRead, statementCount, stripSql } from "../../../../src/serve/sqltext.ts";
+import { isPageStatement, isRead, statementCount } from "../../../../src/serve/sqltext.ts";
 import { toWire } from "../../../../src/serve/wire.ts";
 import type { ColumnType, DbRow, DbValue } from "../../../../src/types.ts";
 import { type Api, ApiError, rowsQuery } from "../api";
@@ -10,7 +10,6 @@ import type { ConflictDetail, RecordDetail, RowsPage, Snapshot, SqlResult, Table
 
 export const READ_ONLY_MESSAGE = "read-only snapshot: only SELECT, EXPLAIN and VALUES run here";
 const MAX_ROWS = 1000;
-const WRITES = /\b(?:INSERT|UPDATE|DELETE|REPLACE(?!\s*\())\b/i;
 
 const refuse = (): Promise<never> => Promise.reject(new ApiError(403, READ_ONLY_MESSAGE, { error: READ_ONLY_MESSAGE }));
 
@@ -154,9 +153,7 @@ export function createStaticApi(opts: {
         if (!spec.sql) throw new HttpError(403, `page ${name} may not run SQL`);
         if (sql.trim() === "") throw new HttpError(400, "sql is required");
         if (statementCount(sql) > 1) throw new HttpError(400, "run one statement at a time");
-        // sql.js has no authorizer, so a WITH-led statement is run only when no code in it writes
-        const readOnly = isRead(sql) || (firstKeyword(sql) === "WITH" && !WRITES.test(stripSql(sql, false)));
-        if (!readOnly) throw new HttpError(403, "a page can only run SELECT");
+        if (!isPageStatement(sql)) throw new HttpError(403, "a page can only run SELECT");
         return select(sql);
       }),
     conflicts: async () => ({ conflicts: [] }),

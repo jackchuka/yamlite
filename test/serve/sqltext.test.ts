@@ -3,6 +3,7 @@ import {
   createdTable,
   definesName,
   firstKeyword,
+  isPageStatement,
   isRead,
   statementCount,
   touchesInternal,
@@ -68,4 +69,15 @@ test("definesName sees single-quoted names and column lists with quoted parenthe
     "projects__milestones",
   );
   expect(definesName("select 'a projects__milestones as (' from t", names)).toBeNull();
+});
+
+test("a page statement is a read, or a WITH whose code never writes", () => {
+  expect(isPageStatement("select 1")).toBe(true);
+  expect(isPageStatement("with x as (select 1) select * from x")).toBe(true);
+  expect(isPageStatement("with x as (select 'ab' as s) select replace (s, 'a', 'c') from x")).toBe(true);
+  expect(isPageStatement("with x as (select 1) select 'delete' as \"update\" from x")).toBe(true);
+  expect(isPageStatement("with x as (select 1) delete from tasks returning *")).toBe(false);
+  expect(isPageStatement("with x as (select 1) insert or replace into t select * from x")).toBe(false);
+  expect(isPageStatement("with x as (select 1) replace into t select * from x")).toBe(false);
+  expect(isPageStatement("update t set a = 1")).toBe(false);
 });

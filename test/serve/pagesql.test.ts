@@ -126,8 +126,9 @@ test("writes are refused and leave the data alone", async () => {
 
 test("a WITH that writes is refused and leaves the data alone", async () => {
   const ask = await serve();
-  expect((await ask("with x as (select 1) update tasks set title = 'Z'")).status).toBe(403);
-  expect((await ask("with x as (select 1) delete from tasks")).status).toBe(403);
+  const refused = { status: 403, body: { error: "a page can only run SELECT" } };
+  expect(await ask("with x as (select 1) update tasks set title = 'Z'")).toEqual(refused);
+  expect(await ask("with x as (select 1) delete from tasks returning *")).toEqual(refused);
   expect((await ask("select title from tasks")).body.rows).toEqual([{ title: "A" }]);
 });
 
