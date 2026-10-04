@@ -345,3 +345,16 @@ test("the output folder may not be the state folder or inside it, even with --fo
   expect(readFileSync(join(root, ".yamlite/db.sqlite"), "utf8")).toBe("db");
   expect(existsSync(join(root, ".yamlite", "site"))).toBe(false);
 });
+
+test("an invalid SOURCE_DATE_EPOCH is reported by name", async () => {
+  for (const value of ["soon", "-1", "1.5", "1e400"]) {
+    process.env.SOURCE_DATE_EPOCH = value;
+    try {
+      await expect(writeSnapshotData({ root: setup(), dir: tmpRoot() }), value).rejects.toThrow(
+        `SOURCE_DATE_EPOCH must be a whole number of seconds: ${value}`,
+      );
+    } finally {
+      delete process.env.SOURCE_DATE_EPOCH;
+    }
+  }
+});

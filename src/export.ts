@@ -58,7 +58,12 @@ interface YamlMap {
 
 function generatedAt(now: () => Date): string {
   const epoch = process.env.SOURCE_DATE_EPOCH;
-  return (epoch ? new Date(Number(epoch) * 1000) : now()).toISOString();
+  if (!epoch) return now().toISOString();
+  const date = new Date(Number(epoch) * 1000);
+  if (!/^\d+$/.test(epoch) || Number.isNaN(date.getTime())) {
+    throw new Error(`SOURCE_DATE_EPOCH must be a whole number of seconds: ${epoch}`);
+  }
+  return date.toISOString();
 }
 
 // a path outside the root would tell readers of a published site about the machine it was built on
@@ -89,6 +94,7 @@ export async function writeSnapshotData(opts: {
   now?: () => Date;
 }): Promise<{ tables: string[]; warnings: Record<string, string[]> }> {
   const root = resolve(opts.root);
+  const stamp = generatedAt(opts.now ?? (() => new Date()));
   const work = mkdtempSync(join(tmpdir(), "yamlite-export-"));
   const dbPath = join(work, "db.sqlite");
   try {
@@ -174,7 +180,7 @@ export async function writeSnapshotData(opts: {
     snapshotDb(dbPath, join(opts.dir, "data", "db.sqlite"), selected);
     const snapshot: Snapshot = {
       version: 1,
-      generatedAt: generatedAt(opts.now ?? (() => new Date())),
+      generatedAt: stamp,
       meta,
       schemas,
       warnings,
