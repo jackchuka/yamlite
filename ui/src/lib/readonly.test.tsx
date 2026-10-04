@@ -83,6 +83,6 @@ test("the record drawer is view-only and shows a YAML that failed to load as an 
   expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "delete record" })).toBeNull();
   expect(screen.queryByText("接続が切れています")).toBeNull();
-  fireEvent.mouseDown(screen.getByRole("tab", { name: "YAML" }));
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "File" }));
   await waitFor(() => expect(screen.getByText("data/yaml/tasks.json: 404")).toBeTruthy());
 });

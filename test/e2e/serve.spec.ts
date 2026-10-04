@@ -194,3 +194,23 @@ test("the ERD draws tables and their references, and opens a table on double-cli
   await page.getByTestId("rf__node-people").dblclick();
   await expect(page.getByRole("heading", { name: "people", exact: true })).toBeVisible();
 });
+
+test("editing a Markdown note's body in the drawer changes only the body in the file", async ({ page }) => {
+  app = await start({
+    "yamlite.yaml": 'tables:\n  notes:\n    files: "**/*.md"\n',
+    "idea.md": "---\ntitle: Idea   # keep this comment\n---\n\nold body\n",
+  });
+  await page.goto(app.url);
+  await page.getByRole("row", { name: /idea/ }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await drawer.getByRole("tab", { name: "Edit" }).click();
+  const editor = drawer.locator(".cm-content").first();
+  await editor.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.type("new body");
+  await drawer.getByRole("button", { name: /Save/ }).click();
+  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  expect(file(app, "idea.md")).toBe("---\ntitle: Idea   # keep this comment\n---\nnew body");
+  await drawer.getByRole("tab", { name: "File" }).click();
+  await expect(drawer.getByText("# keep this comment")).toBeVisible();
+});

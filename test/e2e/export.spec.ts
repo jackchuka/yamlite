@@ -80,7 +80,7 @@ test("an export browses, queries and refuses writes from a subdirectory", async 
   const drawer = page.getByRole("complementary", { name: "record" });
   await expect(drawer.getByLabel("title", { exact: true })).toBeDisabled();
   await expect(drawer.getByRole("button", { name: /Save/ })).toHaveCount(0);
-  await drawer.getByRole("tab", { name: "YAML" }).click();
+  await drawer.getByRole("tab", { name: "File" }).click();
   await expect(drawer.getByText("# the site")).toBeVisible();
   await page.keyboard.press("Escape");
 

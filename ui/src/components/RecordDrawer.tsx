@@ -198,7 +198,7 @@ export function RecordDrawer({
           <TabsList className="ml-auto h-7">
             <TabsTrigger value="form">Form</TabsTrigger>
             <TabsTrigger value="json">JSON</TabsTrigger>
-            <TabsTrigger value="yaml">YAML</TabsTrigger>
+            <TabsTrigger value="yaml">File</TabsTrigger>
           </TabsList>
           <button type="button" aria-label="close" onClick={close} className="text-muted-foreground">
             <X className="size-4" />
@@ -268,7 +268,7 @@ export function RecordDrawer({
         <TabsContent value="yaml" className="min-h-0 flex-1 overflow-auto px-4 py-3">
           {data.yamlError && <p className="mb-2 text-[11.5px] text-err">{data.yamlError}</p>}
           <CodeMirror
-            aria-label="record YAML"
+            aria-label="record file"
             value={data.yaml ?? "# not written to a file yet"}
             extensions={[yaml()]}
             editable={false}
@@ -280,7 +280,7 @@ export function RecordDrawer({
         <div className="flex items-center gap-2 border-t px-4 py-2.5">
           <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground">
             {changes > 0 ? (
-              `変更 ${changes} 件 · 保存すると YAML に反映`
+              `変更 ${changes} 件 · 保存するとファイルに反映`
             ) : (
               <ReflectBadge table={table.name} recordKey={recordKey} />
             )}

@@ -14,11 +14,12 @@ import type { Routes } from "./index.ts";
 
 export function recordFile(spec: TableSpec, key: string): string {
   if (spec.mode === "list") return spec.path;
-  for (const ext of [".yaml", ".yml"]) {
+  const exts = spec.codec === "markdown" ? [".md"] : [".yaml", ".yml"];
+  for (const ext of exts) {
     const path = join(spec.path, `${key}${ext}`);
     if (existsSync(path)) return path;
   }
-  return join(spec.path, `${key}.yaml`);
+  return join(spec.path, `${key}${exts[0]}`);
 }
 
 // a key is never a path, but a record file must stay inside its table directory regardless

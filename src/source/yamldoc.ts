@@ -9,6 +9,8 @@ export const YAML_EXT = /\.ya?ml$/i;
 // the files of a table that was a plain folder: every YAML file below it
 export const YAML_GLOB = "**/*.{yaml,yml}";
 
+export const NOT_A_MAPPING = "top-level value must be a mapping";
+
 // the yaml library appends a multi-line excerpt of the source; keep the first line ("… at line L, column C:")
 export function firstError(doc: { errors: Array<{ message: string }> }): string {
   return (doc.errors[0]?.message ?? "invalid YAML").split("\n")[0]?.replace(/:$/, "") ?? "invalid YAML";
@@ -20,7 +22,7 @@ export function parseRecordFile(content: string): Parsed {
   const doc = parseDocument(content, PARSE_OPTIONS);
   if (doc.errors.length > 0) return { ok: false, error: firstError(doc) };
   if (doc.contents === null) return { ok: true, doc, record: {} };
-  if (!isMap(doc.contents)) return { ok: false, error: "top-level value must be a mapping" };
+  if (!isMap(doc.contents)) return { ok: false, error: NOT_A_MAPPING };
   return { ok: true, doc, record: doc.toJS() as Rec };
 }
 

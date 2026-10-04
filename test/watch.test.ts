@@ -158,3 +158,15 @@ test("a table covering the root picks up edits and does not loop on its own data
   await y.close();
   expect(errors).toEqual([]);
 });
+
+test("a Markdown file added while watching adds no table", async () => {
+  const t = await start({ "tasks/a.yaml": "title: A\n" });
+  const config = read(join(t.root, "yamlite.yaml"));
+  write(join(t.root, "inbox.md"), "# in\n");
+  write(join(t.root, "tasks/x.md"), "# x\n");
+  write(join(t.root, "tasks/b.yaml"), "title: B\n");
+  await waitFor(() => sql(t.db, "SELECT id FROM tasks WHERE id = 'b'").length === 1);
+  expect(read(join(t.root, "yamlite.yaml"))).toBe(config);
+  await t.y.close();
+  expect(t.errors).toEqual([]);
+});

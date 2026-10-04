@@ -9,6 +9,7 @@ export interface Registration {
   columns?: Record<string, ColumnType>;
   // written only when the table is new
   path?: string;
+  files?: string;
   key?: string;
 }
 
@@ -34,11 +35,12 @@ export function registerInConfig(path: string, registrations: Registration[]): b
   const root = doc.contents as unknown as YAMLMap;
   const tables = blockMap(doc, root, "tables");
   let changed = false;
-  for (const { table, columns = {}, path: tablePath, key } of registrations) {
+  for (const { table, columns = {}, path: tablePath, files, key } of registrations) {
     const isNew = !tables.has(table);
     if (isNew) changed = true;
     const entry = blockMap(doc, tables, table);
     if (isNew && tablePath !== undefined) entry.set("path", tablePath);
+    if (isNew && files !== undefined) entry.set("files", files);
     if (isNew && key !== undefined) entry.set("key", key);
     const additions = Object.entries(columns);
     if (additions.length === 0) continue;
