@@ -148,6 +148,34 @@ const drag = (from: number, to: number) => {
   fireEvent.pointerUp(document, { clientX: to });
 };
 
+test("a drag captures the pointer and marks the body until it ends", async () => {
+  localStorage.clear();
+  await openDrawer();
+  const el = handle();
+  const captured: number[] = [];
+  el.setPointerCapture = (id: number) => void captured.push(id);
+  fireEvent.pointerDown(el, { clientX: 600, button: 0, pointerId: 7 });
+  expect(captured).toEqual([7]);
+  expect(document.body.hasAttribute("data-resizing")).toBe(true);
+  fireEvent.pointerMove(el, { clientX: 550 });
+  expect(drawer().style.width).toBe("410px");
+  fireEvent.pointerUp(el, { clientX: 550 });
+  expect(document.body.hasAttribute("data-resizing")).toBe(false);
+});
+
+test("a lost capture or a cancel ends the drag and stops following the pointer", async () => {
+  for (const end of ["lostPointerCapture", "pointerCancel"] as const) {
+    localStorage.clear();
+    await openDrawer();
+    fireEvent.pointerDown(handle(), { clientX: 600, button: 0 });
+    fireEvent[end](handle());
+    expect(document.body.hasAttribute("data-resizing")).toBe(false);
+    fireEvent.pointerMove(document, { clientX: 100 });
+    expect(drawer().style.width).toBe("360px");
+    cleanup();
+  }
+});
+
 test("dragging the left edge widens the panel and the width is remembered", async () => {
   localStorage.clear();
   await openDrawer();

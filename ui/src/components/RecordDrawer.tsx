@@ -365,21 +365,33 @@ export function RecordDrawer({
 }
 
 function ResizeHandle({ width, onResize }: { width: number; onResize: (w: number | null) => void }) {
-  const onPointerDown = (e: ReactPointerEvent) => {
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    const el = e.currentTarget;
+    // without capture, the pointer entering a page's iframe stops the moves from reaching this document
+    el.setPointerCapture?.(e.pointerId);
+    document.body.setAttribute("data-resizing", "");
     const startX = e.clientX;
     const move = (ev: PointerEvent) => onResize(width + startX - ev.clientX);
-    const up = () => {
+    let ended = false;
+    const end = () => {
+      if (ended) return;
+      ended = true;
       document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", up);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+      el.removeEventListener("lostpointercapture", end);
+      document.body.removeAttribute("data-resizing");
       // a drag released outside the panel ends in a click there, which would otherwise close it
       const swallow = (ev: MouseEvent) => ev.stopPropagation();
       window.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
     };
     document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", up);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
   };
   const onKeyDown = (e: ReactKeyboardEvent) => {
     const delta = e.key === "ArrowLeft" ? RESIZE_STEP : e.key === "ArrowRight" ? -RESIZE_STEP : 0;

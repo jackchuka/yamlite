@@ -215,3 +215,8 @@
     border-color: var(--y-line);
   }
 }
+
+/* while the record panel is resized, a page's iframe must not take the pointer */
+[data-resizing] iframe {
+  pointer-events: none;
+}
