@@ -79,6 +79,21 @@ test("--table leaves the other tables and their views out of the snapshot and th
   }
 });
 
+test("--table drops references to the tables it leaves out", async () => {
+  const root = setup({
+    "yamlite.yaml":
+      "tables:\n  projects:\n    references: { owner: people, note: notes }\n    expand:\n      milestones:\n        references: { lead: people, about: projects }\n  notes: {}\n",
+    "projects/website.yaml": "title: Website\nowner: ann\nnote: x\nmilestones:\n  - title: Design\n    lead: ann\n    about: website\n",
+  });
+  const dir = tmpRoot();
+  await writeSnapshotData({ root, dir, tables: ["projects", "notes"] });
+  const snap = readJson(join(dir, "data/snapshot.json"));
+  const tableRefs = snap.meta.tables.find((t: any) => t.name === "projects").references;
+  expect(tableRefs).toEqual([{ column: "note", table: "notes" }]);
+  expect(snap.meta.views[0].references).toEqual([{ column: "about", table: "projects" }]);
+  expect(snap.schemas.projects.references.map((r: any) => [r.column, r.table])).toEqual([["note", "notes"]]);
+});
+
 test("internal bookkeeping is stripped and the view registry kept", async () => {
   const root = setup();
   const dir = tmpRoot();

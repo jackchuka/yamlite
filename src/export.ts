@@ -136,19 +136,23 @@ export async function writeSnapshotData(opts: {
         const router = new Router();
         for (const routes of ROUTES) routes(router, ctx);
         const served = get(router, "/api/meta");
+        // a link to a table left out of the export would lead nowhere
+        const exported = (refs: Json[]) => refs.filter((r) => selected.includes(r.table));
         meta = {
           ...served,
           root: basename(root),
           db: "data/db.sqlite",
           configFile: hidePath(served.configFile),
           tables: selected.flatMap((name) =>
-            served.tables.filter((t: Json) => t.name === name).map((t: Json) => ({ ...t, path: hidePath(t.path) })),
+            served.tables.filter((t: Json) => t.name === name).map((t: Json) => ({ ...t, path: hidePath(t.path), references: exported(t.references) })),
           ),
-          views: served.views.filter((v: Json) => selected.includes(v.table)),
+          views: served.views
+            .filter((v: Json) => selected.includes(v.table))
+            .map((v: Json) => ({ ...v, references: exported(v.references) })),
         };
         for (const name of selected) {
           const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
-          schemas[name] = { ...schema, path: hidePath(schema.path) };
+          schemas[name] = { ...schema, path: hidePath(schema.path), references: exported(schema.references) };
           const spec = y.tables.find((t) => t.name === name);
           const files = new Map<string, string>();
           const keys: Array<[string, string]> = [];
