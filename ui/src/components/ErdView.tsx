@@ -13,7 +13,7 @@ import {
   useReactFlow,
 } from "@xyflow/react";
 import { RotateCcw } from "lucide-react";
-import { type CSSProperties, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { warningCounts } from "@/lib/activity";
@@ -21,6 +21,7 @@ import { api } from "@/lib/api";
 import { buildErd, type Erd } from "@/lib/erd";
 import { layoutErd } from "@/lib/erdLayout";
 import { useEvents, useMeta } from "@/lib/providers";
+import { useTheme } from "@/lib/theme";
 import type { Meta, TableSchema } from "@/lib/types";
 import { columnHandle, type ErdFlowNode, ErdNodeView, headerHandle, HighlightContext } from "./ErdNode";
 import { ErdSelfLoop } from "./ErdSelfLoop";
@@ -42,14 +43,6 @@ const palette = {
   "--xy-attribution-background-color": "transparent",
 } as CSSProperties;
 const dataOf = (results: UseQueryResult<TableSchema>[]) => results.map((r) => r.data);
-
-// applyTheme writes data-theme on <html>; React Flow's controls and minimap follow it
-function subscribeTheme(onChange: () => void): () => void {
-  const observer = new MutationObserver(onChange);
-  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => observer.disconnect();
-}
-const readTheme = (): "light" | "dark" => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
 
 // what the layout depends on: which nodes, which rows in which order, and which edges; counts and problems are
 // left out. Rows count by name: React Flow keeps measured handle positions until a node is laid out again
@@ -111,7 +104,7 @@ interface DiagramProps {
 function Diagram({ meta, schemas, warnings }: DiagramProps) {
   const navigate = useNavigate();
   const { fitView } = useReactFlow();
-  const theme = useSyncExternalStore(subscribeTheme, readTheme);
+  const theme = useTheme();
   const [showViews, setShowViews] = useState(true);
   const [picked, setPicked] = useState<string | null>(null);
   const [round, setRound] = useState(0);

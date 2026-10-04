@@ -1,3 +1,5 @@
+import { useSyncExternalStore } from "react";
+
 export type ThemeChoice = "light" | "dark" | "system";
 const KEY = "yamlite-theme";
 
@@ -25,3 +27,13 @@ export function applyTheme(choice: ThemeChoice): void {
 
 export const nextChoice = (choice: ThemeChoice): ThemeChoice =>
   choice === "system" ? "light" : choice === "light" ? "dark" : "system";
+
+// applyTheme writes data-theme on <html>; components that colour themselves follow it
+function subscribeTheme(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  return () => observer.disconnect();
+}
+const readTheme = (): "light" | "dark" => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+
+export const useTheme = (): "light" | "dark" => useSyncExternalStore(subscribeTheme, readTheme);
