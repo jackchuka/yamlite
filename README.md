@@ -176,6 +176,39 @@ yamlite serve notes --open
 - `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
 - The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
 
+## Pages
+
+Add your own screens — a kanban board, a dashboard — to `serve`. A page is one HTML file that reads and writes your data through `window.yamlite`, limited to what `yamlite.yaml` allows it.
+
+```yaml
+pages:
+  board:
+    path: .pages/kanban.html # a dot-folder: a plain folder under the root would become a table
+    title: Task board
+    access: { tasks: write, people: read } # tables and views; nothing else is reachable
+    sql: false # true allows SELECT over the names in access
+    network: [] # origins the page may load scripts, styles, images and fonts from, and connect to
+```
+
+Start from [`examples/pages/kanban.html`](examples/pages/kanban.html): copy it into `.pages/`, set `TABLE`, `KEY`, `GROUP` and `TITLE` at the top, and declare it as above.
+
+| Call                                                                                             | Does                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `await yamlite.ready`                                                                            | `{ page, title, access, sql, network, readOnly }`                                                                                                 |
+| `yamlite.rows(table, { filter, sort, prefix, limit, offset })`                                   | `{ rows, total }`, reads tables and views, same filters as the table screen; `limit` ≤ 500                                                        |
+| `yamlite.get(table, key)`                                                                        | `{ row, file }`; tables only, a view gives 400                                                                                                    |
+| `yamlite.create(table, key, values)` / `update(table, key, values, base)` / `remove(table, key)` | needs `write`; `update` fails with status 409, `extra.stale` (the fields) and `extra.current` (their values now), if a field changed since `base` |
+| `yamlite.sql(select)`                                                                            | needs `sql: true`; one SELECT over the names in `access`                                                                                          |
+| `yamlite.on("change", ({ tables }) => …)`                                                        | called after a sync changes a table or view the page can read                                                                                     |
+| `yamlite.open(table, key)`                                                                       | opens the record in yamlite's own form; tables only, a view gives 400                                                                             |
+
+Errors reject with `yamlite.YamliteError` (`status`, `message`, `extra`).
+
+- The page runs in a sandboxed frame with no access to yamlite's session; every call goes through yamlite, which checks it against `access`. SQL runs on a read-only connection where SQLite itself refuses tables outside `access`.
+- `network` is enforced with a Content Security Policy. It limits what the page loads and where it connects. Declaring an origin lets the page send data, including anything it can read through `access`, off your machine to that origin.
+- Every page, even with `network: []`, can leak data by navigating its own frame to another site with the data in the URL. yamlite then disconnects the page, but the data has already left. Only declare pages you trust, as you would any script you run.
+- In an [export](#export) pages are read-only, and `access` does not hide data: the exported `db.sqlite` is downloadable, and `sql: true` reads every exported table. Pages whose `access` names a table left out of the export are skipped with a warning.
+
 ## Export
 
 ```bash

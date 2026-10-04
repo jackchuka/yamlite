@@ -1,75 +1,7 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-
-const bin = resolve(import.meta.dirname, "../../dist/cli.mjs");
-
-interface Running {
-  root: string;
-  url: string;
-  child: ChildProcess;
-}
-
-function put(path: string, content: string): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, content);
-}
-
-const exited = (child: ChildProcess) => child.exitCode !== null || child.signalCode !== null;
-
-async function stop(child: ChildProcess): Promise<void> {
-  if (exited(child)) return;
-  const done = new Promise<void>((r) => child.once("exit", () => r()));
-  child.kill("SIGINT");
-  const timer = setTimeout(() => child.kill("SIGKILL"), 5000);
-  await done;
-  clearTimeout(timer);
-}
-
-async function start(files: Record<string, string>): Promise<Running> {
-  const root = mkdtempSync(join(tmpdir(), "yamlite-e2e-"));
-  put(join(root, "yamlite.yaml"), "tables: {}\n");
-  for (const [path, content] of Object.entries(files)) put(join(root, path), content);
-  const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], { stdio: ["ignore", "pipe", "inherit"] });
-  const running: Running = { root, url: "", child };
-  app = running;
-  running.url = await new Promise<string>((done, fail) => {
-    let out = "";
-    const timer = setTimeout(() => {
-      child.kill("SIGKILL");
-      fail(new Error(`serve did not print its URL within 15s: ${out}`));
-    }, 15_000);
-    child.stdout?.setEncoding("utf8");
-    child.stdout?.on("data", (chunk: string) => {
-      out += chunk;
-      const m = /(http:\/\/127\.0\.0\.1:\d+\/\?token=[0-9a-f]+)/.exec(out);
-      if (m?.[1]) {
-        clearTimeout(timer);
-        done(m[1]);
-      }
-    });
-    child.once("exit", (code) => {
-      clearTimeout(timer);
-      fail(new Error(`serve exited with ${code}: ${out}`));
-    });
-  });
-  return running;
-}
-
-function sqlite(root: string, query: string): void {
-  const db = new DatabaseSync(join(root, ".yamlite", "db.sqlite"));
-  try {
-    db.exec("PRAGMA busy_timeout = 5000");
-    db.exec(query);
-  } finally {
-    db.close();
-  }
-}
-
-const file = (app: Running, path: string) => readFileSync(join(app.root, path), "utf8");
+import { file, type Running, sqlite, start, stop } from "./app.ts";
 
 let app: Running | undefined;
 test.afterEach(async () => {
@@ -81,9 +13,12 @@ test.afterEach(async () => {
 });
 
 test("an edit in the drawer reaches the file and keeps its comments", async ({ page }) => {
-  app = await start({
-    "tasks/buy-milk.yaml": "# errand\ntitle:\n  ja: 牛乳を買う\n  en: Buy milk\ndone: false\ntags: [errand, home]\n",
-  });
+  app = await start(
+    {
+      "tasks/buy-milk.yaml": "# errand\ntitle:\n  ja: 牛乳を買う\n  en: Buy milk\ndone: false\ntags: [errand, home]\n",
+    },
+    (r) => (app = r),
+  );
   await page.goto(app.url);
   await page.getByRole("row", { name: /buy-milk/ }).click();
   const drawer = page.getByRole("complementary", { name: "record" });
@@ -99,7 +34,7 @@ test("an edit in the drawer reaches the file and keeps its comments", async ({ p
 });
 
 test("an edit in the editor shows up in the grid", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: before\n" });
+  app = await start({ "tasks/a.yaml": "title: before\n" }, (r) => (app = r));
   await page.goto(app.url);
   await expect(page.getByRole("row", { name: /before/ })).toBeVisible();
   writeFileSync(join(app.root, "tasks/a.yaml"), "title: after\n");
@@ -107,7 +42,7 @@ test("an edit in the editor shows up in the grid", async ({ page }) => {
 });
 
 test("a conflict is announced and its losing side can be restored", async ({ page }) => {
-  app = await start({ "tasks/fix-ci.yaml": "priority: 2\n" });
+  app = await start({ "tasks/fix-ci.yaml": "priority: 2\n" }, (r) => (app = r));
   const running = app;
   await page.goto(running.url);
   await expect(page.getByRole("row", { name: /fix-ci/ })).toBeVisible();
@@ -138,7 +73,7 @@ test("a conflict is announced and its losing side can be restored", async ({ pag
 });
 
 test("an UPDATE in the SQL console lists the files it changed", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: A\n" });
+  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r));
   const running = app;
   await page.goto(running.url);
   await page.getByRole("link", { name: /SQL console/ }).click();
@@ -153,11 +88,14 @@ test("an UPDATE in the SQL console lists the files it changed", async ({ page })
 });
 
 test("an expanded view is listed under its table and opens the record it comes from", async ({ page }) => {
-  app = await start({
-    "yamlite.yaml": "tables:\n  projects:\n    expand:\n      milestones:\n        expand:\n          tasks: {}\n",
-    "projects/website.yaml":
-      "title: Website\nmilestones:\n  - title: Design\n    tasks:\n      - title: Wireframes\n  - title: Launch\n",
-  });
+  app = await start(
+    {
+      "yamlite.yaml": "tables:\n  projects:\n    expand:\n      milestones:\n        expand:\n          tasks: {}\n",
+      "projects/website.yaml":
+        "title: Website\nmilestones:\n  - title: Design\n    tasks:\n      - title: Wireframes\n  - title: Launch\n",
+    },
+    (r) => (app = r),
+  );
   await page.goto(app.url);
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
   await sidebar.getByRole("link", { name: /^projects__milestones(?!__)/ }).click();
@@ -177,12 +115,16 @@ test("an expanded view is listed under its table and opens the record it comes f
 });
 
 test("warnings sit next to the table's name and their messages open from the table", async ({ page }) => {
-  app = await start({
-    "yamlite.yaml": "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
-    "people.yaml": "- id: ann\n",
-    "tasks/a.yaml": "title: A\nassignee: ann\n",
-    "tasks/b.yaml": "title: B\nassignee: zed\n",
-  });
+  app = await start(
+    {
+      "yamlite.yaml":
+        "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
+      "people.yaml": "- id: ann\n",
+      "tasks/a.yaml": "title: A\nassignee: ann\n",
+      "tasks/b.yaml": "title: B\nassignee: zed\n",
+    },
+    (r) => (app = r),
+  );
   await page.goto(app.url);
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
   const tasks = sidebar.getByRole("link", { name: /tasks/ });
@@ -194,7 +136,7 @@ test("warnings sit next to the table's name and their messages open from the tab
 });
 
 test("the record drawer closes on Escape and on a click outside it", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: A\n", "tasks/b.yaml": "title: B\n" });
+  app = await start({ "tasks/a.yaml": "title: A\n", "tasks/b.yaml": "title: B\n" }, (r) => (app = r));
   await page.goto(app.url);
   const drawer = page.getByRole("complementary", { name: "record" });
   await page.getByRole("row", { name: /\ba\b/ }).click();
@@ -210,7 +152,7 @@ test("the record drawer closes on Escape and on a click outside it", async ({ pa
 });
 
 test("dragging the drawer's edge resizes it, keeps it open and survives a reload", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: A\n" });
+  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r));
   await page.goto(app.url);
   const drawer = page.getByRole("complementary", { name: "record" });
   await page.getByRole("row", { name: /\ba\b/ }).click();
@@ -232,12 +174,16 @@ test("dragging the drawer's edge resizes it, keeps it open and survives a reload
 });
 
 test("the ERD draws tables and their references, and opens a table on double-click", async ({ page }) => {
-  app = await start({
-    "yamlite.yaml": "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
-    "people.yaml": "- id: ann\n",
-    "tasks/a.yaml": "title: A\nassignee: ann\n",
-    "tasks/b.yaml": "title: B\nassignee: zed\n",
-  });
+  app = await start(
+    {
+      "yamlite.yaml":
+        "tables:\n  tasks:\n    references:\n      assignee: people\n  people:\n    path: ./people.yaml\n",
+      "people.yaml": "- id: ann\n",
+      "tasks/a.yaml": "title: A\nassignee: ann\n",
+      "tasks/b.yaml": "title: B\nassignee: zed\n",
+    },
+    (r) => (app = r),
+  );
   await page.goto(app.url);
   await page.getByRole("complementary", { name: "sidebar" }).getByRole("link", { name: /^ERD/ }).click();
   const tasks = page.getByTestId("erd-node-tasks");
