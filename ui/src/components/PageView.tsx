@@ -6,11 +6,17 @@ import { isReadOnly } from "@/lib/mode";
 import { PageHost } from "@/lib/pages/host";
 import { injectPage } from "@/lib/pages/inject";
 import { useEventStore, useMeta } from "@/lib/providers";
+import { useTheme } from "@/lib/theme";
 import type { Meta, PageMeta } from "@/lib/types";
-import { accessSummary } from "../../../src/pages/access.ts";
+import { accessBrief, accessSummary } from "../../../src/pages/access.ts";
 import { RecordDrawer } from "./RecordDrawer";
 
 export function PageView({ name }: { name: string }) {
+  const theme = useTheme();
+  // a new document bakes in the theme of that moment; later switches and hello arrive as messages
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const hostRef = useRef<PageHost | null>(null);
   const { data: meta } = useMeta();
   const store = useEventStore();
   const page = meta?.pages.find((p) => p.name === name);
@@ -22,15 +28,17 @@ export function PageView({ name }: { name: string }) {
   const [blocked, setBlocked] = useState<string[]>([]);
   const [opened, setOpened] = useState<{ table: string; key: string } | null>(null);
   const network = page?.network.join(" ");
+  // everything but the theme that makes a new frame; the document is rebuilt with it so it bakes in the current theme
+  const rebuild = `${generation}:${JSON.stringify([page?.access, page?.sql, page?.title])}`;
   const srcDoc = useMemo(
     () =>
       network !== undefined && html.data !== undefined
-        ? injectPage(html.data, network ? network.split(" ") : [])
+        ? injectPage(html.data, network ? network.split(" ") : [], themeRef.current)
         : undefined,
-    [network, html.data],
+    [network, html.data, rebuild],
   );
   // the frame is rebuilt only when its document changes, not on every refetch
-  const frameKey = `${generation}:${JSON.stringify([page?.access, page?.sql, page?.title])}:${srcDoc}`;
+  const frameKey = `${rebuild}:${srcDoc}`;
   const current = useRef({ page, meta });
   current.current = { page, meta };
   const ready = page !== undefined && meta !== undefined;
@@ -50,9 +58,11 @@ export function PageView({ name }: { name: string }) {
         api,
         readOnly: isReadOnly(),
         open: (table, key) => setOpened({ table, key }),
+        theme: () => themeRef.current,
         blocked: (url) => setBlocked((list) => (list.includes(url) ? list : [...list, url])),
       },
     );
+    hostRef.current = host;
     window.addEventListener("message", host.handle);
     const off = store.listen((e) => {
       if (e.type === "sync" && (e.changes.length > 0 || e.schema.length > 0)) host.notify([e.table]);
@@ -61,11 +71,16 @@ export function PageView({ name }: { name: string }) {
       }
     });
     return () => {
+      hostRef.current = null;
       host.dispose();
       window.removeEventListener("message", host.handle);
       off();
     };
   }, [ready, srcDoc, navigated, store]);
+
+  useEffect(() => {
+    hostRef.current?.theme(theme);
+  }, [theme]);
 
   if (!meta) return null;
   if (!page) return <div className="p-6 text-muted-foreground">ページが見つかりません</div>;
@@ -78,10 +93,13 @@ export function PageView({ name }: { name: string }) {
   };
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-3 border-b px-[18px] py-2.5">
-        <h1 className="text-[15px] font-semibold">{page.title}</h1>
-        <span className="truncate font-mono text-[11px] text-muted-foreground" title={page.path}>
-          {accessSummary(page)}
+      <header className="flex min-w-0 items-center gap-3 border-b px-[18px] py-2.5">
+        <h1 className="shrink-0 whitespace-nowrap text-[15px] font-semibold">{page.title}</h1>
+        <span
+          className="min-w-0 truncate font-mono text-[11px] text-muted-foreground"
+          title={`${page.path}\n${accessSummary(page)}`}
+        >
+          {accessBrief(page)}
         </span>
       </header>
       {blocked.length > 0 && (

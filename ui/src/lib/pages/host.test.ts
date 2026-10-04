@@ -31,6 +31,7 @@ function setup(page: PageMeta = board, readOnly = false) {
     readOnly,
     open: vi.fn(),
     blocked: vi.fn(),
+    theme: () => "dark",
   };
   const host = new PageHost(
     () => frame,
@@ -174,4 +175,17 @@ test("nothing is posted after dispose", async () => {
   host.notify(["tasks"]);
   await new Promise((r) => setTimeout(r, 10));
   expect(posted).toEqual([]);
+});
+
+test("theme posts a theme event to the frame", () => {
+  const { host, posted } = setup();
+  host.theme("dark");
+  expect(posted).toEqual([{ yamlite: 1, event: "theme", data: { theme: "dark" } }]);
+});
+
+test("answering hello is followed by the current theme", async () => {
+  const { ask, posted } = setup();
+  const answer = await ask("hello");
+  const at = posted.indexOf(answer);
+  expect(posted[at + 1]).toEqual({ yamlite: 1, event: "theme", data: { theme: "dark" } });
 });

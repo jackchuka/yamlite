@@ -73,3 +73,39 @@ test("a page that navigates its frame away is cut off", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("別の URL に移動したため");
   await expect(page.locator('iframe[title="Board"]')).toHaveCount(0);
 });
+
+test("a page follows the UI's theme and the record panel resizes over it", async ({ page }) => {
+  app = await launch({
+    "yamlite.yaml": config("    access: { tasks: read }\n"),
+    ".pages/board.html": `<!doctype html><html data-yamlite-ui><body><button id="open">open</button><script>
+      document.getElementById("open").onclick = () => yamlite.open("tasks", "a");
+    </script></body></html>`,
+    "tasks/a.yaml": "title: A\n",
+  });
+  await page.goto(`${app.url}#/p/board`);
+  const frame = page.frameLocator('iframe[title="Board"]');
+  const bg = () => frame.locator("body").evaluate((b) => getComputedStyle(b).backgroundColor);
+  const theme = page.getByRole("button", { name: /^theme: / });
+  for (let i = 0; (await theme.getAttribute("aria-label")) !== "theme: light"; i++) {
+    if (i >= 3) throw new Error("the theme button never reached light");
+    await theme.click();
+  }
+  await expect.poll(bg).toBe("rgb(255, 253, 249)");
+  await theme.click();
+  await expect(theme).toHaveAttribute("aria-label", "theme: dark");
+  await expect.poll(bg).toBe("rgb(28, 27, 41)");
+
+  await frame.getByRole("button", { name: "open" }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await expect(drawer).toBeVisible();
+  const before = (await drawer.boundingBox())?.width ?? 0;
+  const handle = page.getByRole("separator", { name: "Resize record panel" });
+  const box = await handle.boundingBox();
+  if (!box) throw new Error("no handle");
+  await page.mouse.move(box.x + 1, box.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 300, box.y + 40, { steps: 10 });
+  await page.mouse.up();
+  const after = (await drawer.boundingBox())?.width ?? 0;
+  expect(after).toBeGreaterThan(before + 200);
+});

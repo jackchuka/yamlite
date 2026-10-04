@@ -9,6 +9,7 @@ export interface HostDeps {
   readOnly: boolean;
   open(table: string, key: string): void;
   blocked(url: string): void;
+  theme(): "light" | "dark";
 }
 
 interface PageRequest {
@@ -66,7 +67,10 @@ export class PageHost {
       return;
     }
     void this.answer(method, args).then(
-      (value) => this.post({ yamlite: 1, id, ok: true, value }),
+      (value) => {
+        this.post({ yamlite: 1, id, ok: true, value });
+        if (method === "hello") this.theme(this.deps.theme());
+      },
       (err: unknown) => this.post({ yamlite: 1, id, ok: false, error: toWireError(err) }),
     );
   };
@@ -77,6 +81,10 @@ export class PageHost {
     for (const v of this.meta().views) if (touched.has(v.table)) touched.add(v.name);
     const visible = [...touched].filter((name) => canRead(this.page(), name));
     if (visible.length > 0) this.post({ yamlite: 1, event: "change", data: { tables: visible } });
+  }
+
+  theme(theme: "light" | "dark"): void {
+    this.post({ yamlite: 1, event: "theme", data: { theme } });
   }
 
   dispose(): void {

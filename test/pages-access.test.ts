@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  accessBrief,
   accessSummary,
   canRead,
   canWrite,
@@ -67,4 +68,18 @@ test("the summary lists access, sql and hosts", () => {
     accessSummary(page({ tasks: "write", people: "read" }, { sql: true, network: ["https://cdn.jsdelivr.net"] })),
   ).toBe("tasks: write · people: read · sql · cdn.jsdelivr.net");
   expect(accessSummary(page({}))).toBe("no access");
+});
+
+test("the brief counts writes, reads, sql and origins", () => {
+  expect(
+    accessBrief(
+      page(
+        { tasks: "write", notes: "write", people: "read" },
+        { sql: true, network: ["https://a.example", "https://b.example"] },
+      ),
+    ),
+  ).toBe("write 2 · read 1 · SQL · 2 origins");
+  expect(accessBrief(page({ people: "read" }, { network: ["https://a.example"] }))).toBe("read 1 · 1 origin");
+  expect(accessBrief(page({}, { sql: true }))).toBe("SQL");
+  expect(accessBrief(page({}))).toBe("no access");
 });

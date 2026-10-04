@@ -200,9 +200,31 @@ Start from [`examples/pages/kanban.html`](examples/pages/kanban.html): copy it i
 | `yamlite.create(table, key, values)` / `update(table, key, values, base)` / `remove(table, key)` | needs `write`; `update` fails with status 409, `extra.stale` (the fields) and `extra.current` (their values now), if a field changed since `base` |
 | `yamlite.sql(select)`                                                                            | needs `sql: true`; one SELECT over the names in `access`                                                                                          |
 | `yamlite.on("change", ({ tables }) => …)`                                                        | called after a sync changes a table or view the page can read                                                                                     |
+| `yamlite.theme` / `yamlite.on("theme", ({ theme }) => …)`                                        | the current theme (`light` or `dark`), and a call when it changes                                                                                 |
 | `yamlite.open(table, key)`                                                                       | opens the record in yamlite's own form; tables only, a view gives 400                                                                             |
 
 Errors reject with `yamlite.YamliteError` (`status`, `message`, `extra`).
+
+### Look and feel
+
+Every page gets the UI's colours and fonts as CSS variables, and follows the theme switch without reloading:
+
+| Variables                                                           | Use                                                                  |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `--y-bg`, `--y-panel`, `--y-panel-2`, `--y-line`                    | surfaces and borders                                                 |
+| `--y-text`, `--y-muted`                                             | text                                                                 |
+| `--y-accent`, `--y-accent-fill`, `--y-accent-soft`, `--y-on-accent` | emphasis                                                             |
+| `--y-ok`, `--y-warn`, `--y-warn-soft`, `--y-err`, `--y-err-soft`    | states                                                               |
+| `--y-chip`, `--y-chip-text`                                         | chips                                                                |
+| `--y-font`, `--y-mono`                                              | Outfit and JetBrains Mono (Latin); other scripts use the system font |
+
+Native form controls and scrollbars follow the theme (`color-scheme`) only on pages with `data-yamlite-ui`.
+
+`<html>` carries `data-theme="light"` or `"dark"`; `yamlite.theme` reads it and `yamlite.on("theme", ({ theme }) => …)` is called when it changes.
+
+Add `data-yamlite-ui` to `<html>` to also get the UI's look for plain elements — `body`, headings, links, `button` (`.y-primary` for the filled one), `input`, `select`, `textarea`, `table` (sticky header, wrapping cells), `pre`/`code`, `details`/`summary` — and these classes: `.y-chip` (with `.y-ok`, `.y-warn`, `.y-err`), `.y-card`, `.y-toolbar`, `.y-muted`, `.y-link`. All of it sits inside `:where()`, so any rule of your own wins.
+
+The variable and class names are part of the page API: renaming one is a breaking change.
 
 - The page runs in a sandboxed frame with no access to yamlite's session; every call goes through yamlite, which checks it against `access`. SQL runs on a read-only connection where SQLite itself refuses tables outside `access`.
 - `network` is enforced with a Content Security Policy. It limits what the page loads and where it connects. Declaring an origin lets the page send data, including anything it can read through `access`, off your machine to that origin.

@@ -1,18 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-yamlite-ui>
   <head>
     <meta charset="utf-8" />
     <title>Kanban</title>
     <style>
-      body {
-        font:
-          14px/1.5 system-ui,
-          sans-serif;
-        margin: 0;
-        padding: 16px;
-        background: #faf7f2;
-        color: #222;
-      }
       .board {
         display: flex;
         gap: 12px;
@@ -21,13 +12,14 @@
       }
       .column {
         flex: 0 0 240px;
-        background: #efe9df;
+        background: var(--y-panel);
+        border: 1px solid var(--y-line);
         border-radius: 8px;
         padding: 8px;
         min-height: 120px;
       }
       .column.over {
-        outline: 2px dashed #e5533d;
+        outline: 2px dashed var(--y-accent);
       }
       .column h2 {
         font-size: 13px;
@@ -36,31 +28,19 @@
         justify-content: space-between;
       }
       .card {
-        background: #fff;
+        background: var(--y-bg);
+        border: 1px solid var(--y-line);
         border-radius: 6px;
         padding: 8px 10px;
         margin-bottom: 8px;
-        box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
         cursor: pointer;
       }
       .card[draggable="true"] {
         cursor: grab;
       }
       .error {
-        color: #b42318;
+        color: var(--y-err);
         margin-bottom: 8px;
-      }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background: #16140f;
-          color: #eee;
-        }
-        .column {
-          background: #26231c;
-        }
-        .card {
-          background: #322e25;
-        }
       }
     </style>
   </head>
