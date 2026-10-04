@@ -1,4 +1,5 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
+export type ColumnFormat = "markdown";
 
 export interface Reference {
   column: string;
@@ -12,6 +13,7 @@ export interface TableMeta {
   path: string;
   key: string;
   columns: Record<string, ColumnType>;
+  formats: Record<string, ColumnFormat>;
   references: Reference[];
   count: number;
   inDb: boolean;

@@ -24,6 +24,7 @@ const table: TableMeta = {
   path: "tasks",
   key: "id",
   columns: { id: "TEXT", title: "TEXT", prio: "INTEGER" },
+  formats: {},
   references: [],
   count: 1,
   inDb: true,
@@ -46,6 +47,17 @@ test("after a save the form keeps the saved values until the refetch arrives", a
   await waitFor(() => expect(screen.getByRole("button", { name: /Save/ }).hasAttribute("disabled")).toBe(true));
   expect(screen.getByLabelText("title")).toBe(title);
   expect(title.value).toBe("new");
+});
+
+test("a markdown column opens on its rendered preview", async () => {
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "# Hi", prio: null }, file: "f", yaml: "" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={{ ...table, formats: { title: "markdown" } }} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("heading", { name: "Hi" })).toBeTruthy();
+  expect(screen.getByText("markdown")).toBeTruthy();
 });
 
 test("an unset INTEGER shows the 0 it was given", async () => {

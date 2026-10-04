@@ -22,6 +22,7 @@ const table: TableMeta = {
   path: "tasks",
   key: "id",
   columns: { id: "TEXT", title: "TEXT" },
+  formats: {},
   references: [],
   count: 1,
   inDb: true,

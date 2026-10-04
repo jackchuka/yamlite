@@ -21,6 +21,14 @@ test("field kinds follow the value and the column type", () => {
   expect(fieldKind(2, undefined, false)).toBe("number");
 });
 
+test("a markdown column gets the markdown editor whatever its length", () => {
+  expect(fieldKind("hi", "TEXT", false, "markdown")).toBe("markdown");
+  expect(fieldKind("# a\n\nb", "TEXT", false, "markdown")).toBe("markdown");
+  expect(fieldKind(null, "TEXT", false, "markdown")).toBe("unset");
+  // a value the file holds as something other than text keeps its own widget
+  expect(fieldKind(3, "TEXT", false, "markdown")).toBe("number");
+});
+
 test("empty values for unset fields", () => {
   expect(emptyValueFor("BOOLEAN")).toBe(false);
   expect(emptyValueFor("INTEGER")).toBe(0);

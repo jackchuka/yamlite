@@ -2,19 +2,20 @@ import { json } from "@codemirror/lang-json";
 import { useQuery } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { ArrowUpRight, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { emptyValueFor, fieldKind } from "@/lib/form";
-import type { ColumnType, Reference } from "@/lib/types";
+import type { ColumnFormat, ColumnType, Reference } from "@/lib/types";
 import { RefLink } from "./RefLink";
 
 export interface FieldProps {
   path: Array<string | number>;
   value: unknown;
   type?: ColumnType;
+  format?: ColumnFormat;
   reference?: Reference;
   onChange: (next: unknown) => void;
   onRemove?: () => void;
@@ -24,6 +25,9 @@ export interface FieldProps {
 
 const label = (path: Array<string | number>) => path.join(".");
 const isDark = () => document.documentElement.dataset.theme === "dark";
+
+// the markdown parsers are large; load them only when a markdown field shows up
+const MarkdownField = lazy(() => import("./MarkdownField"));
 
 function ChipsInput({
   path,
@@ -171,6 +175,7 @@ function MapField(props: FieldProps) {
             path={[...path, k]}
             value={v}
             type={undefined}
+            format={undefined}
             reference={undefined}
             onChange={(next) => onChange({ ...(value as object), [k]: next })}
           />
@@ -216,13 +221,13 @@ const DECIMAL = /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 // the widget is chosen once per mount so typing never swaps it; the parent remounts on reload
 export function FormField(props: FieldProps) {
-  const { path, value, type, reference, onChange } = props;
-  const [kind, setKind] = useState(() => fieldKind(value, type, reference !== undefined));
+  const { path, value, type, format, reference, onChange } = props;
+  const [kind, setKind] = useState(() => fieldKind(value, type, reference !== undefined, format));
   const [numText, setNumText] = useState(value == null ? "" : String(value));
   const text = value == null ? "" : String(value);
   const change = (next: unknown, chosen?: typeof kind) => {
     if (kind === "unset") {
-      setKind(chosen ?? fieldKind(next, type, false));
+      setKind(chosen ?? fieldKind(next, type, false, format));
       setNumText(next == null ? "" : String(next));
     }
     onChange(next);
@@ -257,6 +262,12 @@ export function FormField(props: FieldProps) {
       return <Input aria-label={label(path)} value={text} onChange={(e) => change(e.target.value)} />;
     case "textarea":
       return <Textarea aria-label={label(path)} rows={4} value={text} onChange={(e) => change(e.target.value)} />;
+    case "markdown":
+      return (
+        <Suspense fallback={<Textarea aria-label={label(path)} rows={4} value={text} readOnly />}>
+          <MarkdownField {...props} />
+        </Suspense>
+      );
     case "ref":
       return <RefField {...props} />;
     case "chips":

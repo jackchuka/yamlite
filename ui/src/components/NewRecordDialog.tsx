@@ -61,6 +61,7 @@ export function NewRecordDialog({
                 path={[c]}
                 value={values[c] ?? null}
                 type={type}
+                format={Object.hasOwn(table.formats, c) ? table.formats[c] : undefined}
                 reference={table.references.find((r) => r.column === c)}
                 onChange={(next) => setValues({ ...values, [c]: next })}
               />

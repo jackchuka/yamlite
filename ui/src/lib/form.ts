@@ -1,5 +1,5 @@
 import { isScalar } from "./cell";
-import type { ColumnType, Row } from "./types";
+import type { ColumnFormat, ColumnType, Row } from "./types";
 
 export type FieldKind =
   | "switch"
@@ -7,6 +7,7 @@ export type FieldKind =
   | "bigint"
   | "text"
   | "textarea"
+  | "markdown"
   | "ref"
   | "map"
   | "chips"
@@ -23,13 +24,19 @@ function representable(v: unknown): boolean {
   return isMap(v) && Object.values(v).every(representable);
 }
 
-export function fieldKind(value: unknown, type: ColumnType | undefined, isRef: boolean): FieldKind {
+export function fieldKind(
+  value: unknown,
+  type: ColumnType | undefined,
+  isRef: boolean,
+  format?: ColumnFormat,
+): FieldKind {
   if (isRef) return "ref";
   if (value === null || value === undefined) return "unset";
   if (typeof value === "boolean") return "switch";
   if (typeof value === "number") return "number";
   if (typeof value === "string") {
     if (type === "INTEGER" && /^-?\d+$/.test(value)) return "bigint";
+    if (format === "markdown") return "markdown";
     return value.includes("\n") || value.length > 80 ? "textarea" : "text";
   }
   if (isChips(value)) return "chips";
