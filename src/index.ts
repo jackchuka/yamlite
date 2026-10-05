@@ -9,6 +9,7 @@ import type { PageSpec, TableSpec } from "./types.ts";
 import { checkValues } from "./values.ts";
 import { startWatch, type Watcher, type WatchHandlers, type WatchOptions } from "./watch.ts";
 
+export { check, type CheckResult, type CheckTable } from "./check.ts";
 export type { OpenOptions, TableInput } from "./config.ts";
 export { exportSite, type ExportOptions, type ExportResult } from "./export.ts";
 export { generateConfig, init, type InitOptions } from "./init.ts";
