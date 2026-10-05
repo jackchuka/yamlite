@@ -115,6 +115,12 @@ npx @jackchuka/yamlite status ./notes
    sqlite3 notes/.yamlite/db.sqlite "select team, count(*) from people group by team"
    ```
 
+   Or use `yamlite query` to run SQL directly without needing `sqlite3`:
+
+   ```bash
+   yamlite query "select team, count(*) from people group by team" notes
+   ```
+
    Writes go the other way too — only the changed field is rewritten, and comments stay:
 
    ```console
@@ -142,15 +148,16 @@ npx @jackchuka/yamlite status ./notes
 
 ## Commands
 
-| Command                 | Options                                                          | Description                                                         |
-| ----------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `yamlite init [root]`   | `--db`, `--force`, `--print`                                     | Create `yamlite.yaml` from your files and database                  |
-| `yamlite check [root]`  | `--table <name>`, `--json`                                       | Check the YAML files against `yamlite.yaml`; exits 1 on any problem |
-| `yamlite status [root]` | `--db`, `--table <name>`, `--json`                               | Show what `sync` would change, without writing                      |
-| `yamlite sync [root]`   | `--db`, `--table <name>`, `--force`, `--force-convert`, `--json` | Sync once; exits 1 if any table fails                               |
-| `yamlite watch [root]`  | `--db`, `--quiet`                                                | Sync on every file save, database commit or config change           |
-| `yamlite serve [root]`  | `--db`, `--port` (4610), `--host` (127.0.0.1), `--open`          | Open the web UI and sync continuously                               |
-| `yamlite export [root]` | `--out` (.yamlite-export), `--table`, `--force`                  | Write the web UI as a read-only static site                         |
+| Command                      | Options                                                          | Description                                                         |
+| ---------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `yamlite init [root]`        | `--db`, `--force`, `--print`                                     | Create `yamlite.yaml` from your files and database                  |
+| `yamlite check [root]`       | `--table <name>`, `--json`                                       | Check the YAML files against `yamlite.yaml`; exits 1 on any problem |
+| `yamlite query <sql> [root]` | `--db`, `--format` (table, json, csv), `--limit` (1000)          | Run one read-only SQL statement and print the rows                  |
+| `yamlite status [root]`      | `--db`, `--table <name>`, `--json`                               | Show what `sync` would change, without writing                      |
+| `yamlite sync [root]`        | `--db`, `--table <name>`, `--force`, `--force-convert`, `--json` | Sync once; exits 1 if any table fails                               |
+| `yamlite watch [root]`       | `--db`, `--quiet`                                                | Sync on every file save, database commit or config change           |
+| `yamlite serve [root]`       | `--db`, `--port` (4610), `--host` (127.0.0.1), `--open`          | Open the web UI and sync continuously                               |
+| `yamlite export [root]`      | `--out` (.yamlite-export), `--table`, `--force`                  | Write the web UI as a read-only static site                         |
 
 - `root` defaults to the current directory.
 - `--db <path>` overrides the default `<root>/.yamlite/db.sqlite`.
@@ -261,6 +268,20 @@ jobs:
 # .git/hooks/pre-commit (chmod +x)
 exec npx @jackchuka/yamlite check .
 ```
+
+## Query
+
+```bash
+yamlite query "select status, count(*) from tasks group by status" notes
+yamlite query "select * from people" notes --format csv > people.csv
+```
+
+`query` runs one read-only statement (`SELECT`, `WITH … SELECT`, `EXPLAIN`, `VALUES`) without needing `sqlite3`. Like `check`, it syncs your YAML into a temporary database first, so it always reads what the files say, writes nothing under the root, and runs next to `watch` or `serve`. A table that fails to sync is left out of that database, so querying it errors with `no such table`; the failure and any sync warnings go to stderr.
+
+- `--db <path>` reads that database as it is instead, without syncing — for example `.yamlite/db.sqlite` to see what an app wrote but has not synced yet.
+- `--format` is `table` (default), `json` (one object per row; a repeated column name gets `_2`, `_3`, …) or `csv` (LF line endings).
+- `--limit` (default 1000) caps the rows; `0` removes the cap. The row count and any truncation go to stderr, so stdout stays clean for pipes.
+- To write, use `sqlite3`, your app or the web UI: the database is opened read-only.
 
 ## Export
 
@@ -454,6 +475,25 @@ tables:
 - Values are compared as text (`1` matches `"1"`), numbers also as numbers (`2.0` matches `2`), and `true` / `false` as the `1` / `0` a `BOOLEAN` column stores. A missing field is not checked.
 - The web UI edits the column with a select. A value outside the list stays in it, marked, until you change it.
 - A `markdown` column cannot have values.
+
+### Required
+
+List the columns every record must have a value in, and yamlite checks them on every sync. A missing key or `null` is a warning, not a failed sync; `""` and `[]` count as values.
+
+```yaml
+tables:
+  tasks:
+    required: [title, status]
+    expand:
+      milestones:
+        required: [state]
+```
+
+```
+! title missing (buy-milk, call-mom)
+```
+
+The web UI marks required fields with `*` and highlights the empty ones. `yamlite check` fails on any of these warnings.
 
 ### References
 
