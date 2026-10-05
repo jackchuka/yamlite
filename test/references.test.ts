@@ -58,6 +58,29 @@ describe("references", () => {
     await y.close();
   });
 
+  test("a table that references itself (one file per row)", async () => {
+    const root = setup("tables:\n  nodes:\n    references:\n      parent: nodes\n", {
+      "nodes/top.yaml": "title: t\n",
+      "nodes/sub.yaml": "parent: top\n",
+      "nodes/orphan.yaml": "parent: gone\n",
+    });
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "nodes")).toEqual(['parent "gone" not found in nodes.id (orphan)']);
+    await y.close();
+  });
+
+  test("a table that references itself (list file), with list values", async () => {
+    const root = setup(
+      "tables:\n  items:\n    path: items.yaml\n    references:\n      parent: items\n      related: items\n",
+      {
+        "items.yaml": "- id: a\n- id: b\n  parent: a\n  related: [a, zed]\n- id: c\n  parent: b\n  related: [b, c]\n",
+      },
+    );
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "items")).toEqual(['related "zed" not found in items.id (b)']);
+    await y.close();
+  });
+
   test("rejects malformed declarations", () => {
     const root = setup("tables:\n  tasks:\n    references:\n      owner: a.b.c\n", { "tasks/a.yaml": "x: 1\n" });
     expect(() => resolveConfig({ root })).toThrow(/references.owner must be "table" or "table.column"/);
@@ -92,6 +115,18 @@ describe("references", () => {
     const y = await open({ root });
     expect(warningsOf(await y.sync(), "projects")).toEqual([
       'projects__milestones__tasks: owner "carol" not found in people.id (website/0/1)',
+    ]);
+    await y.close();
+  });
+
+  test("a view that references its own table", async () => {
+    const root = setup(
+      "tables:\n  projects:\n    expand:\n      milestones:\n        references: { blocked_by: projects }\n",
+      { "projects/website.yaml": "milestones:\n  - blocked_by: website\n  - blocked_by: app\n" },
+    );
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "projects")).toEqual([
+      'projects__milestones: blocked_by "app" not found in projects.id (website/1)',
     ]);
     await y.close();
   });

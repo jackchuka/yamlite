@@ -16,7 +16,9 @@ interface Checked {
 
 function check(store: Store, c: Checked, tables: readonly TableSpec[]): string[] {
   const warnings: string[] = [];
-  const label = c.label.map((col) => `CAST(${q(c.name)}.${q(col)} AS TEXT)`).join(" || '/' || ");
+  // the checked table is aliased "src" and the referenced one "dst", so a table that references itself
+  // still compares a row's value against the other rows rather than against itself
+  const label = c.label.map((col) => `CAST(src.${q(col)} AS TEXT)`).join(" || '/' || ");
   for (const ref of c.references) {
     const target = tables.find((t) => t.name === ref.table);
     if (!target) {
@@ -29,15 +31,15 @@ function check(store: Store, c: Checked, tables: readonly TableSpec[]): string[]
       warnings.push(`${c.prefix}references.${ref.column}: column "${targetColumn}" not found in ${target.name}`);
       continue;
     }
-    const source = `${q(c.name)}.${q(ref.column)}`;
+    const source = `src.${q(ref.column)}`;
     const json = c.columns.get(ref.column) === "JSON";
     const value = json ? "item.value" : source;
     const from = json
-      ? `${q(c.name)}, json_each(${source}) AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
-      : `${q(c.name)} WHERE ${source} IS NOT NULL`;
+      ? `${q(c.name)} AS src, json_each(${source}) AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
+      : `${q(c.name)} AS src WHERE ${source} IS NOT NULL`;
     const rows = store.query(
       `SELECT ${label} AS k, CAST(${value} AS TEXT) AS v FROM ${from}
-       AND NOT EXISTS (SELECT 1 FROM ${q(target.name)} WHERE CAST(${q(target.name)}.${q(targetColumn)} AS TEXT) = CAST(${value} AS TEXT))
+       AND NOT EXISTS (SELECT 1 FROM ${q(target.name)} AS dst WHERE CAST(dst.${q(targetColumn)} AS TEXT) = CAST(${value} AS TEXT))
        ORDER BY v, k`,
     );
     const byValue = new Map<string, string[]>();
