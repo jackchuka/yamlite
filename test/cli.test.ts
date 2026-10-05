@@ -125,3 +125,52 @@ test("check does not take --db", () => {
   expect(r.status).not.toBe(0);
   expect(r.stderr).toContain("unknown option '--db'");
 });
+
+test("query prints a table, JSON or CSV, and reports rows and truncation on stderr", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "tasks/b.yaml"), "title: B\n");
+  const table = run("query", "select id, title from tasks order by id", root);
+  expect(table.status).toBe(0);
+  expect(table.stdout).toBe("id  title\n--  -----\na   A\nb   B\n");
+  expect(table.stderr).toContain("2 rows");
+  const json = run("query", "select id from tasks order by id", root, "--format", "json");
+  expect(JSON.parse(json.stdout)).toEqual([{ id: "a" }, { id: "b" }]);
+  const csv = run("query", "select id from tasks order by id", root, "--format", "csv", "--limit", "1");
+  expect(csv.stdout).toBe("id\na\n");
+  expect(csv.stderr).toContain("… truncated at 1 rows (use --limit)");
+  expect(existsSync(join(root, ".yamlite"))).toBe(false);
+});
+
+test("query exits 1 with a specific message on a write, an SQL error or a bad option", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables: {}\n");
+  const cases: [string[], string][] = [
+    [["delete from x", root], "query only reads"],
+    [["select nope", root], "no such column"],
+    [["select 1", root, "--format", "xml"], "unknown format xml"],
+    [["select 1", root, "--format", "constructor"], "unknown format constructor"],
+    [["select 1", root, "--limit", "abc"], "--limit must be a whole number"],
+  ];
+  for (const [args, message] of cases) {
+    const r = run("query", ...args);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toBe("");
+    expect(r.stderr).toContain(message);
+  }
+});
+
+test("query --limit 0 does not truncate, and one row is singular", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "tasks/b.yaml"), "title: B\n");
+  const all = run("query", "select id from tasks", root, "--limit", "0");
+  expect(all.stdout).toBe("id\n--\na\nb\n");
+  expect(all.stderr).toContain("2 rows");
+  expect(all.stderr).not.toContain("truncated");
+  const one = run("query", "select id from tasks where id = 'a'", root);
+  expect(one.stderr).toContain("1 row");
+  expect(one.stderr).not.toContain("1 rows");
+});
