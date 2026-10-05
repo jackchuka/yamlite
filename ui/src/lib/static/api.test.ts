@@ -62,6 +62,7 @@ const snapshot: Snapshot = {
         references: [],
         count: 5,
         inDb: true,
+        group: null,
       },
       {
         name: "nums",
@@ -73,6 +74,7 @@ const snapshot: Snapshot = {
         references: [],
         count: 2,
         inDb: true,
+        group: null,
       },
     ],
     views: [

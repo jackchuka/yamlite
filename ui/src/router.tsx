@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createHashHistory, createRoute, createRouter, lazyRouteComponent, Navigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { GroupButton } from "./components/GroupButton";
 import { NewRecordDialog } from "./components/NewRecordDialog";
 import { Placeholder } from "./components/Placeholder";
 import { RecordDrawer } from "./components/RecordDrawer";
@@ -64,7 +65,16 @@ function TablePage() {
   return (
     <TableView
       key={table}
-      headerActions={isReadOnly() ? undefined : (t) => <NewRecordButton table={t} />}
+      headerActions={
+        isReadOnly()
+          ? undefined
+          : (t) => (
+              <>
+                <GroupButton table={t} />
+                <NewRecordButton table={t} />
+              </>
+            )
+      }
       drawer={(t, key) => (
         <RecordDrawer
           key={`${t.name}:${key}`}

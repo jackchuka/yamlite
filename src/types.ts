@@ -77,6 +77,8 @@ export interface TableSpec {
   // files that other tables (and yamlite.yaml) own inside this files table's folder
   exclude: Claim[];
   expand: ExpandSpec[];
+  // the sidebar section the table is listed under
+  group: string | null;
 }
 
 export type PageAccess = "read" | "write";

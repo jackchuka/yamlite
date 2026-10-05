@@ -107,8 +107,15 @@ export const httpApi = {
   rename: (table: string, key: string, to: string) =>
     request<{ key: string }>("POST", `${rowPath(table, key)}/rename`, { to }),
   remove: (table: string, key: string) => request<{ ok: true }>("DELETE", rowPath(table, key)),
-  createTable: (body: { name: string; mode?: "files" | "list"; key?: string; columns?: Record<string, string> }) =>
-    request<{ name: string }>("POST", "/api/tables", body),
+  createTable: (body: {
+    name: string;
+    mode?: "files" | "list";
+    key?: string;
+    columns?: Record<string, string>;
+    group?: string;
+  }) => request<{ name: string }>("POST", "/api/tables", body),
+  setGroup: (table: string, group: string | null) =>
+    request<{ name: string; group: string | null }>("PATCH", `/api/tables/${enc(table)}`, { group }),
   sql: (sql: string) => request<SqlResult>("POST", "/api/sql", { sql }),
   pageHtml: (name: string) => request<{ html: string }>("GET", `/api/pages/${enc(name)}/html`).then((r) => r.html),
   pageSql: (name: string, sql: string) => request<SqlResult>("POST", "/api/sql", { sql, page: name }),
@@ -142,6 +149,7 @@ export const api: Api = {
   rename: (table, key, to) => backend.rename(table, key, to),
   remove: (table, key) => backend.remove(table, key),
   createTable: (body) => backend.createTable(body),
+  setGroup: (table, group) => backend.setGroup(table, group),
   sql: (sql) => backend.sql(sql),
   pageHtml: (name) => backend.pageHtml(name),
   pageSql: (name, sql) => backend.pageSql(name, sql),

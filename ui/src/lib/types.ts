@@ -19,6 +19,7 @@ export interface TableMeta {
   references: Reference[];
   count: number;
   inDb: boolean;
+  group: string | null;
 }
 
 export interface ViewMeta {

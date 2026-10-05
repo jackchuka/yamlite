@@ -37,6 +37,7 @@ test("discovers tables by convention", () => {
     persisted: true,
     exclude: [],
     expand: [],
+    group: null,
   });
   expect(cfg.db).toBe(join(root, ".yamlite", "db.sqlite"));
   expect(cfg.stateDir).toBe(join(root, ".yamlite"));
@@ -459,4 +460,18 @@ test("a folder holding only non-record files is not a table, an empty folder sti
     ["empty", "yaml"],
     ["tasks", "yaml"],
   ]);
+});
+
+test("a table's group is read from yamlite.yaml", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  people:\n    group: CRM\n  tasks: {}\n");
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(t.people?.group).toBe("CRM");
+  expect(t.tasks?.group).toBeNull();
+});
+
+test.each([['group: ""'], ['group: "  "'], ["group: 1"], ["group: [a]"]])("rejects %s", (entry) => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), `tables:\n  t:\n    ${entry}\n`);
+  expect(() => resolveConfig({ root })).toThrow('table "t": group must be a non-empty string');
 });

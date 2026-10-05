@@ -347,6 +347,7 @@ join projects__milestones__tasks t on t.projects_id = m.projects_id and t.milest
 tables:
   people:
     key: slug # default: id
+    group: CRM # the web UI's sidebar section
     columns: { age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
     formats: { bio: markdown } # how the web UI edits a TEXT column
     expand: { tags: {} } # lists as views — see Expanded views
@@ -390,6 +391,10 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 - A value that can't be converted is cleared and refilled from YAML, which stays the source of truth. If that value was changed in SQL and never synced, the rebuild stops instead; fix the row or pass `--force-convert` to clear it.
 - Tables with triggers, CHECK, UNIQUE or foreign-key constraints, COLLATE, AUTOINCREMENT, generated columns, `STRICT` or `WITHOUT ROWID`, indexes yamlite doesn't manage, or other tables referencing them are never rebuilt; yamlite reports an error and leaves the migration to you.
 - The key column's type is never changed; to change it, recreate the database (delete `.yamlite/`).
+
+### Groups
+
+`group` puts a table under a named section in the web UI's sidebar; it never changes the database. Grouped tables follow the ungrouped ones, and groups are listed in the order their first table appears. A section folds away with a click and stays folded in that browser. The table header's Group button sets or clears a table's group from the UI, writing `group:` into `yamlite.yaml`, and New table takes one too.
 
 ### Formats
 
