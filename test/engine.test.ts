@@ -22,6 +22,7 @@ function setup(mode: Mode = "files") {
     formats: {},
     indexes: [],
     references: [],
+    values: {},
     persisted: false,
     glob: mode === "files" ? "**/*.{yaml,yml}" : null,
     codec: "yaml",

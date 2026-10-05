@@ -34,6 +34,7 @@ test("discovers tables by convention", () => {
     formats: {},
     indexes: [],
     references: [],
+    values: {},
     persisted: true,
     exclude: [],
     expand: [],
@@ -92,6 +93,46 @@ test.each([
   write(join(root, "faqs.yaml"), "[]\n");
   write(join(root, "yamlite.yaml"), `tables:\n  faqs:\n    ${body}\n`);
   expect(() => resolveConfig({ root })).toThrow(error);
+});
+
+test("values list the allowed values of a column, as written, without duplicates", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    values:\n      status: [todo, done, todo]\n      rank: [1, 2]\n      done: [true]\n    expand:\n      steps:\n        values: { state: [open, closed] }\n",
+  );
+  const t = resolveConfig({ root }).tables[0];
+  expect(t?.values).toEqual({ status: ["todo", "done"], rank: [1, 2], done: [true] });
+  expect(t?.expand[0]?.values).toEqual({ state: ["open", "closed"] });
+});
+
+test.each([
+  ["values: [status]", /values must be a map of columns to lists/],
+  ["values: { status: [] }", /values\.status must be a non-empty list of strings, numbers or booleans/],
+  ["values: { status: todo }", /values\.status must be a non-empty list of strings, numbers or booleans/],
+  ["values: { status: [{ a: 1 }] }", /values\.status must be a non-empty list of strings, numbers or booleans/],
+  ["values: { status: [null] }", /values\.status must be a non-empty list of strings, numbers or booleans/],
+  ["formats: { note: markdown }\n    values: { note: [a] }", /values\.note: a markdown column cannot have values/],
+])("rejects bad values: %s", (body, error) => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), `tables:\n  tasks:\n    ${body}\n`);
+  expect(() => resolveConfig({ root })).toThrow(error);
+});
+
+test("a Markdown table's body cannot have values", () => {
+  const root = tmpRoot();
+  write(join(root, "notes/a.md"), "x\n");
+  write(join(root, "yamlite.yaml"), 'tables:\n  notes:\n    files: "notes/*.md"\n    values: { body: [a] }\n');
+  expect(() => resolveConfig({ root })).toThrow(/values\.body: a markdown column cannot have values/);
+});
+
+test("expand entries reject bad values with their path", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    expand:\n      steps:\n        values: { state: [] }\n");
+  expect(() => resolveConfig({ root })).toThrow(/expand\.steps\.values\.state must be a non-empty list/);
 });
 
 test("--db overrides the default database path", () => {
@@ -249,6 +290,7 @@ test("expand declares views over JSON columns, nested", () => {
       columns: { points: "INTEGER" },
       formats: { notes: "markdown" },
       references: [],
+      values: {},
       expand: [
         {
           field: "tasks",
@@ -256,11 +298,12 @@ test("expand declares views over JSON columns, nested", () => {
           columns: {},
           formats: {},
           references: [{ column: "owner", table: "people", target: "slug" }],
+          values: {},
           expand: [],
         },
       ],
     },
-    { field: "tags", name: "projects__tags", columns: {}, formats: {}, references: [], expand: [] },
+    { field: "tags", name: "projects__tags", columns: {}, formats: {}, references: [], values: {}, expand: [] },
   ]);
 });
 

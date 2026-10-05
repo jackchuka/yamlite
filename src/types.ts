@@ -4,6 +4,9 @@ export const COLUMN_TYPES: readonly ColumnType[] = ["INTEGER", "REAL", "TEXT", "
 export type ColumnFormat = "markdown";
 export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown"];
 
+// a value a column may hold, declared under `values` in yamlite.yaml
+export type AllowedValue = string | number | boolean;
+
 export type Mode = "files" | "list";
 export type Rec = Record<string, unknown>;
 export type DbValue = null | number | bigint | string | Uint8Array;
@@ -34,6 +37,8 @@ export interface ExpandSpec {
   columns: Record<string, ColumnType>;
   formats: Record<string, ColumnFormat>;
   references: Reference[];
+  // allowed values per column, as written; checked after every sync, never enforced
+  values: Record<string, AllowedValue[]>;
   expand: ExpandSpec[];
 }
 
@@ -72,6 +77,8 @@ export interface TableSpec {
   formats: Record<string, ColumnFormat>;
   indexes: IndexSpec[];
   references: Reference[];
+  // allowed values per column, as written; checked after every sync, never enforced
+  values: Record<string, AllowedValue[]>;
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)
   persisted: boolean;
   // files that other tables (and yamlite.yaml) own inside this files table's folder
