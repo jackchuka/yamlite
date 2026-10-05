@@ -34,6 +34,7 @@ export interface TableInput {
   indexes?: unknown[];
   references?: Record<string, unknown>;
   values?: unknown;
+  required?: unknown;
   expand?: Record<string, unknown>;
   group?: string;
 }
@@ -184,6 +185,7 @@ interface RawTable {
   indexes?: unknown[];
   references?: Record<string, unknown>;
   values?: unknown;
+  required?: unknown;
   expand?: Record<string, unknown>;
   group?: unknown;
 }
@@ -255,6 +257,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
       toReference(`table "${t.name}": `, column, raw),
     ),
     values: toValues(where, t.values, formats),
+    required: toRequired(where, t.required),
     persisted,
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
@@ -333,6 +336,14 @@ function toValues(where: string, raw: unknown, formats: Record<string, ColumnFor
   return values;
 }
 
+function toRequired(where: string, raw: unknown): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw) || raw.length === 0 || !raw.every((c) => typeof c === "string" && c !== "")) {
+    throw new Error(`${where}required must be a non-empty list of column names`);
+  }
+  return [...new Set(raw as string[])];
+}
+
 // `table` (its key column) or `table.column`
 function toReference(where: string, column: string, raw: unknown): Reference {
   const m = typeof raw === "string" ? REFERENCE.exec(raw.trim()) : null;
@@ -342,7 +353,7 @@ function toReference(where: string, column: string, raw: unknown): Reference {
 
 export const referenceToRaw = (r: Reference): string => (r.target ? `${r.table}.${r.target}` : r.table);
 
-const EXPAND_KEYS = ["columns", "formats", "references", "values", "expand"];
+const EXPAND_KEYS = ["columns", "formats", "references", "values", "required", "expand"];
 
 // `expand: { <field>: { columns?, references?, expand? } | null }`: one view per field, named <parent>__<field>
 function toExpand(table: string, parent: string, raw: unknown, path: string): ExpandSpec[] {
@@ -361,6 +372,7 @@ function toExpand(table: string, parent: string, raw: unknown, path: string): Ex
       formats?: unknown;
       references?: Record<string, unknown>;
       values?: unknown;
+      required?: unknown;
       expand?: unknown;
     };
     const unknown = Object.keys(v).find((k) => !EXPAND_KEYS.includes(k));
@@ -377,6 +389,7 @@ function toExpand(table: string, parent: string, raw: unknown, path: string): Ex
         toReference(`table "${table}": ${where}.`, column, r),
       ),
       values: toValues(`table "${table}": ${where}.`, v.values, formats),
+      required: toRequired(`table "${table}": ${where}.`, v.required),
       expand: toExpand(table, name, v.expand, `${where}.expand`),
     };
   });
@@ -393,6 +406,7 @@ export function expandToRaw(list: ExpandSpec[]): Record<string, unknown> {
           ? { references: Object.fromEntries(e.references.map((r) => [r.column, referenceToRaw(r)])) }
           : {}),
         ...(Object.keys(e.values).length > 0 ? { values: { ...e.values } } : {}),
+        ...(e.required.length > 0 ? { required: [...e.required] } : {}),
         ...(e.expand.length > 0 ? { expand: expandToRaw(e.expand) } : {}),
       },
     ]),
@@ -535,6 +549,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         indexes: o.indexes,
         references: o.references,
         values: o.values,
+        required: o.required,
         expand: o.expand,
         group: o.group as string | undefined,
       });

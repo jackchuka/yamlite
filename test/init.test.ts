@@ -174,6 +174,18 @@ test("init keeps declared values, in tables and in expand", () => {
   expect(out).toContain("        values:\n          state:\n            - open\n");
 });
 
+test("init keeps declared required, in tables and in expand", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "title: A\nsteps:\n  - state: open\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    required: [title]\n    expand:\n      steps:\n        required: [state]\n",
+  );
+  const out = generateConfig({ root, force: true });
+  expect(out).toContain("    required:\n      - title\n");
+  expect(out).toContain("        required:\n          - state\n");
+});
+
 test("writes files: and body: for declared Markdown tables, adds none of its own, and no format for the body", () => {
   const root = tmpRoot();
   write(join(root, "blog/a.md"), "---\ntitle: A\n---\ntext\n");

@@ -165,6 +165,7 @@ describe("dropping columns", () => {
       indexes: [],
       references: [],
       values: {},
+      required: [],
       persisted: true,
       exclude: [],
       expand: [],

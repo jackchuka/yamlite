@@ -159,6 +159,7 @@ export function generateConfig(opts: InitOptions): string {
         entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
       }
       if (Object.keys(spec.values).length > 0) entry.values = { ...spec.values };
+      if (spec.required.length > 0) entry.required = [...spec.required];
       if (spec.expand.length > 0) entry.expand = expandToRaw(spec.expand);
       const node = doc.createNode(entry);
       const found = dbIndexes(db, spec.name);
