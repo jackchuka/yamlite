@@ -56,7 +56,12 @@ export function NewRecordDialog({
           .filter(([c]) => c !== table.key)
           .map(([c, type]) => (
             <div key={c}>
-              <div className="mb-1 text-[11.5px] font-semibold text-muted-foreground">{c}</div>
+              <div
+                className={`mb-1 text-[11.5px] font-semibold ${table.required.includes(c) && values[c] == null ? "text-warn" : "text-muted-foreground"}`}
+              >
+                {c}
+                {table.required.includes(c) && <span aria-label="required"> *</span>}
+              </div>
               <FormField
                 path={[c]}
                 value={values[c] ?? null}

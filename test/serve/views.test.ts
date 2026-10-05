@@ -14,6 +14,7 @@ const config = `tables:
         columns: { title: TEXT }
         references: { owner: people }
         values: { title: [Design, Launch, Draft] }
+        required: [title]
         expand:
           tasks: {}
   people:
@@ -48,6 +49,7 @@ test("meta lists the views under their table", async () => {
       declared: { title: "TEXT" },
       references: [{ column: "owner", table: "people" }],
       values: { title: ["Design", "Launch", "Draft"] },
+      required: ["title"],
       count: 3,
       inDb: true,
     },
@@ -61,6 +63,7 @@ test("meta lists the views under their table", async () => {
       declared: {},
       references: [],
       values: {},
+      required: [],
       count: 1,
       inDb: true,
     },

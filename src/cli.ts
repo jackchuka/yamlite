@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { checkReport, displayPath, painter, reloadLine, report, watchEvents, watchHeader } from "./format.ts";
-import { check, exportSite, generateConfig, init, open } from "./index.ts";
+import { check, exportSite, formatCsv, formatJson, formatTable, generateConfig, init, open, query } from "./index.ts";
 import { serve } from "./serve/index.ts";
 import { isLoopback } from "./serve/security.ts";
 
@@ -12,6 +12,7 @@ const { version } = createRequire(import.meta.url)("../package.json") as { versi
 
 const collect = (value: string, previous: string[]) => [...previous, value];
 const out = painter(process.stdout);
+const err = painter(process.stderr);
 
 function withRoot(cmd: Command): Command {
   return cmd
@@ -49,6 +50,28 @@ program
     if (o.json) console.log(JSON.stringify(result, null, 2));
     else console.log(checkReport(result, { root: resolve(root), paint: out }));
     if (!result.ok) process.exitCode = 1;
+  });
+
+const FORMATS = { table: formatTable, json: formatJson, csv: formatCsv } as const;
+
+program
+  .command("query")
+  .description("run one read-only SQL statement against the YAML files (or --db) and print the rows")
+  .argument("<sql>", "the statement")
+  .argument("[root]", "data directory", ".")
+  .option("--db <path>", "read this database as it is instead of the YAML files")
+  .option("--format <format>", "table, json or csv", "table")
+  .option("--limit <n>", "at most this many rows; 0 for no limit", "1000")
+  .action(async (sql: string, root: string, o: { db?: string; format: string; limit: string }) => {
+    if (!Object.hasOwn(FORMATS, o.format)) throw new Error(`unknown format ${o.format}: use table, json or csv`);
+    const format = FORMATS[o.format as keyof typeof FORMATS];
+    const limit = Number(o.limit);
+    if (!Number.isInteger(limit) || limit < 0) throw new Error(`--limit must be a whole number, not ${o.limit}`);
+    const r = await query({ root, db: o.db, sql, limit });
+    for (const w of r.warnings) console.error(`${err("yellow", "!")} ${w}`);
+    process.stdout.write(o.format === "csv" ? format(r) : `${format(r)}\n`);
+    if (o.format === "table") console.error(err("dim", `${r.rows.length} ${r.rows.length === 1 ? "row" : "rows"}`));
+    if (r.truncated) console.error(err("yellow", `… truncated at ${limit} rows (use --limit)`));
   });
 
 withRoot(program.command("status").description("show what sync would change, without writing"))

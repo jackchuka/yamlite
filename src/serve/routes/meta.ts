@@ -25,6 +25,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         columns,
         formats: t.formats,
         values: t.values,
+        required: t.required,
         references: t.references,
         count,
         inDb,
@@ -58,6 +59,7 @@ export const metaRoutes: Routes = (router, ctx) => {
           declared: spec.columns,
           references: spec.references,
           values: spec.values,
+          required: spec.required,
           count,
           inDb: record !== undefined,
         };

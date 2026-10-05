@@ -13,6 +13,7 @@ const table = (name: string, group: string | null): TableMeta => ({
   columns: {},
   formats: {},
   values: {},
+  required: [],
   references: [],
   count: 0,
   inDb: true,

@@ -39,6 +39,8 @@ export interface ExpandSpec {
   references: Reference[];
   // allowed values per column, as written; checked after every sync, never enforced
   values: Record<string, AllowedValue[]>;
+  // columns that must hold a value (not NULL); checked after every sync, never enforced
+  required: string[];
   expand: ExpandSpec[];
 }
 
@@ -79,6 +81,8 @@ export interface TableSpec {
   references: Reference[];
   // allowed values per column, as written; checked after every sync, never enforced
   values: Record<string, AllowedValue[]>;
+  // columns that must hold a value (not NULL); checked after every sync, never enforced
+  required: string[];
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)
   persisted: boolean;
   // files that other tables (and yamlite.yaml) own inside this files table's folder

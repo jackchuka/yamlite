@@ -35,6 +35,7 @@ test("discovers tables by convention", () => {
     indexes: [],
     references: [],
     values: {},
+    required: [],
     persisted: true,
     exclude: [],
     expand: [],
@@ -133,6 +134,34 @@ test("expand entries reject bad values with their path", () => {
   write(join(root, "tasks.yaml"), "[]\n");
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    expand:\n      steps:\n        values: { state: [] }\n");
   expect(() => resolveConfig({ root })).toThrow(/expand\.steps\.values\.state must be a non-empty list/);
+});
+
+test("required lists columns that must hold a value, without duplicates", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    required: [title, status, title]\n    expand:\n      steps:\n        required: [state]\n",
+  );
+  const t = resolveConfig({ root }).tables[0];
+  expect(t?.required).toEqual(["title", "status"]);
+  expect(t?.expand[0]?.required).toEqual(["state"]);
+});
+
+test.each([
+  ["required: title", /table "tasks": required must be a non-empty list of column names/],
+  ["required: []", /table "tasks": required must be a non-empty list of column names/],
+  ["required: [1]", /table "tasks": required must be a non-empty list of column names/],
+  ["required: ['']", /table "tasks": required must be a non-empty list of column names/],
+  [
+    "expand:\n      steps:\n        required: {}",
+    /table "tasks": expand\.steps\.required must be a non-empty list of column names/,
+  ],
+])("rejects bad required: %s", (body, error) => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), `tables:\n  tasks:\n    ${body}\n`);
+  expect(() => resolveConfig({ root })).toThrow(error);
 });
 
 test("--db overrides the default database path", () => {
@@ -291,6 +320,7 @@ test("expand declares views over JSON columns, nested", () => {
       formats: { notes: "markdown" },
       references: [],
       values: {},
+      required: [],
       expand: [
         {
           field: "tasks",
@@ -299,11 +329,21 @@ test("expand declares views over JSON columns, nested", () => {
           formats: {},
           references: [{ column: "owner", table: "people", target: "slug" }],
           values: {},
+          required: [],
           expand: [],
         },
       ],
     },
-    { field: "tags", name: "projects__tags", columns: {}, formats: {}, references: [], values: {}, expand: [] },
+    {
+      field: "tags",
+      name: "projects__tags",
+      columns: {},
+      formats: {},
+      references: [],
+      values: {},
+      required: [],
+      expand: [],
+    },
   ]);
 });
 

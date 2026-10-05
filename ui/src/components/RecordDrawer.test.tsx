@@ -26,6 +26,7 @@ const table: TableMeta = {
   columns: { id: "TEXT", title: "TEXT", prio: "INTEGER" },
   formats: {},
   values: {},
+  required: [],
   references: [],
   count: 1,
   inDb: true,
@@ -242,4 +243,27 @@ test("the click that ends a drag outside the panel does not close it", async () 
   await new Promise((r) => setTimeout(r, 0));
   fireEvent.click(screen.getByText("outside"));
   expect(navigate).toHaveBeenCalledTimes(1);
+});
+
+test("a required column is starred, and warns while it is empty", async () => {
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: null, prio: 1 }, file: "f", yaml: "" });
+  const view = render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={{ ...table, required: ["title"] }} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  const name = (await screen.findByText("title")).closest("span") as HTMLElement;
+  expect(name.querySelector('[aria-label="required"]')?.textContent).toBe(" *");
+  expect(name.className).toContain("text-warn");
+  expect(screen.getByText("prio").closest("span")?.querySelector('[aria-label="required"]')).toBeNull();
+  view.unmount();
+
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "x", prio: 1 }, file: "f", yaml: "" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={{ ...table, required: ["title"] }} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  const filled = (await screen.findByText("title")).closest("span") as HTMLElement;
+  expect(filled.className).not.toContain("text-warn");
 });

@@ -87,3 +87,12 @@ test("a root without yamlite.yaml is an error", async () => {
   const root = tmpRoot();
   await expect(check({ root })).rejects.toThrow(/no yamlite.yaml/);
 });
+
+test("a missing required value is a problem", async () => {
+  const root = setup("tables:\n  tasks:\n    columns: { status: TEXT, title: TEXT }\n    required: [title]\n", {
+    "tasks/a.yaml": "status: todo\n",
+  });
+  const r = await check({ root });
+  expect(r.ok).toBe(false);
+  expect(r.tables[0]?.warnings).toEqual(["title missing (a)"]);
+});
