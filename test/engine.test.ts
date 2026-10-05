@@ -28,6 +28,7 @@ function setup(mode: Mode = "files") {
     body: null,
     exclude: [],
     expand: [],
+    group: null,
   };
   return {
     db,

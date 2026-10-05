@@ -93,3 +93,45 @@ test("mode is files or list", async () => {
   });
   expect(config(t).tables.y).toEqual({ key: "id" });
 });
+
+const groupOf = async (t: Served, name: string) =>
+  (await t.api("/api/meta")).body.tables.find((x: { name: string }) => x.name === name)?.group;
+
+test("a table's group is set, changed and cleared through yamlite.yaml", async () => {
+  t = await startServe(
+    { "tasks/a.yaml": "title: A\n" },
+    "tables:\n  tasks:\n    key: id # work items\n    columns: { title: TEXT }\n",
+  );
+  expect(await groupOf(t, "tasks")).toBeNull();
+  expect(await t.api("/api/tables/tasks", { method: "PATCH", body: { group: "  Work " } })).toEqual({
+    status: 200,
+    body: { name: "tasks", group: "Work" },
+  });
+  expect(read(join(t.root, "yamlite.yaml"))).toBe(
+    "tables:\n  tasks:\n    key: id # work items\n    columns: { title: TEXT }\n    group: Work\n",
+  );
+  await waitForAsync(async () => (await groupOf(t!, "tasks")) === "Work");
+  await t.api("/api/tables/tasks", { method: "PATCH", body: { group: "" } });
+  expect(config(t).tables.tasks).toEqual({ key: "id", columns: { title: "TEXT" } });
+  await waitForAsync(async () => (await groupOf(t!, "tasks")) === null);
+});
+
+test("a group can be given when a table is made", async () => {
+  t = await startServe();
+  await t.api("/api/tables", { method: "POST", body: { name: "books", group: "Library" } });
+  expect(config(t).tables.books).toEqual({ key: "id", group: "Library" });
+  await waitForAsync(async () => (await groupOf(t!, "books")) === "Library");
+});
+
+test("a group change is refused for unknown tables, views and bad values", async () => {
+  t = await startServe({}, "tables:\n  projects:\n    expand:\n      milestones: {}\n");
+  const patch = (table: string, body: unknown) => t!.api(`/api/tables/${table}`, { method: "PATCH", body });
+  expect((await patch("nope", { group: "X" })).status).toBe(404);
+  expect((await patch("projects__milestones", { group: "X" })).status).toBe(405);
+  expect(await patch("projects", { group: 1 })).toMatchObject({ status: 400, body: { field: "group" } });
+  expect(await patch("projects", {})).toMatchObject({ status: 400, body: { field: "group" } });
+  expect(await t.api("/api/tables", { method: "POST", body: { name: "books", group: [] } })).toMatchObject({
+    status: 400,
+    body: { field: "group" },
+  });
+});

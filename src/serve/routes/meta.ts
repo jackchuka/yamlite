@@ -27,6 +27,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         references: t.references,
         count,
         inDb,
+        group: t.group,
       };
     }),
     pages: ctx.y.pages.map((p) => ({

@@ -33,6 +33,7 @@ export interface TableInput {
   indexes?: unknown[];
   references?: Record<string, unknown>;
   expand?: Record<string, unknown>;
+  group?: string;
 }
 
 // a table input whose files are found: path is absolute, glob is null for a list table
@@ -181,6 +182,7 @@ interface RawTable {
   indexes?: unknown[];
   references?: Record<string, unknown>;
   expand?: Record<string, unknown>;
+  group?: unknown;
 }
 
 export function configPath(root: string): string | null {
@@ -231,6 +233,9 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     if (t.body === (t.key ?? "id")) throw new Error(`${where}body cannot be the key column`);
   }
   const body = codec === "markdown" ? (t.body ?? "body") : null;
+  if (t.group !== undefined && (typeof t.group !== "string" || t.group.trim() === "")) {
+    throw new Error(`${where}group must be a non-empty string`);
+  }
   return {
     name: t.name,
     path: t.path,
@@ -248,6 +253,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     persisted,
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
+    group: t.group ?? null,
   };
 }
 
@@ -500,6 +506,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         indexes: o.indexes,
         references: o.references,
         expand: o.expand,
+        group: o.group as string | undefined,
       });
     }
     if (pathErrors.length > 0) throw new Error(pathErrors.join("\n"));

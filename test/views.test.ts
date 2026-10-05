@@ -188,6 +188,7 @@ function setup(list: ExpandSpec[]) {
     persisted: false,
     exclude: [],
     expand: list,
+    group: null,
   };
   return {
     db,
@@ -360,6 +361,7 @@ describe("reconcileViews", () => {
       persisted: false,
       exclude: [],
       expand: [{ field: "roles", name: "people__roles", columns: {}, formats: {}, references: [], expand: [] }],
+      group: null,
     };
     write(spec.path, "- id: 1\n  roles: [admin, editor]\n");
     syncTable({ store: new Store(db, { busyTimeoutMs: 0 }), stateDir }, spec);
