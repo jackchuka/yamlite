@@ -11,13 +11,12 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { configPath } from "./config.ts";
 import { q } from "./ident.ts";
-import { open } from "./index.ts";
+import { withScratch } from "./scratch.ts";
 import { Store } from "./store.ts";
 import { type ApiContext, displayPath } from "./serve/context.ts";
 import { EventHub } from "./serve/events.ts";
@@ -113,124 +112,114 @@ export async function writeSnapshotData(opts: {
 }> {
   const root = resolve(opts.root);
   const stamp = generatedAt(opts.now ?? (() => new Date()));
-  const work = mkdtempSync(join(tmpdir(), "yamlite-export-"));
-  const dbPath = join(work, "db.sqlite");
-  try {
-    const y = await open({ root, db: dbPath, stateDir: join(work, "state"), persistConfig: false });
-    let selected: string[];
+  return withScratch(root, "yamlite-export-", async ({ y, db: dbPath, stateDir }) => {
     const warnings: Record<string, string[]> = {};
     let meta: Json;
     const schemas: Record<string, unknown> = {};
     const yaml: Array<[string, YamlMap]> = [];
     const pages: Array<[string, string]> = [];
     const skippedPages: Record<string, string> = {};
-    try {
-      const all = y.tables.map((t) => t.name);
-      const unknown = (opts.tables ?? []).filter((n) => !all.includes(n));
-      if (unknown.length > 0) throw new Error(`unknown table: ${unknown.join(", ")}`);
-      selected = opts.tables && opts.tables.length > 0 ? [...new Set(opts.tables)] : all;
-      const results = await y.sync();
-      const failed = results.filter((r) => !r.ok);
-      if (failed.length > 0) throw new Error(failed.map((r) => `${r.table}: ${r.error}`).join("\n"));
-      const scrub = warningScrubber(
-        root,
-        y.tables.map((t) => t.path),
-      );
-      for (const r of results) {
-        if (selected.includes(r.table) && r.warnings.length > 0) warnings[r.table] = r.warnings.map(scrub);
-      }
+    const all = y.tables.map((t) => t.name);
+    const unknown = (opts.tables ?? []).filter((n) => !all.includes(n));
+    if (unknown.length > 0) throw new Error(`unknown table: ${unknown.join(", ")}`);
+    const selected = opts.tables && opts.tables.length > 0 ? [...new Set(opts.tables)] : all;
+    const results = await y.sync();
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) throw new Error(failed.map((r) => `${r.table}: ${r.error}`).join("\n"));
+    const scrub = warningScrubber(
+      root,
+      y.tables.map((t) => t.path),
+    );
+    for (const r of results) {
+      if (selected.includes(r.table) && r.warnings.length > 0) warnings[r.table] = r.warnings.map(scrub);
+    }
 
-      const store = new Store(dbPath);
-      const pageSql = new PageSql(dbPath);
-      try {
-        const ctx: ApiContext = {
-          y,
-          store,
-          pageSql,
-          root,
-          stateDir: join(work, "state"),
-          configFile: configPath(root) ?? join(root, "yamlite.yaml"),
-          dbPath,
-          hub: new EventHub(),
-        };
-        const router = new Router();
-        for (const routes of ROUTES) routes(router, ctx);
-        const served = get(router, "/api/meta");
-        // a link to a table left out of the export would lead nowhere
-        const exported = (refs: Json[]) => refs.filter((r) => selected.includes(r.table));
-        const views = served.views
-          .filter((v: Json) => selected.includes(v.table))
-          .map((v: Json) => ({ ...v, references: exported(v.references) }));
-        const included = new Set([...selected, ...views.map((v: Json) => v.name as string)]);
-        for (const p of y.pages) {
-          const missing = Object.keys(p.access).filter((n) => !included.has(n));
-          if (missing.length > 0) {
-            skippedPages[p.name] = `uses ${missing.join(", ")}, which the export leaves out`;
-            continue;
-          }
-          try {
-            pages.push([p.name, readPageHtml(p.path, hidePath(displayPath(root, p.path)))]);
-          } catch (e) {
-            skippedPages[p.name] = e instanceof Error ? e.message : String(e);
-          }
+    const store = new Store(dbPath);
+    const pageSql = new PageSql(dbPath);
+    try {
+      const ctx: ApiContext = {
+        y,
+        store,
+        pageSql,
+        root,
+        stateDir,
+        configFile: configPath(root) ?? join(root, "yamlite.yaml"),
+        dbPath,
+        hub: new EventHub(),
+      };
+      const router = new Router();
+      for (const routes of ROUTES) routes(router, ctx);
+      const served = get(router, "/api/meta");
+      // a link to a table left out of the export would lead nowhere
+      const exported = (refs: Json[]) => refs.filter((r) => selected.includes(r.table));
+      const views = served.views
+        .filter((v: Json) => selected.includes(v.table))
+        .map((v: Json) => ({ ...v, references: exported(v.references) }));
+      const included = new Set([...selected, ...views.map((v: Json) => v.name as string)]);
+      for (const p of y.pages) {
+        const missing = Object.keys(p.access).filter((n) => !included.has(n));
+        if (missing.length > 0) {
+          skippedPages[p.name] = `uses ${missing.join(", ")}, which the export leaves out`;
+          continue;
         }
-        const kept = new Set(pages.map(([name]) => name));
-        meta = {
-          ...served,
-          root: basename(root),
-          db: "data/db.sqlite",
-          configFile: hidePath(served.configFile),
-          tables: selected.flatMap((name) =>
-            served.tables
-              .filter((t: Json) => t.name === name)
-              .map((t: Json) => ({
-                ...t,
-                path: hidePath(t.path),
-                ...(t.files ? { files: hideFiles(t.files) } : {}),
-                references: exported(t.references),
-              })),
-          ),
-          views,
-          pages: served.pages
-            .filter((p: Json) => kept.has(p.name))
-            .map((p: Json) => ({ ...p, path: hidePath(p.path) })),
+        try {
+          pages.push([p.name, readPageHtml(p.path, hidePath(displayPath(root, p.path)))]);
+        } catch (e) {
+          skippedPages[p.name] = e instanceof Error ? e.message : String(e);
+        }
+      }
+      const kept = new Set(pages.map(([name]) => name));
+      meta = {
+        ...served,
+        root: basename(root),
+        db: "data/db.sqlite",
+        configFile: hidePath(served.configFile),
+        tables: selected.flatMap((name) =>
+          served.tables
+            .filter((t: Json) => t.name === name)
+            .map((t: Json) => ({
+              ...t,
+              path: hidePath(t.path),
+              ...(t.files ? { files: hideFiles(t.files) } : {}),
+              references: exported(t.references),
+            })),
+        ),
+        views,
+        pages: served.pages.filter((p: Json) => kept.has(p.name)).map((p: Json) => ({ ...p, path: hidePath(p.path) })),
+      };
+      for (const name of selected) {
+        const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
+        schemas[name] = {
+          ...schema,
+          path: hidePath(schema.path),
+          ...(schema.files ? { files: hideFiles(schema.files) } : {}),
+          references: exported(schema.references),
         };
-        for (const name of selected) {
-          const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
-          schemas[name] = {
-            ...schema,
-            path: hidePath(schema.path),
-            ...(schema.files ? { files: hideFiles(schema.files) } : {}),
-            references: exported(schema.references),
-          };
-          const spec = y.tables.find((t) => t.name === name);
-          const files = new Map<string, string>();
-          const keys: Array<[string, string]> = [];
-          // a list table's records share one file: read it through serve once, not once per record
-          const seen = new Map<string, string>();
-          if (spec && store.tableExists(name)) {
-            const rows = store.query(`SELECT ${q(spec.key)} AS k FROM ${q(name)} ORDER BY ${q(spec.key)}`);
-            for (const { k } of rows) {
-              const key = String(k);
-              const source = recordFile(spec, key);
-              let file = seen.get(source);
-              if (file === undefined) {
-                const detail = get(router, `/api/tables/${encodeURIComponent(name)}/rows/${encodeURIComponent(key)}`);
-                file = hidePath(detail.file);
-                seen.set(source, file);
-                if (detail.yaml !== null) files.set(file, detail.yaml);
-              }
-              keys.push([key, file]);
+        const spec = y.tables.find((t) => t.name === name);
+        const files = new Map<string, string>();
+        const keys: Array<[string, string]> = [];
+        // a list table's records share one file: read it through serve once, not once per record
+        const seen = new Map<string, string>();
+        if (spec && store.tableExists(name)) {
+          const rows = store.query(`SELECT ${q(spec.key)} AS k FROM ${q(name)} ORDER BY ${q(spec.key)}`);
+          for (const { k } of rows) {
+            const key = String(k);
+            const source = recordFile(spec, key);
+            let file = seen.get(source);
+            if (file === undefined) {
+              const detail = get(router, `/api/tables/${encodeURIComponent(name)}/rows/${encodeURIComponent(key)}`);
+              file = hidePath(detail.file);
+              seen.set(source, file);
+              if (detail.yaml !== null) files.set(file, detail.yaml);
             }
+            keys.push([key, file]);
           }
-          yaml.push([name, { files: Object.fromEntries(files), keys: Object.fromEntries(keys) }]);
         }
-      } finally {
-        pageSql.close();
-        store.close();
+        yaml.push([name, { files: Object.fromEntries(files), keys: Object.fromEntries(keys) }]);
       }
     } finally {
-      await y.close();
+      pageSql.close();
+      store.close();
     }
 
     mkdirSync(join(opts.dir, "data", "yaml"), { recursive: true });
@@ -247,9 +236,7 @@ export async function writeSnapshotData(opts: {
     if (pages.length > 0) mkdirSync(join(opts.dir, "data", "pages"), { recursive: true });
     for (const [name, html] of pages) writeFileSync(join(opts.dir, "data", "pages", `${name}.html`), html);
     return { tables: selected, warnings, pages: pages.map(([name]) => name), skippedPages };
-  } finally {
-    rmSync(work, { recursive: true, force: true });
-  }
+  });
 }
 
 function snapshotDb(from: string, to: string, selected: string[]): void {

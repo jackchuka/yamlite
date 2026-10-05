@@ -13,6 +13,7 @@ const expand = (field: string, extra: Partial<ExpandSpec> = {}): ExpandSpec => (
   columns: {},
   formats: {},
   references: [],
+  values: {},
   expand: [],
   ...extra,
 });
@@ -132,7 +133,15 @@ describe("buildView", () => {
   test("a nested view inherits its parent's identity", () => {
     const milestones = buildView(expand("milestones"), root, [[{ tasks: [{ owner: "ann" }] }]]);
     const tasks = buildView(
-      { field: "tasks", name: "projects__milestones__tasks", columns: {}, formats: {}, references: [], expand: [] },
+      {
+        field: "tasks",
+        name: "projects__milestones__tasks",
+        columns: {},
+        formats: {},
+        references: [],
+        values: {},
+        expand: [],
+      },
       milestones.next,
       milestones.fields.get("tasks") ?? [],
     );
@@ -148,6 +157,7 @@ describe("buildView", () => {
       columns: {},
       formats: {},
       references: [],
+      values: {},
       expand: [],
     });
     const one = buildView(child("projects__children"), root, [[{ children: [{ children: [{ name: "x" }] }] }]]);
@@ -185,6 +195,7 @@ function setup(list: ExpandSpec[]) {
     formats: {},
     indexes: [],
     references: [],
+    values: {},
     persisted: false,
     exclude: [],
     expand: list,
@@ -204,6 +215,7 @@ const tasks: ExpandSpec = {
   columns: {},
   formats: {},
   references: [],
+  values: {},
   expand: [],
 };
 const views = (db: string) =>
@@ -358,9 +370,12 @@ describe("reconcileViews", () => {
       formats: {},
       indexes: [],
       references: [],
+      values: {},
       persisted: false,
       exclude: [],
-      expand: [{ field: "roles", name: "people__roles", columns: {}, formats: {}, references: [], expand: [] }],
+      expand: [
+        { field: "roles", name: "people__roles", columns: {}, formats: {}, references: [], values: {}, expand: [] },
+      ],
       group: null,
     };
     write(spec.path, "- id: 1\n  roles: [admin, editor]\n");
@@ -378,6 +393,7 @@ describe("reconcileViews", () => {
       columns: {},
       formats: {},
       references: [],
+      values: {},
       expand,
     });
     const t = setup([

@@ -25,6 +25,7 @@ const table: TableMeta = {
   key: "id",
   columns: { id: "TEXT", title: "TEXT", prio: "INTEGER" },
   formats: {},
+  values: {},
   references: [],
   count: 1,
   inDb: true,

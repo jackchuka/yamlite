@@ -162,6 +162,18 @@ test("init keeps declared references", () => {
   expect(generateConfig({ root, force: true })).toContain("    references:\n      owner: people.slug\n");
 });
 
+test("init keeps declared values, in tables and in expand", () => {
+  const root = tmpRoot();
+  write(join(root, "tasks/a.yaml"), "status: todo\nsteps:\n  - state: open\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    values:\n      status: [todo, done]\n    expand:\n      steps:\n        values: { state: [open] }\n",
+  );
+  const out = generateConfig({ root, force: true });
+  expect(out).toContain("    values:\n      status:\n        - todo\n        - done\n");
+  expect(out).toContain("        values:\n          state:\n            - open\n");
+});
+
 test("writes files: and body: for declared Markdown tables, adds none of its own, and no format for the body", () => {
   const root = tmpRoot();
   write(join(root, "blog/a.md"), "---\ntitle: A\n---\ntext\n");

@@ -5,6 +5,7 @@ import { parse } from "yaml";
 import { claims } from "./source/files.ts";
 import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
 import {
+  type AllowedValue,
   COLUMN_FORMATS,
   COLUMN_TYPES,
   type ColumnFormat,
@@ -32,6 +33,7 @@ export interface TableInput {
   formats?: Record<string, string>;
   indexes?: unknown[];
   references?: Record<string, unknown>;
+  values?: unknown;
   expand?: Record<string, unknown>;
   group?: string;
 }
@@ -181,6 +183,7 @@ interface RawTable {
   formats?: Record<string, string>;
   indexes?: unknown[];
   references?: Record<string, unknown>;
+  values?: unknown;
   expand?: Record<string, unknown>;
   group?: unknown;
 }
@@ -236,6 +239,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
   if (t.group !== undefined && (typeof t.group !== "string" || t.group.trim() === "")) {
     throw new Error(`${where}group must be a non-empty string`);
   }
+  const formats = toFormats(where, body === null ? t.formats : { [body]: "markdown", ...t.formats }, columns);
   return {
     name: t.name,
     path: t.path,
@@ -245,11 +249,12 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     body,
     key: t.key ?? "id",
     columns,
-    formats: toFormats(where, body === null ? t.formats : { [body]: "markdown", ...t.formats }, columns),
+    formats,
     indexes: (t.indexes ?? []).map((raw, i) => toIndex(t.name, raw, i)),
     references: Object.entries(t.references ?? {}).map(([column, raw]) =>
       toReference(`table "${t.name}": `, column, raw),
     ),
+    values: toValues(where, t.values, formats),
     persisted,
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
@@ -308,6 +313,26 @@ function toFormats(where: string, raw: unknown, columns: Record<string, ColumnTy
   return formats;
 }
 
+const isScalar = (v: unknown): v is AllowedValue =>
+  typeof v === "string" || typeof v === "number" || typeof v === "boolean";
+
+// allowed values are checked against the data, never enforced; a markdown column holds free text
+function toValues(where: string, raw: unknown, formats: Record<string, ColumnFormat>): Record<string, AllowedValue[]> {
+  const values: Record<string, AllowedValue[]> = Object.create(null);
+  if (raw === undefined || raw === null) return values;
+  if (typeof raw !== "object" || Array.isArray(raw))
+    throw new Error(`${where}values must be a map of columns to lists`);
+  for (const [column, list] of Object.entries(raw)) {
+    if (!Array.isArray(list) || list.length === 0 || !list.every(isScalar)) {
+      throw new Error(`${where}values.${column} must be a non-empty list of strings, numbers or booleans`);
+    }
+    if (Object.hasOwn(formats, column))
+      throw new Error(`${where}values.${column}: a markdown column cannot have values`);
+    values[column] = [...new Set(list)];
+  }
+  return values;
+}
+
 // `table` (its key column) or `table.column`
 function toReference(where: string, column: string, raw: unknown): Reference {
   const m = typeof raw === "string" ? REFERENCE.exec(raw.trim()) : null;
@@ -317,7 +342,7 @@ function toReference(where: string, column: string, raw: unknown): Reference {
 
 export const referenceToRaw = (r: Reference): string => (r.target ? `${r.table}.${r.target}` : r.table);
 
-const EXPAND_KEYS = ["columns", "formats", "references", "expand"];
+const EXPAND_KEYS = ["columns", "formats", "references", "values", "expand"];
 
 // `expand: { <field>: { columns?, references?, expand? } | null }`: one view per field, named <parent>__<field>
 function toExpand(table: string, parent: string, raw: unknown, path: string): ExpandSpec[] {
@@ -335,20 +360,23 @@ function toExpand(table: string, parent: string, raw: unknown, path: string): Ex
       columns?: Record<string, string>;
       formats?: unknown;
       references?: Record<string, unknown>;
+      values?: unknown;
       expand?: unknown;
     };
     const unknown = Object.keys(v).find((k) => !EXPAND_KEYS.includes(k));
     if (unknown !== undefined) throw new Error(`table "${table}": ${where} has an unknown key "${unknown}"`);
     const name = `${parent}__${field}`;
     const columns = toColumns(`table "${table}": ${where}: `, v.columns);
+    const formats = toFormats(`table "${table}": ${where}.`, v.formats, columns);
     return {
       field,
       name,
       columns,
-      formats: toFormats(`table "${table}": ${where}.`, v.formats, columns),
+      formats,
       references: Object.entries(v.references ?? {}).map(([column, r]) =>
         toReference(`table "${table}": ${where}.`, column, r),
       ),
+      values: toValues(`table "${table}": ${where}.`, v.values, formats),
       expand: toExpand(table, name, v.expand, `${where}.expand`),
     };
   });
@@ -364,6 +392,7 @@ export function expandToRaw(list: ExpandSpec[]): Record<string, unknown> {
         ...(e.references.length > 0
           ? { references: Object.fromEntries(e.references.map((r) => [r.column, referenceToRaw(r)])) }
           : {}),
+        ...(Object.keys(e.values).length > 0 ? { values: { ...e.values } } : {}),
         ...(e.expand.length > 0 ? { expand: expandToRaw(e.expand) } : {}),
       },
     ]),
@@ -505,6 +534,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         formats: o.formats,
         indexes: o.indexes,
         references: o.references,
+        values: o.values,
         expand: o.expand,
         group: o.group as string | undefined,
       });

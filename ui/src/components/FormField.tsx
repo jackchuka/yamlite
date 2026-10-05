@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { emptyValueFor, fieldKind } from "@/lib/form";
 import { useTheme } from "@/lib/theme";
-import type { ColumnFormat, ColumnType, Reference } from "@/lib/types";
+import type { AllowedValue, ColumnFormat, ColumnType, Reference } from "@/lib/types";
 import { RefLink } from "./RefLink";
 
 export interface FieldProps {
@@ -18,6 +18,8 @@ export interface FieldProps {
   type?: ColumnType;
   format?: ColumnFormat;
   reference?: Reference;
+  // the column's declared values: edited with a select, a value outside the list kept and marked
+  allowed?: AllowedValue[];
   onChange: (next: unknown) => void;
   onRemove?: () => void;
   onValidity?: (path: string, ok: boolean) => void;
@@ -128,6 +130,37 @@ function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) 
   );
 }
 
+// as a BOOLEAN column stores it, so that false matches 0 and true matches 1
+const asText = (v: unknown) => (v === true ? "1" : v === false ? "0" : v == null ? "" : String(v));
+
+function ValuesField({ path, value, allowed, onChange, readOnly }: FieldProps & { allowed: AllowedValue[] }) {
+  const current = asText(value);
+  const outside = current !== "" && !allowed.some((a) => asText(a) === current);
+  return (
+    <select
+      aria-label={label(path)}
+      aria-invalid={outside || undefined}
+      disabled={readOnly}
+      className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${outside ? "border-warn text-warn" : ""}`}
+      value={current}
+      onChange={(e) => {
+        const next = e.target.value;
+        if (next === "") return onChange(null);
+        const hit = allowed.find((a) => asText(a) === next);
+        if (hit !== undefined) onChange(hit);
+      }}
+    >
+      <option value="">—</option>
+      {outside && <option value={current}>{`${current} (not in values)`}</option>}
+      {allowed.map((a, i) => (
+        <option key={`${i}:${asText(a)}`} value={asText(a)}>
+          {String(a)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function RefField({ path, value, reference, onChange }: FieldProps) {
   const target = reference?.table ?? "";
   const { data } = useQuery({
@@ -233,6 +266,7 @@ export function FormField(props: FieldProps) {
     }
     onChange(next);
   };
+  if (props.allowed && type !== "JSON") return <ValuesField {...props} allowed={props.allowed} />;
   switch (kind) {
     case "switch":
       return <Switch aria-label={label(path)} checked={value === true} onCheckedChange={change} />;

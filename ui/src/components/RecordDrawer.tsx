@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
 import { isReadOnly } from "@/lib/mode";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
-import type { ColumnFormat, ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
+import type { AllowedValue, ColumnFormat, ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
 import { ReflectBadge } from "./ReflectBadge";
 import { StaleDialog } from "./StaleDialog";
@@ -30,6 +30,8 @@ const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
   Object.hasOwn(table.columns, field) ? table.columns[field] : undefined;
 const columnFormat = (table: TableMeta, field: string): ColumnFormat | undefined =>
   Object.hasOwn(table.formats, field) ? table.formats[field] : undefined;
+const columnValues = (table: TableMeta, field: string): AllowedValue[] | undefined =>
+  Object.hasOwn(table.values, field) ? table.values[field] : undefined;
 
 // laid over the table, so opening a record does not reflow the page under it
 const panel = "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl";
@@ -225,6 +227,7 @@ export function RecordDrawer({
                     value={draft[f]}
                     type={columnType(table, f)}
                     format={columnFormat(table, f)}
+                    allowed={columnValues(table, f)}
                     reference={reference}
                     onChange={(next) => setDraft({ ...draft, [f]: next })}
                     onValidity={(p, ok) =>

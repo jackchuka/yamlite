@@ -23,6 +23,7 @@ const table: TableMeta = {
   key: "id",
   columns: { id: "TEXT", title: "TEXT" },
   formats: {},
+  values: {},
   references: [],
   count: 1,
   inDb: true,

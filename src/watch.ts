@@ -5,6 +5,7 @@ import { type ConflictInfo, type EngineContext, syncTable, type TableResult } fr
 import { checkReferences, referrersOf } from "./references.ts";
 import { matchesFiles } from "./source/files.ts";
 import type { TableSpec } from "./types.ts";
+import { checkValues } from "./values.ts";
 
 export interface WatchHandlers {
   onSync?: (result: TableResult) => void;
@@ -143,7 +144,8 @@ export function startWatch(
           schedule(name);
           return;
         }
-        if (result.ok) result.warnings.push(...checkReferences(ctx.store, table, all()));
+        if (result.ok)
+          result.warnings.push(...checkValues(ctx.store, table), ...checkReferences(ctx.store, table, all()));
         // only a real change re-checks the tables pointing here, so mutual references cannot ping-pong
         if (result.changes.length > 0 || result.schema.length > 0) {
           for (const referrer of referrersOf(name, all())) schedule(referrer.name);

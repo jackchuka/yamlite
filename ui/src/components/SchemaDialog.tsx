@@ -39,6 +39,9 @@ function ViewSchema({ view }: { view: ViewMeta }) {
                 <td className={`${cell} text-muted-foreground`}>
                   {view.identity.includes(name) ? "identity" : Object.hasOwn(view.declared, name) ? "宣言済み" : "推論"}
                 </td>
+                <td className={`${cell} font-mono text-muted-foreground`}>
+                  {Object.hasOwn(view.values, name) ? view.values[name]?.map(String).join(", ") : ""}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -101,6 +104,9 @@ export function SchemaDialog({
                           <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
                           <td className={`${cell} text-muted-foreground`}>
                             {name === data.key ? "key" : name in data.declared ? "宣言済み" : "推論"}
+                          </td>
+                          <td className={`${cell} font-mono text-muted-foreground`}>
+                            {Object.hasOwn(data.values, name) ? data.values[name]?.map(String).join(", ") : ""}
                           </td>
                         </tr>
                       ))}

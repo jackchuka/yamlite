@@ -142,21 +142,22 @@ npx @jackchuka/yamlite status ./notes
 
 ## Commands
 
-| Command                 | Options                                                          | Description                                               |
-| ----------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
-| `yamlite init [root]`   | `--db`, `--force`, `--print`                                     | Create `yamlite.yaml` from your files and database        |
-| `yamlite status [root]` | `--db`, `--table <name>`, `--json`                               | Show what `sync` would change, without writing            |
-| `yamlite sync [root]`   | `--db`, `--table <name>`, `--force`, `--force-convert`, `--json` | Sync once; exits 1 if any table fails                     |
-| `yamlite watch [root]`  | `--db`, `--quiet`                                                | Sync on every file save, database commit or config change |
-| `yamlite serve [root]`  | `--db`, `--port` (4610), `--host` (127.0.0.1), `--open`          | Open the web UI and sync continuously                     |
-| `yamlite export [root]` | `--out` (.yamlite-export), `--table`, `--force`                  | Write the web UI as a read-only static site               |
+| Command                 | Options                                                          | Description                                                         |
+| ----------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `yamlite init [root]`   | `--db`, `--force`, `--print`                                     | Create `yamlite.yaml` from your files and database                  |
+| `yamlite check [root]`  | `--table <name>`, `--json`                                       | Check the YAML files against `yamlite.yaml`; exits 1 on any problem |
+| `yamlite status [root]` | `--db`, `--table <name>`, `--json`                               | Show what `sync` would change, without writing                      |
+| `yamlite sync [root]`   | `--db`, `--table <name>`, `--force`, `--force-convert`, `--json` | Sync once; exits 1 if any table fails                               |
+| `yamlite watch [root]`  | `--db`, `--quiet`                                                | Sync on every file save, database commit or config change           |
+| `yamlite serve [root]`  | `--db`, `--port` (4610), `--host` (127.0.0.1), `--open`          | Open the web UI and sync continuously                               |
+| `yamlite export [root]` | `--out` (.yamlite-export), `--table`, `--force`                  | Write the web UI as a read-only static site                         |
 
 - `root` defaults to the current directory.
 - `--db <path>` overrides the default `<root>/.yamlite/db.sqlite`.
 - `--table <name>` can be repeated.
 - `--force` allows mass deletions that the deletion guard would refuse.
 - `--force-convert` clears values that cannot be converted when a column type changes (see [Column types](#column-types)).
-- `--json` prints the raw results (per table: counts, `changes` per key, `conflicts`, `warnings`) for scripting.
+- `--json` prints the raw results (per table: counts, `changes` per key, `conflicts`, `warnings`) for scripting. `check --json` has its own shape (see [Check](#check)).
 - Output is colored on a terminal; set `NO_COLOR=1` to disable it.
 
 ## Web UI
@@ -230,6 +231,36 @@ The variable and class names are part of the page API: renaming one is a breakin
 - `network` is enforced with a Content Security Policy. It limits what the page loads and where it connects. Declaring an origin lets the page send data, including anything it can read through `access`, off your machine to that origin.
 - Every page, even with `network: []`, can leak data by navigating its own frame to another site with the data in the URL. yamlite then disconnects the page, but the data has already left. Only declare pages you trust, as you would any script you run.
 - In an [export](#export) pages are read-only, and `access` does not hide data: the exported `db.sqlite` is downloadable, and `sql: true` reads every exported table. Pages whose `access` names a table left out of the export are skipped with a warning.
+
+## Check
+
+```bash
+yamlite check notes
+```
+
+`check` syncs your YAML into a temporary database, the way `export` does, and reports every problem it finds: a table that fails, any warning (values, references, types, indexes), and a table or column that `yamlite.yaml` does not list yet. It exits 1 if there is one. Nothing under the root is written and no lock is taken, so it runs in CI, in a pre-commit hook, and next to a running `watch` or `serve`.
+
+- `--table` (repeatable) checks only those tables.
+- `--json` prints `{ ok, tables: [{ table, ok, error?, warnings, unregistered }], unregisteredTables }`.
+
+```yaml
+# .github/workflows/check.yml
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npx @jackchuka/yamlite check .
+```
+
+```sh
+#!/bin/sh
+# .git/hooks/pre-commit (chmod +x)
+exec npx @jackchuka/yamlite check .
+```
 
 ## Export
 
@@ -348,6 +379,7 @@ tables:
   people:
     key: slug # default: id
     group: CRM # the web UI's sidebar section
+    values: { team: [platform, sales] }
     columns: { age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
     formats: { bio: markdown } # how the web UI edits a TEXT column
     expand: { tags: {} } # lists as views — see Expanded views
@@ -399,6 +431,29 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 ### Formats
 
 `formats` tells the web UI how to edit a `TEXT` column; it never changes the database. `markdown` shows the field as rendered Markdown, with an Edit tab for the source. The editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A format on a column declared with another type is an error. `expand` entries take `formats` too.
+
+### Values
+
+List the values a column may hold, and yamlite checks them on every sync. Like references, they are never enforced: a value outside the list is a warning, not a failed sync.
+
+```yaml
+tables:
+  tasks:
+    values:
+      status: [todo, doing, done]
+      tags: [errand, home, work] # each item of a list is checked
+    expand:
+      milestones:
+        values: { state: [open, closed] }
+```
+
+```
+! status "doen" not in values (buy-milk)
+```
+
+- Values are compared as text (`1` matches `"1"`), numbers also as numbers (`2.0` matches `2`), and `true` / `false` as the `1` / `0` a `BOOLEAN` column stores. A missing field is not checked.
+- The web UI edits the column with a select. A value outside the list stays in it, marked, until you change it.
+- A `markdown` column cannot have values.
 
 ### References
 

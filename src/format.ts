@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { relative } from "node:path";
 import { styleText } from "node:util";
+import type { CheckResult } from "./check.ts";
 import type { ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
 import type { SchemaChange } from "./indexes.ts";
 
@@ -135,6 +136,34 @@ export function report(results: TableResult[], { mode, root, paint, elapsedMs = 
     footer = [head, ...(work.length > 0 ? work : ["no changes"]), ...extras].join(" · ");
   }
   lines.push("", `  ${footer}`);
+  return lines.join("\n");
+}
+
+export function checkReport(result: CheckResult, { root, paint }: { root: string; paint: Painter }): string {
+  const nameWidth = Math.max(0, ...result.tables.map((t) => t.table.length));
+  const indent = " ".repeat(2 + 1 + 1 + nameWidth + 3);
+  const lines = [`${paint("bold", "yamlite")} ${paint("dim", `· ${displayPath(root)}`)}`, ""];
+  const unlisted = new Set(result.unregisteredTables);
+  let problems = 0;
+  for (const t of result.tables) {
+    const name = t.table.padEnd(nameWidth);
+    if (!t.ok) {
+      problems++;
+      lines.push(`  ${paint("red", "✗")} ${name}   ${paint("red", t.error ?? "failed")}`);
+      continue;
+    }
+    const details = [
+      ...(unlisted.has(t.table) ? [`${paint("yellow", "+")} table ${paint("dim", "(not in yamlite.yaml)")}`] : []),
+      ...t.unregistered.map(
+        (c) => `${paint("yellow", "+")} column ${c.column} ${c.type} ${paint("dim", "(not in yamlite.yaml)")}`,
+      ),
+      ...t.warnings.map((w) => `${paint("yellow", "!")} ${w}`),
+    ];
+    problems += details.length;
+    lines.push(`  ${details.length > 0 ? paint("red", "✗") : paint("green", "✓")} ${t.table}`);
+    for (const d of details) lines.push(`${indent}${d}`);
+  }
+  lines.push("", problems === 0 ? paint("green", "✓ no problems") : paint("red", `✗ ${plural(problems, "problem")}`));
   return lines.join("\n");
 }
 

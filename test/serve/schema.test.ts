@@ -66,3 +66,18 @@ test("a table that is not in the database yet has an empty schema", async () => 
   expect(body.indexes).toEqual([expect.objectContaining({ definition: "(x)", inDb: false })]);
   expect((await t.api("/api/tables/nope/schema")).status).toBe(404);
 });
+
+test("meta and schema carry each table's values", async () => {
+  t = await startServe(
+    { "tasks/a.yaml": "status: todo\n" },
+    "tables:\n  tasks:\n    columns: { status: TEXT }\n    values:\n      status: [todo, done]\n",
+  );
+  const served = t;
+  await waitForAsync(async () => (await served.api("/api/tables/tasks/schema")).status === 200);
+  const meta = await t.api("/api/meta");
+  expect(meta.body.tables.find((x: { name: string }) => x.name === "tasks").values).toEqual({
+    status: ["todo", "done"],
+  });
+  const schema = await t.api("/api/tables/tasks/schema");
+  expect(schema.body.values).toEqual({ status: ["todo", "done"] });
+});
