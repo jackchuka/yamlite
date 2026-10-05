@@ -4,6 +4,7 @@ import { registerInConfig } from "./configfile.ts";
 import { type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { acquireLock } from "./lock.ts";
 import { checkReferences } from "./references.ts";
+import { checkRequired } from "./required.ts";
 import { Store } from "./store.ts";
 import type { PageSpec, TableSpec } from "./types.ts";
 import { checkValues } from "./values.ts";
@@ -75,7 +76,13 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
   const withChecks = (results: TableResult[]): TableResult[] => {
     for (const r of results) {
       const spec = config.tables.find((t) => t.name === r.table);
-      if (r.ok && spec) r.warnings.push(...checkValues(store, spec), ...checkReferences(store, spec, config.tables));
+      if (r.ok && spec) {
+        r.warnings.push(
+          ...checkValues(store, spec),
+          ...checkRequired(store, spec),
+          ...checkReferences(store, spec, config.tables),
+        );
+      }
     }
     return results;
   };
