@@ -62,6 +62,14 @@ test("--table limits the check", async () => {
   expect(r.ok).toBe(true);
 });
 
+test("--table also limits which unlisted tables are reported", async () => {
+  const root = setup(clean, { "tasks/a.yaml": "status: todo\n", "people.yaml": "- id: 1\n" });
+  expect((await check({ root })).unregisteredTables).toEqual(["people"]);
+  const r = await check({ root, tables: ["tasks"] });
+  expect(r.unregisteredTables).toEqual([]);
+  expect(r.ok).toBe(true);
+});
+
 test("runs while another process holds the lock", async () => {
   const root = setup(clean, { "tasks/a.yaml": "status: todo\n" });
   const y = await open({ root });

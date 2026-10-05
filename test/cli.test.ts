@@ -1,5 +1,5 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, expect, test } from "vitest";
 import { sql, dataRoot, tmpRoot, write } from "./helpers.ts";
@@ -98,4 +98,30 @@ test("export writes a static site and lists what it wrote", () => {
     files: { "tasks/a.yaml": "title: A\n" },
     keys: { a: "tasks/a.yaml" },
   });
+});
+
+test("check exits 0 without problems and 1 with them, and writes nothing", () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    columns: { status: TEXT }\n    values: { status: [todo] }\n",
+  );
+  write(join(root, "tasks/a.yaml"), "status: todo\n");
+  const ok = run("check", root);
+  expect(ok.status).toBe(0);
+  expect(ok.stdout).toContain("✓ no problems");
+  write(join(root, "tasks/a.yaml"), "status: doen\n");
+  const bad = run("check", root, "--json");
+  expect(bad.status).toBe(1);
+  expect(JSON.parse(bad.stdout)).toMatchObject({
+    ok: false,
+    tables: [{ table: "tasks", warnings: ['status "doen" not in values (a)'] }],
+  });
+  expect(existsSync(join(root, ".yamlite"))).toBe(false);
+});
+
+test("check does not take --db", () => {
+  const r = run("check", tmpRoot(), "--db", "x.db");
+  expect(r.status).not.toBe(0);
+  expect(r.stderr).toContain("unknown option '--db'");
 });

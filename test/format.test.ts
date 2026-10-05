@@ -1,6 +1,9 @@
+import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { check } from "../src/check.ts";
 import type { TableResult } from "../src/engine.ts";
-import { displayPath, plain, reloadLine, report, watchEvents, watchHeader } from "../src/format.ts";
+import { checkReport, displayPath, plain, reloadLine, report, watchEvents, watchHeader } from "../src/format.ts";
+import { tmpRoot, write } from "./helpers.ts";
 
 const result = (o: Partial<TableResult>): TableResult => ({
   table: "tasks",
@@ -286,4 +289,58 @@ test("dropped columns", () => {
     quiet: false,
   });
   expect(lines).toEqual(["  12:03:41  tasks  − column    old"]);
+});
+
+test("checkReport lists problems per table and counts them", () => {
+  const out = checkReport(
+    {
+      ok: false,
+      tables: [
+        { table: "people", ok: true, warnings: [], unregistered: [] },
+        {
+          table: "tasks",
+          ok: true,
+          warnings: ['status "doen" not in values (a)'],
+          unregistered: [{ column: "due", type: "TEXT" }],
+        },
+        { table: "inbox", ok: false, error: "cannot read inbox/a.yaml", warnings: [], unregistered: [] },
+        { table: "notes", ok: true, warnings: [], unregistered: [] },
+      ],
+      unregisteredTables: ["notes"],
+    },
+    { root: "/tmp/data", paint: plain },
+  );
+  expect(out).toBe(
+    [
+      "yamlite · /tmp/data",
+      "",
+      "  ✓ people",
+      "  ✗ tasks",
+      "             + column due TEXT (not in yamlite.yaml)",
+      '             ! status "doen" not in values (a)',
+      "  ✗ inbox    cannot read inbox/a.yaml",
+      "  ✗ notes",
+      "             + table (not in yamlite.yaml)",
+      "",
+      "✗ 4 problems",
+    ].join("\n"),
+  );
+});
+
+test("checkReport's footer agrees with the result's ok", async () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "people.yaml"), "- id: 1\n");
+  const r = await check({ root });
+  expect(r.ok).toBe(false);
+  expect(checkReport(r, { root, paint: plain }).endsWith("\n✗ 2 problems")).toBe(true);
+});
+
+test("checkReport says when there is nothing to fix", () => {
+  const out = checkReport(
+    { ok: true, tables: [{ table: "tasks", ok: true, warnings: [], unregistered: [] }], unregisteredTables: [] },
+    { root: "/tmp/data", paint: plain },
+  );
+  expect(out.endsWith("\n✓ no problems")).toBe(true);
 });
