@@ -163,6 +163,7 @@ export function createStaticApi(opts: {
     rename: refuse,
     remove: refuse,
     createTable: refuse,
+    setGroup: refuse,
     restore: refuse,
     dismiss: refuse,
   };

@@ -39,6 +39,7 @@ const meta = (taskCount = 3): Meta => ({
       references: [{ column: "project", table: "projects" }],
       count: taskCount,
       inDb: true,
+      group: null,
     },
     {
       name: "projects",
@@ -50,6 +51,7 @@ const meta = (taskCount = 3): Meta => ({
       references: [],
       count: 2,
       inDb: true,
+      group: null,
     },
     {
       name: "tags",
@@ -61,6 +63,7 @@ const meta = (taskCount = 3): Meta => ({
       references: [],
       count: 5,
       inDb: true,
+      group: null,
     },
   ],
   views: [
@@ -161,6 +164,7 @@ test("a self-reference is drawn with the self-loop edge", () => {
           references: [{ column: "parent", table: "tasks" }],
           count: 1,
           inDb: true,
+          group: null,
         },
       ],
       views: [],

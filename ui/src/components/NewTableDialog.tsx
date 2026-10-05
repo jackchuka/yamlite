@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { fieldError } from "@/lib/fielderror";
-import { useEvents } from "@/lib/providers";
+import { groupNames } from "@/lib/groups";
+import { useEvents, useMeta } from "@/lib/providers";
 import type { ColumnType } from "@/lib/types";
 
 const TYPES: ColumnType[] = ["TEXT", "INTEGER", "REAL", "BOOLEAN", "JSON"];
@@ -24,6 +25,9 @@ export function NewTableDialog({
   const client = useQueryClient();
   const navigate = useNavigate();
   const { connected } = useEvents();
+  const { data: meta } = useMeta();
+  const groupList = useId();
+  const [group, setGroup] = useState("");
   const [name, setName] = useState(adopt ?? "");
   const [mode, setMode] = useState<"files" | "list">("files");
   const [key, setKey] = useState("id");
@@ -35,6 +39,7 @@ export function NewTableDialog({
         mode,
         key,
         columns: Object.fromEntries(columns.filter((c) => c.name !== "").map((c) => [c.name, c.type])),
+        group: group.trim() === "" ? undefined : group.trim(),
       }),
     onSuccess: async () => {
       onOpenChange(false);
@@ -82,6 +87,22 @@ export function NewTableDialog({
           />
         </label>
         {errorFor("key")}
+        <label className="text-[11.5px] font-semibold text-muted-foreground">
+          グループ（任意）
+          <Input
+            aria-label="group name"
+            list={groupList}
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            className="mt-1"
+          />
+        </label>
+        <datalist id={groupList}>
+          {groupNames(meta?.tables ?? []).map((g) => (
+            <option key={g} value={g} />
+          ))}
+        </datalist>
+        {errorFor("group")}
         {!adopt && (
           <div className="flex flex-col gap-1.5">
             <span className="text-[11.5px] font-semibold text-muted-foreground">

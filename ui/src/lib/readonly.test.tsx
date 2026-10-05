@@ -26,6 +26,7 @@ const table: TableMeta = {
   references: [],
   count: 1,
   inDb: true,
+  group: null,
 };
 const snapshot: Snapshot = {
   version: 1,

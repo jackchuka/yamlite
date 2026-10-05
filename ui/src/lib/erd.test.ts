@@ -7,7 +7,18 @@ const table = (
   key: string,
   columns: TableMeta["columns"],
   references: TableMeta["references"] = [],
-): TableMeta => ({ name, mode: "files", path: name, key, columns, formats: {}, references, count: 1, inDb: true });
+): TableMeta => ({
+  name,
+  mode: "files",
+  path: name,
+  key,
+  columns,
+  formats: {},
+  references,
+  count: 1,
+  inDb: true,
+  group: null,
+});
 
 const view = (
   name: string,

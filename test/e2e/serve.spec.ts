@@ -214,3 +214,20 @@ test("editing a Markdown note's body in the drawer changes only the body in the 
   await drawer.getByRole("tab", { name: "File" }).click();
   await expect(drawer.getByText("# keep this comment")).toBeVisible();
 });
+
+test("a table's group is set in the header, written to yamlite.yaml and shown in the sidebar", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "title: A\n", "notes/a.yaml": "title: N\n" }, (r) => (app = r));
+  const running = app;
+  await page.goto(`${running.url}#/t/tasks`);
+  await page.getByRole("button", { name: /^group:/ }).click();
+  await page.getByRole("combobox", { name: "group name" }).fill("Work");
+  await page.getByRole("button", { name: "保存" }).click();
+  const sidebar = page.getByRole("complementary", { name: "sidebar" });
+  const work = sidebar.getByRole("group", { name: "Work" });
+  await expect(work.getByRole("link", { name: /tasks/ })).toBeVisible();
+  await expect(sidebar.getByRole("link", { name: /notes/ })).toBeVisible();
+  await expect(work.getByRole("link", { name: /notes/ })).toHaveCount(0);
+  expect(file(running, "yamlite.yaml")).toMatch(/tasks:\n(?:\s{4}.*\n)*\s{4}group: Work\n/);
+  await sidebar.getByRole("button", { name: "Work" }).click();
+  await expect(work.getByRole("link", { name: /tasks/ })).toHaveCount(0);
+});

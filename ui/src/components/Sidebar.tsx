@@ -1,11 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftRight, Layers, LayoutDashboard, Network, Plus, Table2, Terminal, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeftRight,
+  ChevronRight,
+  Layers,
+  LayoutDashboard,
+  Network,
+  Plus,
+  Table2,
+  Terminal,
+  TriangleAlert,
+} from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { warningLinks } from "@/lib/activity";
+import { groupTables, useCollapsedGroups } from "@/lib/groups";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
+import type { TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const item = "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2";
@@ -34,6 +46,36 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
   const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts, enabled: !readOnly });
   const conflictCount = conflicts?.conflicts.length ?? 0;
   const viewNames = new Set(meta?.views.map((v) => v.name));
+  const [collapsed, toggleGroup] = useCollapsedGroups();
+  const tableLinks = (t: TableMeta) => {
+    const links = warningLinks({ [t.name]: warnings[t.name] ?? [] }, viewNames);
+    const warnOf = (view: string | null) => links.filter((w) => w.view === view).length;
+    return (
+      <Fragment key={t.name}>
+        <Link to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
+          <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
+          {t.name}
+          <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
+        </Link>
+        {meta?.views
+          .filter((v) => v.table === t.name)
+          .map((v) => (
+            <Link
+              key={v.name}
+              to="/t/$table"
+              params={{ table: v.name }}
+              className={item}
+              activeProps={active}
+              style={{ paddingLeft: `${10 + v.depth * 14}px` }}
+            >
+              <WarnMark count={warnOf(v.name)} fallback={<Layers className="size-3.5 shrink-0 opacity-70" />} />
+              <span className="truncate">{v.name}</span>
+              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{v.count}</span>
+            </Link>
+          ))}
+      </Fragment>
+    );
+  };
   return (
     <aside className="flex min-h-0 flex-col border-r bg-panel" aria-label="sidebar">
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
@@ -53,35 +95,25 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
         Tables
       </div>
       <nav className="flex flex-col gap-px overflow-auto">
-        {meta?.tables.map((t) => {
-          const links = warningLinks({ [t.name]: warnings[t.name] ?? [] }, viewNames);
-          const warnOf = (view: string | null) => links.filter((w) => w.view === view).length;
-          return (
-            <Fragment key={t.name}>
-              <Link to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
-                <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
-                {t.name}
-                <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
-              </Link>
-              {meta.views
-                .filter((v) => v.table === t.name)
-                .map((v) => (
-                  <Link
-                    key={v.name}
-                    to="/t/$table"
-                    params={{ table: v.name }}
-                    className={item}
-                    activeProps={active}
-                    style={{ paddingLeft: `${10 + v.depth * 14}px` }}
-                  >
-                    <WarnMark count={warnOf(v.name)} fallback={<Layers className="size-3.5 shrink-0 opacity-70" />} />
-                    <span className="truncate">{v.name}</span>
-                    <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{v.count}</span>
-                  </Link>
-                ))}
-            </Fragment>
-          );
-        })}
+        {meta &&
+          groupTables(meta.tables).map(({ group, tables }) => {
+            if (group === null) return <Fragment key="">{tables.map(tableLinks)}</Fragment>;
+            const open = !collapsed.has(group);
+            return (
+              <div key={`g:${group}`} role="group" aria-label={group} className="flex flex-col gap-px">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  className="mx-1.5 mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] font-semibold text-muted-foreground hover:bg-panel-2"
+                  onClick={() => toggleGroup(group)}
+                >
+                  <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+                  <span className="truncate">{group}</span>
+                </button>
+                {open && tables.map(tableLinks)}
+              </div>
+            );
+          })}
         {!readOnly && (
           <button
             type="button"
