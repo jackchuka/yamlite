@@ -177,3 +177,59 @@ test("a markdown editor follows a theme change made while it is open", async () 
   await waitFor(() => expect((editor.closest(".cm-editor") ?? editor).className).not.toBe(before));
   document.documentElement.dataset.theme = "light";
 });
+
+test("a column with values is a select that emits the listed value", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["status"]} value="todo" type="TEXT" allowed={["todo", "done"]} onChange={onChange} />));
+  const select = screen.getByLabelText("status") as HTMLSelectElement;
+  expect([...select.options].map((o) => o.textContent)).toEqual(["—", "todo", "done"]);
+  fireEvent.change(select, { target: { value: "done" } });
+  expect(onChange).toHaveBeenLastCalledWith("done");
+  fireEvent.change(select, { target: { value: "" } });
+  expect(onChange).toHaveBeenLastCalledWith(null);
+});
+
+test("a value outside the list stays selected and is marked", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["status"]} value="doen" type="TEXT" allowed={["todo", "done"]} onChange={onChange} />));
+  const select = screen.getByLabelText("status") as HTMLSelectElement;
+  expect(select.value).toBe("doen");
+  expect(select.getAttribute("aria-invalid")).toBe("true");
+  expect([...select.options].map((o) => o.textContent)).toContain("doen (not in values)");
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+test("numbers and booleans come back typed", () => {
+  const onChange = vi.fn();
+  const { unmount } = render(
+    wrap(<FormField path={["rank"]} value={1} type="INTEGER" allowed={[1, 2]} onChange={onChange} />),
+  );
+  fireEvent.change(screen.getByLabelText("rank"), { target: { value: "2" } });
+  expect(onChange).toHaveBeenLastCalledWith(2);
+  unmount();
+  render(wrap(<FormField path={["done"]} value={false} type="BOOLEAN" allowed={[true, false]} onChange={onChange} />));
+  const select = screen.getByLabelText("done") as HTMLSelectElement;
+  expect(select.value).toBe("0");
+  fireEvent.change(select, { target: { value: "1" } });
+  expect(onChange).toHaveBeenLastCalledWith(true);
+});
+
+test("an unset value with values shows the select, not the unset button", () => {
+  render(wrap(<FormField path={["status"]} value={null} type="TEXT" allowed={["todo"]} onChange={() => {}} />));
+  const el = screen.getByLabelText("status") as HTMLSelectElement;
+  expect(el.tagName).toBe("SELECT");
+  expect(el.value).toBe("");
+});
+
+test('a list holding 1 and "1" renders both options without a key collision', () => {
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  render(wrap(<FormField path={["n"]} value={1} type="TEXT" allowed={[1, "1"]} onChange={() => {}} />));
+  expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual(["—", "1", "1"]);
+  expect(error).not.toHaveBeenCalled();
+  error.mockRestore();
+});
+
+test("a JSON column ignores values", () => {
+  render(wrap(<FormField path={["tags"]} value={["a"]} type="JSON" allowed={["a"]} onChange={() => {}} />));
+  expect(screen.queryByRole("combobox")).toBeNull();
+});

@@ -28,9 +28,13 @@ export async function stop(child: ChildProcess): Promise<void> {
   clearTimeout(timer);
 }
 
-export async function start(files: Record<string, string>, track?: (r: Running) => void): Promise<Running> {
+export async function start(
+  files: Record<string, string>,
+  track?: (r: Running) => void,
+  config?: string,
+): Promise<Running> {
   const root = mkdtempSync(join(tmpdir(), "yamlite-e2e-"));
-  put(join(root, "yamlite.yaml"), "tables: {}\n");
+  put(join(root, "yamlite.yaml"), config ?? "tables: {}\n");
   for (const [path, content] of Object.entries(files)) put(join(root, path), content);
   const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], { stdio: ["ignore", "pipe", "inherit"] });
   const running: Running = { root, url: "", child };

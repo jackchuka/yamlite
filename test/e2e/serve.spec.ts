@@ -231,3 +231,20 @@ test("a table's group is set in the header, written to yamlite.yaml and shown in
   await sidebar.getByRole("button", { name: "Work" }).click();
   await expect(work.getByRole("link", { name: /tasks/ })).toHaveCount(0);
 });
+
+test("a column with values is edited with a select and saved to the file", async ({ page }) => {
+  app = await start(
+    { "tasks/buy-milk.yaml": "# errand\nstatus: todo\n" },
+    (r) => (app = r),
+    "tables:\n  tasks:\n    columns: { status: TEXT }\n    values:\n      status: [todo, done]\n",
+  );
+  await page.goto(app.url);
+  await page.getByRole("row", { name: /buy-milk/ }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await drawer.getByLabel("status", { exact: true }).selectOption("done");
+  await drawer.getByRole("button", { name: /Save/ }).click();
+  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  const text = file(app, "tasks/buy-milk.yaml");
+  expect(text).toContain("# errand");
+  expect(text).toContain("status: done");
+});
