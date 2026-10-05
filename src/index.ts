@@ -6,6 +6,7 @@ import { acquireLock } from "./lock.ts";
 import { checkReferences } from "./references.ts";
 import { Store } from "./store.ts";
 import type { PageSpec, TableSpec } from "./types.ts";
+import { checkValues } from "./values.ts";
 import { startWatch, type Watcher, type WatchHandlers, type WatchOptions } from "./watch.ts";
 
 export type { OpenOptions, TableInput } from "./config.ts";
@@ -70,10 +71,10 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
   };
 
   // checked after every table has synced, so the result does not depend on the order of tables
-  const withReferences = (results: TableResult[]): TableResult[] => {
+  const withChecks = (results: TableResult[]): TableResult[] => {
     for (const r of results) {
       const spec = config.tables.find((t) => t.name === r.table);
-      if (r.ok && spec) r.warnings.push(...checkReferences(store, spec, config.tables));
+      if (r.ok && spec) r.warnings.push(...checkValues(store, spec), ...checkReferences(store, spec, config.tables));
     }
     return results;
   };
@@ -88,7 +89,7 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
     async status(opts = {}) {
       if (closed) throw new Error("yamlite is closed");
       const dbTime = store.lastWriteMs();
-      return withReferences(select(opts.tables).map((t) => syncTable(ctx, t, { dryRun: true, dbTime })));
+      return withChecks(select(opts.tables).map((t) => syncTable(ctx, t, { dryRun: true, dbTime })));
     },
     async sync(opts = {}) {
       if (closed) throw new Error("yamlite is closed");
@@ -97,7 +98,7 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
       const dbTime = store.lastWriteMs();
       lock();
       registerTables();
-      return withReferences(
+      return withChecks(
         tables.map((t) => syncTable(ctx, t, { force: opts.force, forceConvert: opts.forceConvert, dbTime })),
       );
     },
