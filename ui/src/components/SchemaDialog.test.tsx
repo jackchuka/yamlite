@@ -22,6 +22,7 @@ test("references show their problems and indexes show whether they exist", async
     references: [
       { column: "project", table: "projects", target: "id", problems: ['project "blog" not found in projects.id (b)'] },
     ],
+    values: {},
     indexes: [
       { name: "yamlite_tasks_1", definition: "(project)", columns: ["project"], unique: false, inDb: true },
       { name: "yamlite_tasks_2", definition: "(nope)", columns: ["nope"], unique: false, inDb: false },
@@ -53,6 +54,7 @@ test("a table's expanded views link to them and show their problems", async () =
     columns: { id: "TEXT", milestones: "JSON" },
     declared: {},
     references: [],
+    values: {},
     indexes: [],
     otherIndexes: [],
     views: [
@@ -102,6 +104,7 @@ test("a view's schema comes from its meta, without a request", () => {
           identity: ["projects_id", "idx"],
           declared: { title: "TEXT" },
           references: [],
+          values: { title: ["Design", "Launch"] },
           count: 2,
           inDb: true,
         }}
@@ -111,9 +114,33 @@ test("a view's schema comes from its meta, without a request", () => {
     </QueryClientProvider>,
   );
   expect(screen.getByText("projects_id, idx")).toBeTruthy();
-  const label = (column: string) => screen.getByText(column).closest("tr")?.lastElementChild?.textContent;
+  const label = (column: string) => screen.getByText(column).closest("tr")?.children[2]?.textContent;
   expect(label("idx")).toBe("identity");
   expect(label("title")).toBe("宣言済み");
   expect(label("points")).toBe("推論");
+  expect(screen.getByText("Design, Launch")).toBeTruthy();
   expect(api.schema).not.toHaveBeenCalled();
+});
+
+test("a column's allowed values are listed", async () => {
+  vi.mocked(api.schema).mockResolvedValue({
+    name: "tasks",
+    mode: "files",
+    path: "tasks",
+    key: "id",
+    inDb: true,
+    columns: { id: "TEXT", status: "TEXT" },
+    declared: { status: "TEXT" },
+    references: [],
+    values: { status: ["todo", "done"] },
+    indexes: [],
+    otherIndexes: [],
+    views: [],
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("todo, done")).toBeTruthy();
 });

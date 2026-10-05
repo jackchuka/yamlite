@@ -33,6 +33,7 @@ export const schemaRoutes: Routes = (router, ctx) => {
       inDb,
       columns: inDb ? Object.fromEntries(store.columns(spec.name)) : { [spec.key]: "TEXT", ...spec.columns },
       declared: spec.columns,
+      values: spec.values,
       references: spec.references.map((r) => {
         const target = r.target ?? ctx.y.tables.find((t) => t.name === r.table)?.key ?? "id";
         return {
