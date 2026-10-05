@@ -15,6 +15,7 @@ const table = (
   columns,
   formats: {},
   values: {},
+  required: [],
   references,
   count: 1,
   inDb: true,
@@ -37,6 +38,7 @@ const view = (
   declared: {},
   references,
   values: {},
+  required: [],
   count: 2,
   inDb: true,
 });
@@ -65,6 +67,7 @@ const schema = (
   declared: {},
   references,
   values: {},
+  required: [],
   indexes: [],
   otherIndexes: [],
   views,

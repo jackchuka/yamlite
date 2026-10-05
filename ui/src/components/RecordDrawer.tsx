@@ -215,7 +215,10 @@ export function RecordDrawer({
               return (
                 <div key={f} className="mb-3.5">
                   <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground">
-                    {f}
+                    <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
+                      {f}
+                      {table.required.includes(f) && <span aria-label="required"> *</span>}
+                    </span>
                     <span className="font-mono text-[10px] font-medium">
                       {reference ? `→ ${reference.table}` : (columnFormat(table, f) ?? columnType(table, f) ?? "new")}
                     </span>

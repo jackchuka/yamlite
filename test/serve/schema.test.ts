@@ -81,3 +81,15 @@ test("meta and schema carry each table's values", async () => {
   const schema = await t.api("/api/tables/tasks/schema");
   expect(schema.body.values).toEqual({ status: ["todo", "done"] });
 });
+
+test("meta and schema carry each table's required columns", async () => {
+  t = await startServe(
+    { "tasks/a.yaml": "title: A\n" },
+    "tables:\n  tasks:\n    columns: { title: TEXT }\n    required: [title]\n",
+  );
+  const served = t;
+  await waitForAsync(async () => (await served.api("/api/tables/tasks/schema")).status === 200);
+  const meta = await t.api("/api/meta");
+  expect(meta.body.tables.find((x: { name: string }) => x.name === "tasks").required).toEqual(["title"]);
+  expect((await t.api("/api/tables/tasks/schema")).body.required).toEqual(["title"]);
+});

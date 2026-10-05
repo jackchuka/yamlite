@@ -19,6 +19,7 @@ export interface TableMeta {
   formats: Record<string, ColumnFormat>;
   references: Reference[];
   values: Record<string, AllowedValue[]>;
+  required: string[];
   count: number;
   inDb: boolean;
   group: string | null;
@@ -34,6 +35,7 @@ export interface ViewMeta {
   declared: Record<string, ColumnType>;
   references: Reference[];
   values: Record<string, AllowedValue[]>;
+  required: string[];
   count: number;
   inDb: boolean;
 }
@@ -69,6 +71,7 @@ export interface TableSchema {
   declared: Record<string, ColumnType>;
   references: Array<{ column: string; table: string; target: string; problems: string[] }>;
   values: Record<string, AllowedValue[]>;
+  required: string[];
   indexes: Array<{
     name: string;
     definition: string;
