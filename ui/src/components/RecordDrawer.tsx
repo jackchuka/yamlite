@@ -218,7 +218,7 @@ export function RecordDrawer({
         }}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex items-center gap-2 border-b px-4 py-3 max-md:flex-wrap max-md:gap-1 max-md:px-2 max-md:pt-[calc(0.5rem+env(safe-area-inset-top))] max-md:pb-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-4 py-3 max-md:gap-1 max-md:px-2 max-md:pt-[calc(0.5rem+env(safe-area-inset-top))] max-md:pb-2">
           {mobile && (
             <button
               type="button"
@@ -229,7 +229,8 @@ export function RecordDrawer({
               <ArrowLeft className="size-5" />
             </button>
           )}
-          <span className="min-w-0 truncate font-mono font-bold max-md:flex-1">{recordKey}</span>
+          {/* a narrow panel moves the tabs to their own line rather than cut the key down to one letter */}
+          <span className="min-w-[6rem] flex-1 truncate font-mono font-bold">{recordKey}</span>
           {headerActions}
           <TabsList className="ml-auto h-7 max-md:order-last max-md:ml-0 max-md:h-9 max-md:w-full">
             <TabsTrigger value="form" className={tabTrigger}>
