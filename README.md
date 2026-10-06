@@ -448,6 +448,7 @@ tables:
     files: "content/**/*.mdx" # MDX: JSX in the body is kept as text
 ```
 
+- The web UI previews the body as rendered Markdown. For `*.mdx`, components, `{expressions}` and `import`/`export` lines are shown as written, never run.
 - A file without front matter is a record with only a body; adding a field adds a front matter block.
 - Writes change only what changed: editing only the body leaves the front matter text as it was, and editing a field leaves the body's bytes alone. A field edit rewrites the front matter the way it does for a YAML file: comments mostly stay on their lines, but a comment-only block loses its comment when the first field is added, and spacing or number formatting on other lines can be normalised. CRLF line endings and a BOM are kept.
 - Only YAML front matter is read. A file with TOML (`+++`) or JSON front matter is skipped with a warning and never written.

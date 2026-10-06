@@ -38,3 +38,40 @@ test("nested values show a size badge and a key preview", () => {
   expect(cellView([{ a: 1 }, { a: 2 }], "JSON")).toEqual({ kind: "nested", label: "[2]", preview: "{1}, {1}" });
   expect(cellView({}, "JSON")).toEqual({ kind: "nested", label: "{0}", preview: "" });
 });
+
+test("a markdown column shows its text without the markup", () => {
+  const body = [
+    'import { Callout } from "./Callout";',
+    "",
+    "# Hello world",
+    "",
+    "This post uses **MDX** and `code`,",
+    "with a [link](https://example.com).",
+    "",
+    '<Callout type="warning">',
+    "  Be careful.",
+    "</Callout>",
+    "",
+    "```ts",
+    "const x = 1;",
+    "```",
+    "",
+    "- [x] done",
+    "- todo",
+    "",
+    "| a | b |",
+    "|---|---|",
+    "| 1 | 2 |",
+  ].join("\n");
+  expect(cellView(body, "TEXT", "markdown")).toEqual({
+    kind: "text",
+    text: "Hello world · This post uses MDX and code, with a link. · Be careful. · done · todo · a b · 1 2",
+  });
+});
+
+test("snake_case and prose that starts with Export are left alone", () => {
+  expect(cellView("Export the file_name_here\n", "TEXT", "markdown")).toEqual({
+    kind: "text",
+    text: "Export the file_name_here",
+  });
+});

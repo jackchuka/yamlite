@@ -58,7 +58,7 @@ function RenameButton({ table, recordKey }: { table: TableMeta; recordKey: strin
         type="button"
         aria-label={m.nav_rename_key()}
         disabled={!connected}
-        className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 max-md:px-2 max-md:py-2 max-md:text-[13px]"
+        className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 max-md:px-2 max-md:py-2 max-md:text-[13px]"
         onClick={() => setOpen(true)}
       >
         {m.nav_rename()}

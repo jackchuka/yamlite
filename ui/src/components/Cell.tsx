@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { cellView } from "@/lib/cell";
 import { Highlight } from "@/lib/highlight";
-import type { ColumnType } from "@/lib/types";
+import type { ColumnFormat, ColumnType } from "@/lib/types";
 import { JsonPopover } from "./JsonPopover";
 
 export const chip = "inline-block rounded-full bg-chip px-[7px] text-[11.5px] text-chip-foreground mr-[3px]";
@@ -9,15 +9,17 @@ export const chip = "inline-block rounded-full bg-chip px-[7px] text-[11.5px] te
 export function Cell({
   value,
   type,
+  format,
   column,
   rowKey,
 }: {
   value: unknown;
   type: ColumnType;
+  format?: ColumnFormat;
   column: string;
   rowKey: string;
 }) {
-  const v = cellView(value, type);
+  const v = cellView(value, type, format);
   switch (v.kind) {
     case "null":
       return <span className="text-muted-foreground">—</span>;

@@ -142,32 +142,57 @@
 
 /* rendered markdown in a form field; preflight strips the defaults */
 .md-preview {
-  line-height: 1.6;
+  font-size: 14px;
+  line-height: 1.7;
   overflow-wrap: anywhere;
-  & > * + * {
-    margin-top: 0.6em;
+  & > * + *,
+  & .mdx-jsx > * + * {
+    margin-top: 0.75em;
+  }
+  & :is(h1, h2, h3, h4, h5, h6) {
+    line-height: 1.3;
+    font-weight: 700;
+  }
+  & * + :is(h1, h2, h3, h4, h5, h6) {
+    margin-top: 1.4em;
   }
   & h1 {
-    font-size: 1.4em;
-    font-weight: 700;
+    font-size: 1.6em;
   }
   & h2 {
-    font-size: 1.2em;
-    font-weight: 700;
+    font-size: 1.3em;
+    padding-bottom: 0.2em;
+    border-bottom: 1px solid var(--y-line);
   }
-  & h3,
+  & h3 {
+    font-size: 1.1em;
+  }
   & h4,
   & h5,
   & h6 {
     font-weight: 600;
   }
+  & strong {
+    font-weight: 700;
+  }
+  & em {
+    font-style: italic;
+  }
+  & del {
+    color: var(--y-muted);
+  }
   & ul {
     list-style: disc;
-    padding-left: 1.4em;
+    padding-left: 1.5em;
   }
   & ol {
     list-style: decimal;
-    padding-left: 1.4em;
+    padding-left: 1.5em;
+  }
+  & li + li,
+  & li > ul,
+  & li > ol {
+    margin-top: 0.25em;
   }
   /* GFM task lists: the checkbox is the marker */
   & .contains-task-list {
@@ -175,45 +200,148 @@
     padding-left: 0.2em;
   }
   & .task-list-item input {
-    margin-right: 0.4em;
+    margin-right: 0.5em;
     vertical-align: middle;
   }
   & a {
     color: var(--y-accent);
     text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  & img {
+    max-width: 100%;
+    border-radius: 6px;
   }
   & code {
     font-family: var(--font-mono);
-    font-size: 0.92em;
+    font-size: 0.88em;
     background: var(--y-panel);
-    border-radius: 3px;
-    padding: 0 0.25em;
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
   }
   & pre {
     background: var(--y-panel);
+    border: 1px solid var(--y-line);
     border-radius: 6px;
-    padding: 0.6em 0.8em;
+    padding: 0.75em 1em;
     overflow-x: auto;
+    line-height: 1.55;
     & code {
       padding: 0;
+      background: none;
+      font-size: 0.86em;
     }
   }
   & blockquote {
-    border-left: 3px solid var(--y-line);
-    padding-left: 0.8em;
+    background: var(--y-panel);
+    border-radius: 6px;
+    padding: 0.5em 0.9em;
     color: var(--y-muted);
+    font-style: italic;
+  }
+  & .md-table {
+    overflow-x: auto;
   }
   & table {
     border-collapse: collapse;
+    font-size: 0.95em;
   }
   & th,
   & td {
     border: 1px solid var(--y-line);
-    padding: 0.2em 0.5em;
+    padding: 0.35em 0.8em;
+    text-align: left;
+  }
+  & th {
+    background: var(--y-panel);
+    font-weight: 600;
   }
   & hr {
     border-color: var(--y-line);
+    margin: 1.2em 0;
   }
+  & .md-error {
+    font-size: 12px;
+    color: var(--y-warn);
+  }
+
+  /* MDX: components and expressions are shown as written, never run */
+  & .mdx-tag {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--y-chip-text);
+    overflow-wrap: anywhere;
+  }
+  & .mdx-jsx {
+    border: 1px dashed var(--y-line);
+    border-radius: 6px;
+    padding: 0.5em 0.9em;
+    &:has(> .mdx-tag:only-child) {
+      padding: 0.35em 0.9em;
+    }
+  }
+  & .mdx-jsx-inline {
+    border-bottom: 1px dashed var(--y-chip-text);
+    & > .mdx-tag {
+      display: inline;
+    }
+  }
+  & .mdx-expr {
+    color: var(--y-chip-text);
+    background: var(--y-chip);
+  }
+  & .mdx-esm {
+    font-size: 12px;
+    color: var(--y-muted);
+    & summary {
+      font-family: var(--font-mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    & pre {
+      margin-top: 0.4em;
+    }
+  }
+}
+
+/* code fences in the preview, colored like the editors */
+.tok-keyword,
+.tok-tagName,
+.tok-operatorKeyword,
+.tok-modifier {
+  color: var(--y-k);
+}
+.tok-string,
+.tok-string2,
+.tok-attributeValue {
+  color: var(--y-s);
+}
+.tok-number,
+.tok-bool,
+.tok-atom,
+.tok-literal,
+.tok-attributeName,
+.tok-typeName,
+.tok-className {
+  color: var(--y-n);
+}
+.tok-comment,
+.tok-meta {
+  color: var(--y-muted);
+  font-style: italic;
+}
+.tok-heading,
+.tok-strong {
+  font-weight: 700;
+}
+.tok-emphasis {
+  font-style: italic;
+}
+.tok-link,
+.tok-url {
+  color: var(--y-accent);
 }
 
 /* while the record panel is resized, a page's iframe must not take the pointer */
