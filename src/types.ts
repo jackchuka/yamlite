@@ -1,11 +1,14 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
 export const COLUMN_TYPES: readonly ColumnType[] = ["INTEGER", "REAL", "TEXT", "BOOLEAN", "JSON"];
-// how the UI edits a TEXT column, declared under `formats` in yamlite.yaml
-export type ColumnFormat = "markdown";
-export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown"];
+// how the UI edits a TEXT column, declared under `formats` in yamlite.yaml; date and datetime are also checked
+export type ColumnFormat = "markdown" | "date" | "datetime";
+export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown", "date", "datetime"];
 
 // a value a column may hold, declared under `values` in yamlite.yaml
 export type AllowedValue = string | number | boolean;
+
+// a min or max: a number for INTEGER and REAL columns, a date or datetime for those formats
+export type Bound = number | string;
 
 export type Mode = "files" | "list";
 export type Rec = Record<string, unknown>;
@@ -41,6 +44,9 @@ export interface ExpandSpec {
   values: Record<string, AllowedValue[]>;
   // columns that must hold a value (not NULL); checked after every sync, never enforced
   required: string[];
+  // bounds per column, both included; checked after every sync, never enforced
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
   expand: ExpandSpec[];
 }
 
@@ -83,6 +89,9 @@ export interface TableSpec {
   values: Record<string, AllowedValue[]>;
   // columns that must hold a value (not NULL); checked after every sync, never enforced
   required: string[];
+  // bounds per column, both included; checked after every sync, never enforced
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
   // whether yamlite.yaml is the schema of record (root mode tables, not the ones passed in code)
   persisted: boolean;
   // files that other tables (and yamlite.yaml) own inside this files table's folder

@@ -4,6 +4,7 @@ import { watch as chokidarWatch, type FSWatcher } from "chokidar";
 import { type ConflictInfo, type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { checkReferences, referrersOf } from "./references.ts";
 import { checkRequired } from "./required.ts";
+import { checkBounds, checkFormats } from "./rulecheck.ts";
 import { matchesFiles } from "./source/files.ts";
 import type { TableSpec } from "./types.ts";
 import { checkValues } from "./values.ts";
@@ -149,6 +150,8 @@ export function startWatch(
           result.warnings.push(
             ...checkValues(ctx.store, table),
             ...checkRequired(ctx.store, table),
+            ...checkFormats(ctx.store, table),
+            ...checkBounds(ctx.store, table),
             ...checkReferences(ctx.store, table, all()),
           );
         }

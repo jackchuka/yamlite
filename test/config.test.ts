@@ -36,6 +36,8 @@ test("discovers tables by convention", () => {
     references: [],
     values: {},
     required: [],
+    min: {},
+    max: {},
     persisted: true,
     exclude: [],
     expand: [],
@@ -321,6 +323,8 @@ test("expand declares views over JSON columns, nested", () => {
       references: [],
       values: {},
       required: [],
+      min: {},
+      max: {},
       expand: [
         {
           field: "tasks",
@@ -330,6 +334,8 @@ test("expand declares views over JSON columns, nested", () => {
           references: [{ column: "owner", table: "people", target: "slug" }],
           values: {},
           required: [],
+          min: {},
+          max: {},
           expand: [],
         },
       ],
@@ -342,6 +348,8 @@ test("expand declares views over JSON columns, nested", () => {
       references: [],
       values: {},
       required: [],
+      min: {},
+      max: {},
       expand: [],
     },
   ]);
@@ -557,4 +565,63 @@ test.each([['group: ""'], ['group: "  "'], ["group: 1"], ["group: [a]"]])("rejec
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), `tables:\n  t:\n    ${entry}\n`);
   expect(() => resolveConfig({ root })).toThrow('table "t": group must be a non-empty string');
+});
+
+const bounded = (yaml: string) => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), yaml);
+  return () => resolveConfig({ root });
+};
+
+test("min and max: numbers for INTEGER and REAL columns, dates for date and datetime formats", () => {
+  const config = bounded(
+    [
+      "tables:",
+      "  tasks:",
+      "    columns: { priority: INTEGER, ratio: REAL, due: TEXT, at: TEXT }",
+      "    formats: { due: date, at: datetime }",
+      "    min: { priority: 1, ratio: 0.5, due: 2026-01-01, at: 2026-01-01 }",
+      "    max: { priority: 5, at: 2026-12-31T23:59:59+09:00 }",
+      "    expand:",
+      "      milestones:",
+      "        columns: { points: INTEGER }",
+      "        max: { points: 13 }",
+      "",
+    ].join("\n"),
+  )();
+  const tasks = config.tables.find((t) => t.name === "tasks")!;
+  expect({ ...tasks.min }).toEqual({ priority: 1, ratio: 0.5, due: "2026-01-01", at: "2026-01-01" });
+  expect({ ...tasks.max }).toEqual({ priority: 5, at: "2026-12-31T23:59:59+09:00" });
+  expect({ ...tasks.expand[0]!.max }).toEqual({ points: 13 });
+});
+
+test.each([
+  ["    min: { title: 1 }\n", 'table "tasks": min.title needs an INTEGER or REAL column, or a date or datetime format'],
+  ["    min: { due: soon }\n", 'table "tasks": min.due: "soon" is not a date'],
+  ["    max: { due: 5 }\n", 'table "tasks": max.due: 5 is not a date'],
+  ['    max: { priority: "5" }\n', 'table "tasks": max.priority: "5" is not a number'],
+  ["    min: { priority: 5 }\n    max: { priority: 1 }\n", 'table "tasks": min.priority (5) is above max.priority (1)'],
+  ["    min: [priority]\n", 'table "tasks": min must be a map of columns to numbers or dates'],
+  [
+    "    min: { at: 2026-01-01T00:00 }\n    max: { at: 2025-12-31 }\n",
+    'table "tasks": min.at (2026-01-01T00:00) is above max.at (2025-12-31)',
+  ],
+])("a bad bound is an error: %s", (lines, error) => {
+  const config = bounded(
+    "tables:\n  tasks:\n    columns: { priority: INTEGER, title: TEXT, due: TEXT, at: TEXT }\n    formats: { due: date, at: datetime }\n" +
+      lines,
+  );
+  expect(config).toThrow(error);
+});
+
+test("a bound in an expand entry needs the type declared there", () => {
+  const config = bounded("tables:\n  projects:\n    expand:\n      milestones:\n        max: { points: 13 }\n");
+  expect(config).toThrow(
+    'table "projects": expand.milestones.max.points needs an INTEGER or REAL column, or a date or datetime format',
+  );
+});
+
+test("a date column cannot have values", () => {
+  const config = bounded("tables:\n  tasks:\n    formats: { due: date }\n    values: { due: [2026-01-01] }\n");
+  expect(config).toThrow('table "tasks": values.due: a date column cannot have values');
 });

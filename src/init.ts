@@ -3,12 +3,13 @@ import { isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Document, type YAMLSeq } from "yaml";
 import { configPath, expandToRaw, filesOf, isConventional, referenceToRaw, resolveConfig } from "./config.ts";
+import { isDate, isDatetime } from "./datetime.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
 import { checkShapes, inferColumns, logicalType } from "./schema.ts";
 import { STRINGIFY_OPTIONS } from "./source/yamldoc.ts";
 import { q } from "./store.ts";
-import type { ColumnType, IndexSpec, TableSpec } from "./types.ts";
+import type { ColumnFormat, ColumnType, IndexSpec, Rec, TableSpec } from "./types.ts";
 
 export interface InitOptions {
   root: string;
@@ -110,7 +111,10 @@ function dbIndexes(db: DatabaseSync | null, table: string): FoundIndex[] {
   return found;
 }
 
-function columnsFor(spec: TableSpec, existing: Map<string, ColumnType> | null): Map<string, ColumnType> {
+function columnsFor(
+  spec: TableSpec,
+  existing: Map<string, ColumnType> | null,
+): { columns: Map<string, ColumnType>; records: Iterable<Rec> } {
   const files = makeSource(spec).read();
   if (files.tableError) throw new Error(`${spec.name}: ${files.tableError}`);
   const shapes = checkShapes(files.records, existing ?? new Map(), spec.columns);
@@ -121,7 +125,33 @@ function columnsFor(spec: TableSpec, existing: Map<string, ColumnType> | null): 
   }
   for (const [column, type] of Object.entries(spec.columns)) if (!existing?.has(column)) columns.set(column, type);
   if (spec.mode === "files") columns.delete(spec.key);
-  return columns;
+  return { columns, records: files.records.values() };
+}
+
+// TEXT columns that hold only dates (or dates and datetimes) get that format, so the UI offers a picker
+function inferFormats(
+  records: Iterable<Rec>,
+  columns: Map<string, ColumnType>,
+  spec: TableSpec,
+): Record<string, ColumnFormat> {
+  const seen = new Map<string, "date" | "datetime" | null>();
+  for (const record of records) {
+    for (const [column, value] of Object.entries(record)) {
+      if (value === null || value === undefined || seen.get(column) === null) continue;
+      const kind = isDate(value) ? "date" : isDatetime(value) ? "datetime" : null;
+      seen.set(
+        column,
+        kind === null ? null : kind === "datetime" || seen.get(column) === "datetime" ? "datetime" : "date",
+      );
+    }
+  }
+  const formats: Record<string, ColumnFormat> = {};
+  for (const [column, format] of seen) {
+    if (format === null || columns.get(column) !== "TEXT") continue;
+    if (Object.hasOwn(spec.formats, column) || Object.hasOwn(spec.values, column)) continue;
+    formats[column] = format;
+  }
+  return formats;
 }
 
 function displayPath(root: string, path: string): string {
@@ -148,18 +178,23 @@ export function generateConfig(opts: InitOptions): string {
       }
       if (spec.body !== null && spec.body !== "body") entry.body = spec.body;
       if (spec.key !== "id") entry.key = spec.key;
-      const columns = columnsFor(spec, dbColumns(db, spec.name));
+      const { columns, records } = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);
       // the body column's markdown format comes with body:, so it is not written out
-      const formats = Object.fromEntries(
-        Object.entries(spec.formats).filter(([column, format]) => !(column === spec.body && format === "markdown")),
-      );
+      const formats = {
+        ...Object.fromEntries(
+          Object.entries(spec.formats).filter(([column, format]) => !(column === spec.body && format === "markdown")),
+        ),
+        ...inferFormats(records, columns, spec),
+      };
       if (Object.keys(formats).length > 0) entry.formats = formats;
       if (spec.references.length > 0) {
         entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
       }
       if (Object.keys(spec.values).length > 0) entry.values = { ...spec.values };
       if (spec.required.length > 0) entry.required = [...spec.required];
+      if (Object.keys(spec.min).length > 0) entry.min = { ...spec.min };
+      if (Object.keys(spec.max).length > 0) entry.max = { ...spec.max };
       if (spec.expand.length > 0) entry.expand = expandToRaw(spec.expand);
       const node = doc.createNode(entry);
       const found = dbIndexes(db, spec.name);

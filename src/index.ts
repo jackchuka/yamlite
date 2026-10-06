@@ -5,6 +5,7 @@ import { type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { acquireLock } from "./lock.ts";
 import { checkReferences } from "./references.ts";
 import { checkRequired } from "./required.ts";
+import { checkBounds, checkFormats } from "./rulecheck.ts";
 import { Store } from "./store.ts";
 import type { PageSpec, TableSpec } from "./types.ts";
 import { checkValues } from "./values.ts";
@@ -81,6 +82,8 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
         r.warnings.push(
           ...checkValues(store, spec),
           ...checkRequired(store, spec),
+          ...checkFormats(store, spec),
+          ...checkBounds(store, spec),
           ...checkReferences(store, spec, config.tables),
         );
       }
