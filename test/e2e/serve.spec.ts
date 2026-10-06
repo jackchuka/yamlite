@@ -192,6 +192,9 @@ test("the ERD draws tables and their references, and opens a table on double-cli
   await expect(page.getByTestId("erd-node-people")).toBeVisible();
   await expect(page.getByTestId("rf__edge-ref:tasks.assignee")).toBeAttached();
   await expect(tasks.getByTitle('assignee "zed" not found in people.id (b)')).toBeVisible();
+  // the column's own warning mark is what opens its problems, so it shows once
+  await expect(tasks.getByRole("button", { name: "assignee problems" }).getByLabel("problem")).toBeVisible();
+  await expect(tasks.getByLabel("problem", { exact: true })).toHaveCount(1);
   await page.getByTestId("rf__node-people").dblclick();
   await expect(page.getByRole("heading", { name: "people", exact: true })).toBeVisible();
 });

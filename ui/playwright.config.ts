@@ -7,5 +7,13 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: false,
   reporter: "list",
-  use: { ...devices["Desktop Chrome"], viewport: { width: 1400, height: 900 }, trace: "retain-on-failure" },
+  use: { trace: "retain-on-failure" },
+  projects: [
+    {
+      name: "desktop",
+      testIgnore: "**/mobile.spec.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1400, height: 900 } },
+    },
+    { name: "mobile", testMatch: "**/mobile.spec.ts", use: { ...devices["iPhone 13"] } },
+  ],
 });
