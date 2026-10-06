@@ -157,6 +157,9 @@ export function createStaticApi(opts: {
         return select(sql);
       }),
     conflicts: async () => ({ conflicts: [] }),
+    history: async () => ({ state: "nogit" as const }),
+    historyDiff: () =>
+      Promise.reject(new ApiError(404, "no git history in a snapshot", {})) as Promise<{ text: string }>,
     conflict: () => Promise.reject(new ApiError(404, "no conflicts in a snapshot", {})) as Promise<ConflictDetail>,
     create: refuse,
     update: refuse,
