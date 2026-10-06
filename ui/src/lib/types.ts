@@ -106,6 +106,32 @@ export interface RecordDetail {
   yamlError?: string;
 }
 
+export interface HistoryChange {
+  path: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface HistoryEntry {
+  kind: "wip" | "commit";
+  sha: string | null;
+  head: boolean;
+  subject: string | null;
+  author: string | null;
+  date: string;
+  path: string;
+  renamedFrom?: string;
+  event?: "created" | "deleted";
+  unreadable?: boolean;
+  changes: HistoryChange[];
+  record: Row | null;
+}
+
+export type HistoryPage =
+  | { state: "nogit" | "untracked" }
+  | { state: "error"; message: string }
+  | { state: "ok"; entries: HistoryEntry[]; next: string | null };
+
 export type ChangeOp = "toDb" | "toFile" | "deleteDb" | "deleteFile";
 
 export interface Change {

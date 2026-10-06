@@ -23,7 +23,7 @@ export function recordFile(spec: TableSpec, key: string): string {
 }
 
 // a key is never a path, but a record file must stay inside its table directory regardless
-function insideTable(spec: TableSpec, file: string): boolean {
+export function insideTable(spec: TableSpec, file: string): boolean {
   if (spec.mode === "list") return true;
   const rel = relative(spec.path, file);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);

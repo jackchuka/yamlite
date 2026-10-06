@@ -15,7 +15,7 @@ vi.mock("@/lib/providers", () => ({
 }));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
-  api: { record: vi.fn(), update: vi.fn(), remove: vi.fn(), rows: vi.fn() },
+  api: { record: vi.fn(), update: vi.fn(), remove: vi.fn(), rows: vi.fn(), history: vi.fn(), historyDiff: vi.fn() },
 }));
 
 const table: TableMeta = {
@@ -266,4 +266,73 @@ test("a required column is starred, and warns while it is empty", async () => {
   );
   const filled = (await screen.findByText("title")).closest("span") as HTMLElement;
   expect(filled.className).not.toContain("text-warn");
+});
+
+test("after saving a restored version, a new edit is no longer labelled as restored", async () => {
+  vi.mocked(api.record)
+    .mockResolvedValueOnce({ row: { id: "a", title: "new", prio: null }, file: "tasks/a.yaml", yaml: "" })
+    .mockReturnValue(new Promise(() => {}));
+  vi.mocked(api.update).mockResolvedValue({ ok: true });
+  vi.mocked(api.history).mockResolvedValue({
+    state: "ok",
+    next: null,
+    entries: [
+      {
+        kind: "commit",
+        sha: "7be0d44".padEnd(40, "0"),
+        head: false,
+        subject: "old title",
+        author: "alice",
+        date: "2026-10-01T00:00:00Z",
+        path: "tasks/a.yaml",
+        changes: [{ path: "title", from: null, to: "old" }],
+        record: { title: "old" },
+      },
+    ],
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  fireEvent.mouseDown(await screen.findByRole("tab", { name: /History/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /old title/ }));
+  fireEvent.click(screen.getByRole("button", { name: "この版に戻す" }));
+  fireEvent.click(await screen.findByRole("button", { name: /Save/ }));
+  await waitFor(() => expect(screen.getByRole("button", { name: /Save/ }).hasAttribute("disabled")).toBe(true));
+  fireEvent.change(screen.getByLabelText("title"), { target: { value: "typed" } });
+  expect(screen.getByText("変更 1 件 · 保存するとファイルに反映")).toBeTruthy();
+});
+
+test("restoring a version fills the form, marks it unsaved, and Discard undoes it", async () => {
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "new", prio: 3 }, file: "tasks/a.yaml", yaml: "" });
+  vi.mocked(api.history).mockResolvedValue({
+    state: "ok",
+    next: null,
+    entries: [
+      {
+        kind: "commit",
+        sha: "7be0d44".padEnd(40, "0"),
+        head: false,
+        subject: "old title",
+        author: "alice",
+        date: "2026-10-01T00:00:00Z",
+        path: "tasks/a.yaml",
+        changes: [{ path: "title", from: null, to: "old" }],
+        record: { title: "old" },
+      },
+    ],
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  fireEvent.mouseDown(await screen.findByRole("tab", { name: /History/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /old title/ }));
+  fireEvent.click(screen.getByRole("button", { name: "この版に戻す" }));
+  expect(((await screen.findByLabelText("title")) as HTMLInputElement).value).toBe("old");
+  expect(screen.getByText("7be0d44 の値に戻しました · 2 項目が未保存")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+  expect(((await screen.findByLabelText("title")) as HTMLInputElement).value).toBe("new");
 });
