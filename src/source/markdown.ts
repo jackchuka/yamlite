@@ -4,8 +4,15 @@ import type { Rec } from "../types.ts";
 import type { Codec } from "./types.ts";
 import { NOT_A_MAPPING, parseRecordFile, STRINGIFY_OPTIONS, stripNulls, updateMap } from "./yamldoc.ts";
 
-export const MD_EXT = /\.md$/i;
-export const MD_GLOB = "**/*.md";
+export type MarkdownExt = ".md" | ".mdx";
+
+// a files glob ending in *.md or *.mdx makes a Markdown table, whose new files take that extension
+export function markdownExt(glob: string | null): MarkdownExt | null {
+  if (glob === null) return null;
+  if (glob.endsWith(".md")) return ".md";
+  if (glob.endsWith(".mdx")) return ".mdx";
+  return null;
+}
 const BOM = "\uFEFF";
 
 export interface FrontMatterSplit {
@@ -66,10 +73,10 @@ function frontFor(old: string | null, fields: Rec, keep: (field: string) => bool
   return withEol(parsed.doc.toString(STRINGIFY_OPTIONS), eol);
 }
 
-export function markdownCodec(body: string): Codec {
+export function markdownCodec(body: string, ext: MarkdownExt = ".md"): Codec {
   return {
-    ext: ".md",
-    match: MD_EXT,
+    ext,
+    match: ext === ".md" ? /\.md$/i : /\.mdx$/i,
     read(content) {
       const split = splitFrontMatter(content);
       if (!split.ok) return split;

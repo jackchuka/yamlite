@@ -1,7 +1,7 @@
 import { dirname } from "node:path";
 import { isMap, isSeq, parseDocument } from "yaml";
 import { type Extract, fileDiff, type HistoryTarget, recordHistory } from "../../githistory.ts";
-import { markdownCodec } from "../../source/markdown.ts";
+import { markdownCodec, markdownExt } from "../../source/markdown.ts";
 import { PARSE_OPTIONS, yamlCodec } from "../../source/yamldoc.ts";
 import { own, type Rec, type TableSpec } from "../../types.ts";
 import { type ApiContext, displayPath, tableSpec } from "../context.ts";
@@ -30,7 +30,8 @@ export function extractor(spec: TableSpec, key: string): Extract {
       return null;
     };
   }
-  const codec = spec.codec === "markdown" ? markdownCodec(spec.body ?? "body") : yamlCodec;
+  const codec =
+    spec.codec === "markdown" ? markdownCodec(spec.body ?? "body", markdownExt(spec.glob) ?? ".md") : yamlCodec;
   return (content) => {
     const read = codec.read(content);
     return read.ok ? read.record : "unreadable";

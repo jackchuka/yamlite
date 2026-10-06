@@ -8,7 +8,7 @@ import type { Decision, KeyState } from "./reconcile.ts";
 import { FilesSource } from "./source/files.ts";
 import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
-import { markdownCodec } from "./source/markdown.ts";
+import { markdownCodec, markdownExt } from "./source/markdown.ts";
 import { YAML_GLOB, yamlCodec } from "./source/yamldoc.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
 import type { ColumnType, TableSpec } from "./types.ts";
@@ -64,7 +64,8 @@ export interface TableResult {
 
 export function makeSource(spec: TableSpec): Source {
   if (spec.mode === "list") return new ListSource(spec.path, spec.key);
-  const codec = spec.codec === "markdown" ? markdownCodec(spec.body ?? "body") : yamlCodec;
+  const codec =
+    spec.codec === "markdown" ? markdownCodec(spec.body ?? "body", markdownExt(spec.glob) ?? ".md") : yamlCodec;
   return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude, codec);
 }
 

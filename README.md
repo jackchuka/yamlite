@@ -419,7 +419,7 @@ tables:
 
 ### Markdown files
 
-A `files:` glob ending in `*.md` makes a Markdown table: the YAML front matter between the `---` lines at the top of each file becomes columns, and the text below it goes into a `body` column, which the web UI edits as Markdown.
+A `files:` glob ending in `*.md` or `*.mdx` makes a Markdown table: the YAML front matter between the `---` lines at the top of each file becomes columns, and the text below it goes into a `body` column, which the web UI edits as Markdown.
 
 ```yaml
 tables:
@@ -428,12 +428,14 @@ tables:
   posts:
     files: "src/content/blog/**/*.md"
     body: content # name the body column something else
+  docs:
+    files: "content/**/*.mdx" # MDX: JSX in the body is kept as text
 ```
 
 - A file without front matter is a record with only a body; adding a field adds a front matter block.
 - Writes change only what changed: editing only the body leaves the front matter text as it was, and editing a field leaves the body's bytes alone. A field edit rewrites the front matter the way it does for a YAML file: comments mostly stay on their lines, but a comment-only block loses its comment when the first field is added, and spacing or number formatting on other lines can be normalised. CRLF line endings and a BOM are kept.
 - Only YAML front matter is read. A file with TOML (`+++`) or JSON front matter is skipped with a warning and never written.
-- A Markdown table exists only where `yamlite.yaml` declares one: neither `init` nor `sync` creates one from the `.md` files it finds, and a README next to your YAML stays a README. A folder holding no YAML files (only Markdown notes or images, say) is not discovered as a table.
+- A Markdown table exists only where `yamlite.yaml` declares one: neither `init` nor `sync` creates one from the `.md` or `.mdx` files it finds, and a README next to your YAML stays a README. A folder holding no YAML files (only Markdown notes or images, say) is not discovered as a table.
 
 ### Removing columns
 
@@ -610,7 +612,7 @@ Open your own `node:sqlite` (or any SQLite) connection to write to the database 
 
 - Local, single-machine use. One yamlite process per data folder.
 - Sized for hundreds to thousands of records per table; every sync scans the whole table.
-- No SQLite foreign-key constraints ([references](#references) are checked, not enforced). Only YAML is read: `.md` files through their YAML front matter, never TOML or JSON front matter or other formats.
+- No SQLite foreign-key constraints ([references](#references) are checked, not enforced). Only YAML is read: `.md` and `.mdx` files through their YAML front matter, never TOML or JSON front matter or other formats.
 - When a file is rewritten, the space before an inline comment is normalized to one (`a: 1  # note` → `a: 1 # note`).
 
 ## License
