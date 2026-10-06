@@ -46,23 +46,23 @@ test("shows rows, warnings and the SQL, and applies", async () => {
   renderCard(proposal);
   expect(screen.getByText("errand を完了に")).toBeTruthy();
   expect(screen.getByText("buy-milk")).toBeTruthy();
-  expect(screen.getByText("削除")).toBeTruthy();
+  expect(screen.getByText("Delete")).toBeTruthy();
   expect(screen.getByText(/title is required/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "2 件を適用" }));
+  fireEvent.click(screen.getByRole("button", { name: "Apply 2 changes" }));
   await waitFor(() => expect(apply).toHaveBeenCalledWith("p1"));
 });
 
 test("discards", async () => {
   discard.mockResolvedValue({ ...proposal, status: "discarded" });
   renderCard(proposal);
-  fireEvent.click(screen.getByRole("button", { name: "破棄" }));
+  fireEvent.click(screen.getByRole("button", { name: "Discard" }));
   await waitFor(() => expect(discard).toHaveBeenCalledWith("p1"));
 });
 
 test("settled proposals show their outcome and no buttons", () => {
   renderCard({ ...proposal, warnings: [], status: "stale", stale: ["tasks/buy-milk"] });
   expect(screen.queryByRole("button", { name: /適用/ })).toBeNull();
-  expect(screen.getByText(/変更されたため適用しませんでした/)).toBeTruthy();
+  expect(screen.getByText(/original data changed/)).toBeTruthy();
   expect(screen.getByText(/tasks\/buy-milk/)).toBeTruthy();
 });
 
@@ -86,7 +86,7 @@ test("a change inside a JSON column lists only the added elements", () => {
       },
     ],
   });
-  expect(screen.getAllByText("追加")).toHaveLength(2);
+  expect(screen.getAllByText("added")).toHaveLength(2);
   expect(screen.getByText("answers › Q-3")).toBeTruthy();
   expect(screen.getByText("answers › Q-4")).toBeTruthy();
   expect(screen.queryByText(/Q-1/)).toBeNull();
@@ -107,7 +107,7 @@ test("a JSON column that only reorders keys says there is no visible difference"
       },
     ],
   });
-  expect(screen.getByText("表示上の差分なし（並び順のみ）")).toBeTruthy();
+  expect(screen.getByText("No visible difference (order only)")).toBeTruthy();
 });
 
 test("more than 50 changes are capped with a remainder note", () => {
@@ -119,5 +119,5 @@ test("more than 50 changes are capped with a remainder note", () => {
     rows: [{ table: "t", key: "k", op: "update", before, after, changed: ["m"] }],
   });
   expect(screen.getByRole("list", { name: "m" }).querySelectorAll("li")).toHaveLength(51);
-  expect(screen.getByText("ほか 5 件")).toBeTruthy();
+  expect(screen.getByText("5 more")).toBeTruthy();
 });

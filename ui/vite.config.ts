@@ -1,7 +1,9 @@
 import { fileURLToPath } from "node:url";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vitest/config";
+import { paraglideOptions } from "./paraglide.config.ts";
 
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 // pnpm dev:ui proxies the API of a running `yamlite serve`; pass its token in YAMLITE_TOKEN
@@ -24,7 +26,7 @@ const sameOriginOnly: Plugin = {
 export default defineConfig({
   root: here("."),
   base: "./",
-  plugins: [sameOriginOnly, react(), tailwindcss()],
+  plugins: [sameOriginOnly, paraglideVitePlugin(paraglideOptions), react(), tailwindcss()],
   resolve: { alias: { "@": here("./src") } },
   build: { outDir: here("../dist/ui"), emptyOutDir: true },
   server: {

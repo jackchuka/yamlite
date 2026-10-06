@@ -5,15 +5,15 @@ import type { HistoryEntry } from "./types";
 const now = Date.parse("2026-10-06T12:00:00Z");
 
 test("since", () => {
-  expect(since("2026-10-06T11:59:30Z", now)).toBe("たった今");
-  expect(since("2026-10-06T11:56:00Z", now)).toBe("4 分前");
-  expect(since("2026-10-06T10:00:00Z", now)).toBe("2 時間前");
-  expect(since("2026-10-03T12:00:00Z", now)).toBe("3 日前");
+  expect(since("2026-10-06T11:59:30Z", now)).toBe("just now");
+  expect(since("2026-10-06T11:56:00Z", now)).toBe("4 minutes ago");
+  expect(since("2026-10-06T10:00:00Z", now)).toBe("2 hours ago");
+  expect(since("2026-10-03T12:00:00Z", now)).toBe("3 days ago");
   expect(since("2026-08-01T00:00:00Z", now)).toBe("2026-08-01");
 });
 
 test("valueText", () => {
-  expect(valueText(null)).toBe("（なし）");
+  expect(valueText(null)).toBe("(none)");
   expect(valueText("x")).toBe("x");
   expect(valueText(["a", "b"])).toBe('["a","b"]');
   expect(valueText(false)).toBe("false");

@@ -1,4 +1,5 @@
 import type { ChangeOp, ServeEvent } from "./types";
+import { m } from "@/paraglide/messages.js";
 
 export interface ActivityLine {
   at: string;
@@ -8,31 +9,35 @@ export interface ActivityLine {
   detail: string;
 }
 
-const CHANGE: Record<ChangeOp, { symbol: string; tone: ActivityLine["tone"]; detail: string }> = {
-  toDb: { symbol: "M", tone: "warn", detail: "file → DB" },
-  toFile: { symbol: "M", tone: "warn", detail: "DB → file" },
-  deleteDb: { symbol: "−", tone: "err", detail: "削除 · file → DB" },
-  deleteFile: { symbol: "−", tone: "err", detail: "削除 · DB → file" },
+const CHANGE: Record<ChangeOp, { symbol: string; tone: ActivityLine["tone"]; detail: () => string }> = {
+  toDb: { symbol: "M", tone: "warn", detail: () => "file → DB" },
+  toFile: { symbol: "M", tone: "warn", detail: () => "DB → file" },
+  deleteDb: { symbol: "−", tone: "err", detail: m.activity_delete_to_db },
+  deleteFile: { symbol: "−", tone: "err", detail: m.activity_delete_to_file },
 };
 
 export function activityLines(events: ServeEvent[]): ActivityLine[] {
   const lines: ActivityLine[] = [];
   for (const e of events) {
     if (e.type === "sync") {
-      if (!e.ok) lines.push({ at: e.at, symbol: "✗", tone: "err", text: e.table, detail: e.error ?? "sync failed" });
-      for (const c of e.changes) lines.push({ at: e.at, ...CHANGE[c.op], text: `${e.table} / ${c.key}` });
+      if (!e.ok)
+        lines.push({ at: e.at, symbol: "✗", tone: "err", text: e.table, detail: e.error ?? m.activity_sync_failed() });
+      for (const c of e.changes) {
+        const { detail, ...rest } = CHANGE[c.op];
+        lines.push({ at: e.at, ...rest, detail: detail(), text: `${e.table} / ${c.key}` });
+      }
     } else if (e.type === "conflict") {
       lines.push({
         at: e.at,
         symbol: "⚠",
         tone: "err",
         text: `${e.table} / ${e.key}`,
-        detail: `コンフリクト（${e.winner} を採用）`,
+        detail: m.activity_conflict({ winner: e.winner }),
       });
     } else if (e.type === "error") {
       lines.push({ at: e.at, symbol: "✗", tone: "err", text: e.table ?? "yamlite", detail: e.message });
     } else {
-      lines.push({ at: e.at, symbol: "↻", tone: "muted", text: "yamlite.yaml", detail: "設定を再読み込み" });
+      lines.push({ at: e.at, symbol: "↻", tone: "muted", text: "yamlite.yaml", detail: m.activity_config_reloaded() });
     }
   }
   return lines.reverse();

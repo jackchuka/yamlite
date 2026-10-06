@@ -40,7 +40,7 @@ test("loadYaml encodes the table name", async () => {
 test("a file:// page explains that a web server is needed", () => {
   render(<LoadFailure error={new LoadError("data/snapshot.json", "Failed to fetch")} protocol="file:" />);
   expect(screen.getByRole("alert").textContent).toContain("data/snapshot.json");
-  expect(screen.getByRole("alert").textContent).toContain("Web サーバー");
+  expect(screen.getByRole("alert").textContent).toContain("web server");
 });
 
 test("loadPage fetches the page's html next to the data", async () => {

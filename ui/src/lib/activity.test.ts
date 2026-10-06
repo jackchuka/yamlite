@@ -29,10 +29,10 @@ test("activity is newest first, one line per change", () => {
     { type: "reload", at: "2026-10-02T10:03:00.000Z", tables: ["tasks"] },
   ]);
   expect(lines.map((l) => [l.symbol, l.text, l.detail])).toEqual([
-    ["↻", "yamlite.yaml", "設定を再読み込み"],
+    ["↻", "yamlite.yaml", "Reloaded the config"],
     ["✗", "tasks", "broken"],
-    ["⚠", "tasks / c", "コンフリクト（file を採用）"],
-    ["−", "tasks / b", "削除 · DB → file"],
+    ["⚠", "tasks / c", "Conflict (kept file)"],
+    ["−", "tasks / b", "deleted \u00b7 DB \u2192 file"],
     ["M", "tasks / a", "file → DB"],
   ]);
 });

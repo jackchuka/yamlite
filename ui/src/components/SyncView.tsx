@@ -9,20 +9,21 @@ import { activityLines, warningLinks } from "@/lib/activity";
 import { ApiError, api } from "@/lib/api";
 import { diffRows, restoreLabel } from "@/lib/diff";
 import { useEvents, useEventStore, useMeta } from "@/lib/providers";
+import { formatClock } from "@/lib/format";
 import type { ConflictDetail, ConflictEntry } from "@/lib/types";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { FieldDiff } from "./FieldDiff";
+import { m } from "@/paraglide/messages.js";
 
 const TONE = { ok: "text-ok", warn: "text-warn", err: "text-err", muted: "text-muted-foreground" } as const;
-const time = (at: string) => new Date(at).toLocaleTimeString();
 const show = (v: unknown) => (v === undefined ? "—" : JSON.stringify(v));
 
 function Diff({ entry, detail, keyCol }: { entry: ConflictEntry; detail: ConflictDetail; keyCol?: string }) {
   return (
     <FieldDiff
       className="md:text-[11.5px]"
-      labels={[<span className="text-ok">採用: {entry.winner}</span>, "退避"]}
-      note={detail.deleted ? "退避された側では削除されていました" : undefined}
+      labels={[<span className="text-ok">{m.sync_kept({ winner: entry.winner ?? "" })}</span>, m.sync_backup()]}
+      note={detail.deleted ? m.sync_deleted_on_backup() : undefined}
       rows={diffRows(detail.current, detail.saved, keyCol).map((d) => ({
         field: d.field,
         a: show(d.winner),
@@ -54,7 +55,7 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
     mutationFn: (expected: ConflictDetail["current"]) => api.restore(entry.id, expected),
     onSuccess: () => {
       setConfirming(false);
-      done(`${entry.table} / ${entry.key} を戻しました`);
+      done(m.sync_restored({ table: entry.table, key: entry.key ?? "" }));
     },
     onError: (e) => {
       toast.error(e.message);
@@ -64,14 +65,14 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
   });
   const dismiss = useMutation({
     mutationFn: () => api.dismiss(entry.id),
-    onSuccess: () => done("既読にしました"),
+    onSuccess: () => done(m.sync_dismissed()),
     onError: (e) => toast.error(e.message),
   });
   const restoreTitle = !connected
-    ? "disconnected"
+    ? m.common_disconnected_hint()
     : entry.restorable
       ? undefined
-      : "キーが分からないため、手で戻してください";
+      : m.sync_restore_unknown_key();
   return (
     <div className="border-b px-3.5 py-2.5 text-[12px] last:border-b-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -85,7 +86,7 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
             {entry.table} / {entry.key ?? entry.file}
           </span>
           <span className="truncate text-[11.5px] text-muted-foreground max-md:basis-full max-md:pl-5 max-md:text-[12.5px] max-md:whitespace-normal">
-            {time(entry.at)} · {entry.winner ? `${entry.winner} を採用` : "ヘッダーなし（古い形式）"}
+            {formatClock(entry.at)} · {entry.winner ? m.sync_winner({ winner: entry.winner }) : m.sync_no_header()}
           </span>
         </button>
         <Button
@@ -101,10 +102,10 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
           size={mobile ? "default" : "sm"}
           variant="ghost"
           disabled={!connected || dismiss.isPending}
-          title={connected ? undefined : "disconnected"}
+          title={connected ? undefined : m.common_disconnected_hint()}
           onClick={() => dismiss.mutate()}
         >
-          既読
+          {m.sync_dismiss()}
         </Button>
       </div>
       {mobile && restoreTitle && <p className="mt-1 text-[12px] text-muted-foreground">{restoreTitle}</p>}
@@ -117,21 +118,19 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
         <Dialog open onOpenChange={(o) => !o && setConfirming(false)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>
-                {entry.table} / {entry.key} を戻しますか？
-              </DialogTitle>
+              <DialogTitle>{m.sync_restore_title({ table: entry.table, key: entry.key ?? "" })}</DialogTitle>
             </DialogHeader>
             {detail.data ? (
               <Diff entry={entry} detail={detail.data} keyCol={keyCol} />
             ) : (
-              <p className="text-[12px] text-muted-foreground">{detail.error ? detail.error.message : "読み込み中…"}</p>
+              <p className="text-[12px] text-muted-foreground">
+                {detail.error ? detail.error.message : m.common_loading()}
+              </p>
             )}
-            <p className="text-[12px] text-muted-foreground">
-              現在の版は新しい退避として残るので、あとでもう一度戻せます。
-            </p>
+            <p className="text-[12px] text-muted-foreground">{m.sync_restore_note()}</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirming(false)}>
-                キャンセル
+                {m.common_cancel()}
               </Button>
               <Button
                 disabled={!detail.data || restore.isPending}
@@ -187,23 +186,23 @@ export function SyncView() {
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-2.5 border-b px-[18px] py-3 max-md:px-3">
-        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">Sync</h1>
+        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">{m.nav_sync()}</h1>
         <span className="text-[12px] text-muted-foreground">
-          {connected ? "watching" : "disconnected"}
-          {lastSyncAt && ` · last sync ${time(lastSyncAt)}`}
+          {connected ? m.sync_watching() : m.status_disconnected()}
+          {lastSyncAt && m.sync_last_sync({ at: formatClock(lastSyncAt) })}
         </span>
       </div>
       <div className="overflow-auto px-[18px] py-3.5 max-md:px-3">
-        <Card title="Conflicts" count={conflicts.length} tone="err">
+        <Card title={m.sync_conflicts()} count={conflicts.length} tone="err">
           {conflicts.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">コンフリクトはありません</p>
+            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">{m.sync_no_conflicts()}</p>
           ) : (
             conflicts.map((c) => <ConflictItem key={c.id} entry={c} />)
           )}
         </Card>
-        <Card title="Warnings" count={warningList.length} tone="warn">
+        <Card title={m.sync_warnings()} count={warningList.length} tone="warn">
           {warningList.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">警告はありません</p>
+            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">{m.sync_no_warnings()}</p>
           ) : (
             warningList.map((w, i) => (
               <div
@@ -223,21 +222,21 @@ export function SyncView() {
                     search={{ key: w.key }}
                     className="text-tomato max-md:py-1.5"
                   >
-                    開く
+                    {m.sync_open()}
                   </Link>
                 )}
                 {w.view && (
                   <Link to="/t/$table" params={{ table: w.view }} className="text-tomato max-md:py-1.5">
-                    開く
+                    {m.sync_open()}
                   </Link>
                 )}
               </div>
             ))
           )}
         </Card>
-        <Card title="Activity">
+        <Card title={m.sync_activity()}>
           {lines.length === 0 ? (
-            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">まだ何も同期していません</p>
+            <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">{m.sync_no_activity()}</p>
           ) : (
             lines.map((l, i) => (
               <div
@@ -247,7 +246,7 @@ export function SyncView() {
                 <span className={`w-3 font-mono font-bold ${TONE[l.tone]}`}>{l.symbol}</span>
                 <span className="font-semibold">{l.text}</span>
                 <span className="text-muted-foreground">
-                  {time(l.at)} · {l.detail}
+                  {formatClock(l.at)} · {l.detail}
                 </span>
               </div>
             ))

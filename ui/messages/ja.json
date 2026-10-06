@@ -1,0 +1,417 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "language_label": "言語",
+  "status_snapshot": "読み取り専用スナップショット · {at} UTC",
+  "status_watching": "{root} を監視中",
+  "status_connected": "接続中",
+  "status_disconnected": "切断",
+  "status_last_sync": "最終同期 {ago}",
+  "status_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "⚠ 警告 {count} 件"
+      }
+    }
+  ],
+  "status_conflicts": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "● 競合 {count} 件"
+      }
+    }
+  ],
+  "status_theme": "テーマ: {theme}",
+  "theme_light": "ライト",
+  "theme_dark": "ダーク",
+  "theme_system": "システム",
+  "common_close": "閉じる",
+  "common_no_tables": "テーブルがありません",
+  "common_disconnected_hint": "切断中",
+  "shell_config_error": "yamlite.yaml を読み込めません。前回の設定で同期を続けています: {error}",
+  "shell_session_expired": "セッションが切れました。`yamlite serve` が表示した URL を開き直してください。",
+  "shell_placeholder": "{title}（準備中）",
+  "shell_load_failed": "スナップショットを読み込めませんでした",
+  "shell_load_file_protocol": "file:// では開けません。このフォルダを Web サーバー経由で開いてください（例: npx serve）。",
+  "nav_sidebar": "サイドバー",
+  "nav_menu": "メニュー",
+  "nav_search": "検索",
+  "nav_search_placeholder": "検索…",
+  "nav_ask_ai": "AI に依頼",
+  "nav_tables": "テーブル",
+  "nav_pages": "ページ",
+  "nav_tools": "ツール",
+  "nav_new_table": "新しいテーブル",
+  "nav_sql_console": "SQL コンソール",
+  "nav_erd": "ER 図",
+  "nav_sync": "同期",
+  "nav_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件の警告"
+      }
+    }
+  ],
+  "nav_footer_tables": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} テーブル"
+      }
+    }
+  ],
+  "nav_footer_db": "DB {db}",
+  "nav_new_record": "+ 新しいレコード",
+  "nav_rename": "名前を変更",
+  "nav_rename_key": "キーの名前を変更",
+  "grid_resize": "{column} の幅を変更",
+  "grid_key": "キー",
+  "grid_unpin_key": "キー列の固定を解除",
+  "grid_pin_key": "キー列を固定",
+  "grid_unpin_key_hint": "キー列も一緒にスクロールします",
+  "grid_pin_key_hint": "キー列を常に表示します",
+  "filter_search": "検索",
+  "filter_search_placeholder": "すべての列を検索…",
+  "filter_add_filter": "+ 絞り込み",
+  "filter_column": "列",
+  "filter_operator": "条件",
+  "filter_value": "値",
+  "filter_add": "追加",
+  "filter_op_contains": "含む",
+  "filter_op_has": "要素に含む",
+  "filter_op_null": "空",
+  "filter_op_notnull": "空でない",
+  "table_group": "グループ",
+  "table_group_label": "グループ: {group}",
+  "table_group_none": "なし",
+  "table_group_name": "グループ名",
+  "table_ungroup": "グループなし",
+  "common_save": "保存",
+  "table_from": "{parent} から",
+  "table_read_only_view": "読み取り専用ビュー",
+  "table_records": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件"
+      }
+    }
+  ],
+  "table_rows": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 行"
+      }
+    }
+  ],
+  "table_schema": "スキーマ",
+  "table_columns": "列",
+  "table_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件の警告"
+      }
+    }
+  ],
+  "table_warning_list": "警告",
+  "json_copy": "コピー",
+  "erd_problem": "問題あり",
+  "erd_key": "キー",
+  "erd_reference": "参照",
+  "erd_show_views": "ビューを表示",
+  "erd_relayout": "再レイアウト",
+  "erd_hint_touch": "タップで関連をハイライト · タイトルをタップでテーブルを開く",
+  "erd_hint_pointer": "クリックで関連をハイライト · ダブルクリックでテーブルを開く",
+  "record_label": "レコード",
+  "record_resize": "レコードパネルの幅を変更",
+  "common_close_lower": "閉じる",
+  "record_tab_form": "フォーム",
+  "record_tab_file": "ファイル",
+  "record_tab_history": "履歴",
+  "record_disconnected": "接続が切れています",
+  "record_required": "必須",
+  "record_new_column": "新規",
+  "record_json": "レコードの JSON",
+  "record_json_not_object": "レコードは JSON オブジェクトにしてください",
+  "record_file": "レコードのファイル",
+  "record_restored": [
+    {
+      "declarations": ["input from", "input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{from} の値に戻しました · {count} 項目が未保存"
+      }
+    }
+  ],
+  "record_changes": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "変更 {count} 件 · 保存するとファイルに反映"
+      }
+    }
+  ],
+  "record_delete": "レコードを削除",
+  "record_discard": "破棄",
+  "record_save_shortcut": "保存 ⌘S",
+  "record_delete_title": "{key} を削除しますか？",
+  "record_delete_note": "{file} からも削除されます。",
+  "common_cancel": "キャンセル",
+  "common_delete": "削除",
+  "record_stale_title": "他で変更されました",
+  "record_stale_description": "読み込んだあとに、ファイルか DB で次のフィールドが変わりました。",
+  "record_stale_theirs": "いまの値",
+  "record_stale_mine": "あなたの編集",
+  "record_reload": "最新を読み込む",
+  "record_overwrite": "上書き",
+  "record_reflecting": "反映中…",
+  "record_reflected": "{file} に反映済み",
+  "record_reflect_failed": "⚠ 反映されませんでした: {reason}",
+  "record_reflect_waiting": "反映待ち",
+  "restore_to_db": "DB 側に戻す",
+  "restore_to_file": "ファイル側に戻す",
+  "restore_unavailable": "復元できません",
+  "form_remove": "{item} を削除",
+  "form_add_placeholder": "+ 追加",
+  "form_add_to": "{field} に追加",
+  "form_add": "追加",
+  "form_new_key": "+ キー",
+  "form_new_key_in": "{field} の新しいキー",
+  "form_as": "{field} を {kind} で編集",
+  "form_unset": "— (未設定)",
+  "form_preview": "プレビュー",
+  "form_edit": "編集",
+  "common_loading": "読み込み中…",
+  "history_fields": "フィールド",
+  "history_yaml_diff": "YAML の差分",
+  "history_unreadable": "読めない版です",
+  "history_no_value_changes": "値の変更はありません",
+  "history_restore_hint": "この時点の値をフォームに入れます（保存はしません）",
+  "history_same_as_now": "今の値と同じです",
+  "history_restore": "この版に戻す",
+  "history_no_git": "git の履歴はありません",
+  "history_no_git_detail": "このフォルダは git リポジトリの外にあります。",
+  "history_no_commits": "まだコミットされていません",
+  "history_no_commits_detail": "コミットすると、ここに変更が並びます。",
+  "history_wip": "未コミットの変更",
+  "history_uncommitted": "未コミット",
+  "history_created": "作成",
+  "history_deleted": "削除",
+  "history_load_older": "さらに古い履歴を読み込む",
+  "history_just_now": "たった今",
+  "history_none": "（なし）",
+  "schema_none": "なし",
+  "schema_view": "ビュー",
+  "schema_parent": "親",
+  "schema_identity": "識別子",
+  "schema_db": "DB",
+  "schema_view_in_db": "VIEW あり",
+  "schema_not_yet": "まだありません",
+  "schema_columns": "列",
+  "schema_declared": "宣言済み",
+  "schema_inferred": "推論",
+  "schema_required": "必須",
+  "schema_title": "{table} のスキーマ",
+  "schema_view_description": "VIEW は yamlite.yaml の expand から作られる読み取り専用の表です。",
+  "schema_table_description": "yamlite.yaml の宣言と、DB 上の状態です。変更は yamlite.yaml を編集してください。",
+  "schema_table": "テーブル",
+  "schema_path": "パス",
+  "schema_key": "キー",
+  "schema_table_in_db": "テーブルあり",
+  "schema_references": "参照",
+  "schema_broken_refs": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "⚠ {count} 件の参照切れ"
+      }
+    }
+  ],
+  "schema_indexes": "インデックス",
+  "schema_created": "作成済み",
+  "schema_not_created": "未作成",
+  "schema_unmanaged_index": "yamlite の管理外（SQL などで作成）",
+  "schema_not_created_hint": "未作成の理由は同期画面の警告に出ます。",
+  "schema_expanded_views": "展開ビュー",
+  "cmd_placeholder": "テーブルや画面を検索…",
+  "cmd_empty": "見つかりません",
+  "cmd_views": "ビュー",
+  "sql_history": "履歴",
+  "sql_run_shortcut": "実行 ⌘↵",
+  "sql_run": "実行",
+  "sql_rows": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 行"
+      }
+    }
+  ],
+  "sql_truncated": "（先頭 1000 行）",
+  "sql_changed": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "✓ {count} 行を変更"
+      }
+    }
+  ],
+  "sql_unmanaged": "{table} は yamlite.yaml にないため同期されません。",
+  "sql_adopt": "yamlite.yaml に追加",
+  "sql_touched_files": "変更されたファイル",
+  "sql_confirm_title": "実行しますか？",
+  "sql_execute": "実行",
+  "sql_confirm_drop": "DROP は元に戻せません。",
+  "sql_confirm_no_where": "WHERE がないため、すべての行が対象になります。",
+  "page_not_found": "ページが見つかりません",
+  "page_access": "アクセス",
+  "page_blocked": "ブロック: {list}",
+  "page_navigated": "ページが別の URL に移動したため、接続を切りました。",
+  "page_reload": "再読み込み",
+  "agent_tool_schema": "テーブル構成を確認",
+  "agent_tool_query": "検索",
+  "agent_tool_get_records": "レコードを読み込み",
+  "agent_tool_propose_changes": "変更を提案",
+  "agent_tool_propose_table": "テーブルを提案",
+  "agent_tool_check": "ルールを確認",
+  "agent_running": "{tool} を実行中…",
+  "agent_thinking": "考えています…",
+  "agent_denied": "許可されていない操作を止めました（{tool}）",
+  "agent_status_dormant": "休止中",
+  "agent_status_failed": "再開できません",
+  "agent_conversations": "会話",
+  "agent_no_conversations": "まだ会話はありません",
+  "agent_untitled": "（メッセージなし）",
+  "agent_login_required": "{agent} にログインが必要です。ターミナルで次を実行してから、もう一度送信してください。",
+  "agent_spawn_failed": "{agent} を起動できませんでした: {error}",
+  "agent_agent": "エージェント",
+  "agent_new_conversation": "新しい会話",
+  "agent_pending_proposals": "未適用の提案",
+  "agent_pending_proposals_note": "前の会話で作られ、まだ適用も破棄もしていない提案です。",
+  "agent_intro": "データの検索や編集を頼めます。例:「来週締め切りのタスクを一覧して」「errand タグのタスクを全部完了にして」",
+  "agent_resume_failed": "この会話は再開できませんでした。新しい会話で続けてください。",
+  "agent_closed": "会話が終了しました。次のメッセージは新しい会話で送られます。",
+  "agent_input": "AI への依頼",
+  "agent_placeholder": "例: 来週締め切りのタスクを一覧して",
+  "agent_read_only_note": "読み取りと提案のみ。適用するまで保存されません",
+  "agent_stop": "停止",
+  "agent_send": "送信",
+  "agent_disconnected": "接続が切れました。新しい会話を始めてください。",
+  "proposal_op_insert": "追加",
+  "proposal_op_update": "変更",
+  "proposal_op_delete": "削除",
+  "proposal_applied": "適用しました",
+  "proposal_discarded": "破棄しました",
+  "proposal_stale": "元のデータが変更されたため適用しませんでした",
+  "proposal_failed": "適用できませんでした",
+  "proposal_change_added": "追加",
+  "proposal_change_removed": "削除",
+  "proposal_change_changed": "変更",
+  "proposal_collapse": "折りたたむ",
+  "proposal_show_all": "すべて表示",
+  "proposal_order_only": "表示上の差分なし（並び順のみ）",
+  "proposal_more": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "ほか {count} 件"
+      }
+    }
+  ],
+  "proposal_before": "変更前",
+  "proposal_after": "変更後",
+  "proposal_label": "提案: {title}",
+  "proposal_new_table": "新しいテーブル {name}",
+  "proposal_summary": [
+    {
+      "declarations": ["input tables", "input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{tables} · {count} 件"
+      }
+    }
+  ],
+  "proposal_table_list": "{name}（1 ファイルにまとめる、キー {key}）",
+  "proposal_table_files": "{name}（1 件ごとにファイル、キー {key}）",
+  "proposal_discard": "破棄",
+  "proposal_apply": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件を適用"
+      }
+    }
+  ],
+  "activity_delete_to_db": "削除 · file → DB",
+  "activity_delete_to_file": "削除 · DB → file",
+  "activity_sync_failed": "同期に失敗しました",
+  "activity_conflict": "コンフリクト（{winner} を採用）",
+  "activity_config_reloaded": "設定を再読み込み",
+  "sync_kept": "採用: {winner}",
+  "sync_backup": "退避",
+  "sync_deleted_on_backup": "退避された側では削除されていました",
+  "sync_restored": "{table} / {key} を戻しました",
+  "sync_dismissed": "既読にしました",
+  "sync_restore_unknown_key": "キーが分からないため、手で戻してください",
+  "sync_winner": "{winner} を採用",
+  "sync_no_header": "ヘッダーなし（古い形式）",
+  "sync_dismiss": "既読",
+  "sync_restore_title": "{table} / {key} を戻しますか？",
+  "sync_restore_note": "現在の版は新しい退避として残るので、あとでもう一度戻せます。",
+  "sync_watching": "監視中",
+  "sync_last_sync": " · 最終同期 {at}",
+  "sync_conflicts": "コンフリクト",
+  "sync_no_conflicts": "コンフリクトはありません",
+  "sync_warnings": "警告",
+  "sync_no_warnings": "警告はありません",
+  "sync_open": "開く",
+  "sync_activity": "アクティビティ",
+  "sync_no_activity": "まだ何も同期していません",
+  "conflict_title": "{table}/{key} でコンフリクト",
+  "conflict_file_won": "ファイルと DB の両方が変更されました。ファイル側を採用し、DB側の内容をバックアップしました。",
+  "conflict_db_won": "ファイルと DB の両方が変更されました。DB側を採用し、ファイル側の内容をバックアップしました。",
+  "conflict_view_diff": "差分を見る",
+  "toast_db_busy": "データベースが使用中です。少し待ってから再試行してください",
+  "toast_not_reflected": "反映されませんでした: {record}",
+  "dialog_add_to": "{table} に追加",
+  "dialog_key_is_file": "{key}（ファイル名になります）",
+  "dialog_key_is_key": "{key}（キー）",
+  "dialog_new_key": "新しいキー",
+  "form_add_record": "追加",
+  "dialog_adopt_title": "{table} を yamlite.yaml に追加",
+  "dialog_new_table": "新しいテーブル",
+  "dialog_name": "名前",
+  "dialog_table_name": "テーブル名",
+  "dialog_mode_files": "フォルダ（1 レコード 1 ファイル: {name}/*.yaml）",
+  "dialog_mode_list": "1 ファイルのリスト（{name}.yaml）",
+  "dialog_key_column_label": "キー列",
+  "dialog_key_column": "キー列",
+  "dialog_group_optional": "グループ（任意）",
+  "dialog_columns": "列（あとで YAML に書いても自動で増えます）",
+  "dialog_column_name": "{n} 列目の名前",
+  "dialog_column_type": "{n} 列目の型",
+  "dialog_remove_column": "{n} 列目を削除",
+  "dialog_add_column": "+ 列",
+  "dialog_create": "作成",
+  "dialog_rename_title": "キーを変更",
+  "dialog_rename_files": "ファイル名が変わります。新しいファイルは DB の値から書き直されるので、元のファイルのコメントは失われます。",
+  "dialog_rename_list": "リスト内のレコードのキーが変わります。このレコードのコメントは失われることがあります。",
+  "dialog_rename": "変更"
+}

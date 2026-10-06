@@ -38,12 +38,12 @@ test("the AI item shows only when an agent exists and opens the panel", () => {
   render(<CommandMenu />);
   const { result } = renderHook(() => useAgentPanelOpen());
   act(() => openCommandMenu());
-  fireEvent.click(screen.getByRole("option", { name: "AI に依頼" }));
+  fireEvent.click(screen.getByRole("option", { name: "Ask AI" }));
   expect(result.current).toBe(true);
 });
 
 test("no AI item without agents", () => {
   render(<CommandMenu />);
   act(() => openCommandMenu());
-  expect(screen.queryByRole("option", { name: "AI に依頼" })).toBeNull();
+  expect(screen.queryByRole("option", { name: "Ask AI" })).toBeNull();
 });

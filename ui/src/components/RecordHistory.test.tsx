@@ -54,7 +54,7 @@ const show = (
 
 test("lists uncommitted changes and commits", async () => {
   show({ state: "ok", entries: [wip, commit], next: null });
-  expect(await screen.findByText("未コミットの変更")).toBeTruthy();
+  expect(await screen.findByText("Uncommitted changes")).toBeTruthy();
   expect(screen.getByText("Add docs tag")).toBeTruthy();
   expect(screen.getByText("HEAD")).toBeTruthy();
   expect(screen.getByText("a3f9c21")).toBeTruthy();
@@ -74,14 +74,14 @@ test("restore hands the version's record and sha to the drawer", async () => {
   const onRestore = vi.fn();
   show({ state: "ok", entries: [commit], next: null }, { current: { id: "a", title: "A", priority: 3 }, onRestore });
   fireEvent.click(await screen.findByRole("button", { name: /Add docs tag/ }));
-  fireEvent.click(screen.getByRole("button", { name: "この版に戻す" }));
+  fireEvent.click(screen.getByRole("button", { name: "Restore this version" }));
   expect(onRestore).toHaveBeenCalledWith(commit.record, sha);
 });
 
 test("restore is disabled when the version equals the current values", async () => {
   show({ state: "ok", entries: [commit], next: null }, { current: { id: "a", title: "A", priority: 1 } });
   fireEvent.click(await screen.findByRole("button", { name: /Add docs tag/ }));
-  expect(screen.getByRole("button", { name: "この版に戻す" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "Restore this version" }).hasAttribute("disabled")).toBe(true);
 });
 
 test("an unreadable version shows its YAML diff", async () => {
@@ -92,16 +92,16 @@ test("an unreadable version shows its YAML diff", async () => {
     next: null,
   });
   fireEvent.click(await screen.findByRole("button", { name: /break/ }));
-  expect(screen.getByText("読めない版です")).toBeTruthy();
+  expect(screen.getByText("This version can't be read")).toBeTruthy();
   expect(await screen.findByText("+title: [")).toBeTruthy();
 });
 
 test("empty states", async () => {
   show({ state: "nogit" });
-  expect(await screen.findByText("git の履歴はありません")).toBeTruthy();
+  expect(await screen.findByText("No git history")).toBeTruthy();
   cleanup();
   show({ state: "untracked" });
-  expect(await screen.findByText("まだコミットされていません")).toBeTruthy();
+  expect(await screen.findByText("Not committed yet")).toBeTruthy();
   cleanup();
   show({ state: "error", message: "git log timed out" });
   expect(await screen.findByText("git log timed out")).toBeTruthy();
@@ -120,8 +120,8 @@ test("loads older pages", async () => {
       <Harness current={{ id: "a" }} />
     </QueryClientProvider>,
   );
-  fireEvent.click(await screen.findByRole("button", { name: "さらに古い履歴を読み込む" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Load older history" }));
   expect(await screen.findByText("Older")).toBeTruthy();
   await waitFor(() => expect(api.history).toHaveBeenLastCalledWith("tasks", "a", "50"));
-  expect(screen.queryByRole("button", { name: "さらに古い履歴を読み込む" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Load older history" })).toBeNull();
 });

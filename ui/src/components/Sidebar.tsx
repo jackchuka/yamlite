@@ -22,6 +22,7 @@ import { isReadOnly } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
 import type { TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { m } from "@/paraglide/messages.js";
 
 const item =
   "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2 max-md:py-2.5 max-md:text-[15px]";
@@ -33,8 +34,8 @@ function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
   return (
     <span
       role="img"
-      aria-label={`${count} warnings`}
-      title={`${count} 件の警告`}
+      aria-label={m.nav_warnings({ count })}
+      title={m.nav_warnings({ count })}
       className="flex shrink-0 items-center gap-0.5 rounded-full bg-warn-soft px-1 text-[10.5px] font-semibold text-warn"
     >
       <TriangleAlert className="size-3" />
@@ -84,7 +85,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
     );
   };
   return (
-    <aside className="flex h-full min-h-0 flex-col border-r bg-panel" aria-label="sidebar">
+    <aside className="flex h-full min-h-0 flex-col border-r bg-panel" aria-label={m.nav_sidebar()}>
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
         <img src="./favicon.svg" alt="" className="size-6" />
         yamlite
@@ -98,7 +99,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           openCommandMenu();
         }}
       >
-        <span>Search…</span>
+        <span>{m.nav_search_placeholder()}</span>
         <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
       </button>
       {agents.length > 0 && (
@@ -112,11 +113,11 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           }}
         >
           <Sparkles className="size-4" />
-          AI に依頼
+          {m.nav_ask_ai()}
         </button>
       )}
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
-        Tables
+        {m.nav_tables()}
       </div>
       <nav className="flex flex-col gap-px overflow-auto">
         {meta &&
@@ -142,18 +143,18 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           <button
             type="button"
             disabled={!connected}
-            title={connected ? undefined : "disconnected"}
+            title={connected ? undefined : m.common_disconnected_hint()}
             className={cn(item, "text-muted-foreground disabled:opacity-50")}
             onClick={onNewTable}
           >
-            <Plus className="size-3.5" /> New table
+            <Plus className="size-3.5" /> {m.nav_new_table()}
           </button>
         )}
       </nav>
       {meta && meta.pages.length > 0 && (
         <>
           <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
-            Pages
+            {m.nav_pages()}
           </div>
           <nav className="flex flex-col gap-px">
             {meta.pages.map((p) => (
@@ -166,18 +167,18 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
         </>
       )}
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
-        Tools
+        {m.nav_tools()}
       </div>
       <nav className="flex flex-col gap-px">
         <Link to="/sql" className={item} activeProps={active}>
-          <Terminal className="size-3.5 opacity-70" /> SQL console
+          <Terminal className="size-3.5 opacity-70" /> {m.nav_sql_console()}
         </Link>
         <Link to="/erd" className={item} activeProps={active}>
-          <Network className="size-3.5 opacity-70" /> ERD
+          <Network className="size-3.5 opacity-70" /> {m.nav_erd()}
         </Link>
         {!readOnly && (
           <Link to="/sync" className={item} activeProps={active}>
-            <ArrowLeftRight className="size-3.5 opacity-70" /> Sync
+            <ArrowLeftRight className="size-3.5 opacity-70" /> {m.nav_sync()}
             {conflictCount > 0 && (
               <span className="ml-auto rounded-full bg-err-soft px-1.5 text-[10.5px] font-semibold text-err">
                 {conflictCount}
@@ -187,9 +188,9 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
         )}
       </nav>
       <div className="mt-auto border-t px-3.5 py-2.5 text-[11px] text-muted-foreground max-md:pb-[calc(0.625rem+env(safe-area-inset-bottom))] max-md:text-[12px]">
-        {meta?.configFile} · {meta?.tables.length ?? 0} tables
+        {meta?.configFile} · {m.nav_footer_tables({ count: meta?.tables.length ?? 0 })}
         <br />
-        DB {meta?.db}
+        {m.nav_footer_db({ db: meta?.db ?? "" })}
         <span className="md:hidden">
           <br />
           {location.host}

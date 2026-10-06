@@ -119,7 +119,10 @@ test("the browser giving up closes the chat with an error item", async () => {
   src.handlers.error(new Event("error"));
   expect(src.closed).toBe(true);
   expect(c.state.closed).toBe(true);
-  expect(c.state.items.at(-1)).toEqual({ kind: "error", message: "接続が切れました。新しい会話を始めてください。" });
+  expect(c.state.items.at(-1)).toEqual({
+    kind: "error",
+    message: "The connection was lost. Start a new conversation.",
+  });
 });
 
 test("a stale source and malformed frames are ignored", async () => {

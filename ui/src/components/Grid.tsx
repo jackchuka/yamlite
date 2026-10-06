@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { Cell, chip } from "./Cell";
 import { HintPopover } from "./HintPopover";
 import { RefLink } from "./RefLink";
+import { m } from "@/paraglide/messages.js";
 
 export interface GridColumn {
   name: string;
@@ -95,7 +96,7 @@ function ResizeEdge({
   return (
     <div
       role="separator"
-      aria-label={`Resize ${column}`}
+      aria-label={m.grid_resize({ column })}
       aria-orientation="vertical"
       aria-valuenow={width}
       tabIndex={0}
@@ -198,7 +199,7 @@ export function Grid({
               >
                 <span className="truncate">{c.name}</span>
                 <span className="shrink-0 rounded bg-panel-2 px-1 font-mono text-[9.5px] font-medium max-md:text-[11px]">
-                  {c.name === keyCol ? "key" : (c.note ?? c.type)}
+                  {c.name === keyCol ? m.grid_key() : (c.note ?? c.type)}
                 </span>
                 {sortCol === c.name &&
                   (sortDir === "desc" ? (
@@ -210,9 +211,9 @@ export function Grid({
               {c.name === stickyCol && onTogglePin && (
                 <button
                   type="button"
-                  aria-label={pinned ? "unpin key column" : "pin key column"}
+                  aria-label={pinned ? m.grid_unpin_key() : m.grid_pin_key()}
                   aria-pressed={pinned}
-                  title={pinned ? "Let the key column scroll" : "Keep the key column in place"}
+                  title={pinned ? m.grid_unpin_key_hint() : m.grid_pin_key_hint()}
                   className={cn(
                     "mr-1 grid size-6 shrink-0 place-items-center rounded text-muted-foreground hover:bg-panel-2 hover:text-foreground focus-visible:opacity-100 max-md:size-8",
                     pinned && "opacity-0 group-hover/header:opacity-100 max-md:opacity-100",

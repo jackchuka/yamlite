@@ -30,7 +30,7 @@ test("Enter sends, Shift+Enter and IME composition do not", async () => {
   start.mockResolvedValue(undefined);
   send.mockResolvedValue(undefined);
   renderPanel();
-  const box = screen.getByRole("textbox", { name: "AI への依頼" });
+  const box = screen.getByRole("textbox", { name: "Request to the AI" });
   fireEvent.change(box, { target: { value: "にほんご" } });
   fireEvent.keyDown(box, { key: "Enter", isComposing: true });
   fireEvent.keyDown(box, { key: "Enter", keyCode: 229 });
@@ -45,10 +45,10 @@ test("a login failure tells the user what to run", async () => {
   const { ApiError } = await import("@/lib/api");
   start.mockRejectedValue(new ApiError(502, "auth", { code: "login" }));
   renderPanel();
-  const box = screen.getByRole("textbox", { name: "AI への依頼" });
+  const box = screen.getByRole("textbox", { name: "Request to the AI" });
   fireEvent.change(box, { target: { value: "hi" } });
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "送信" })));
-  expect(await screen.findByText(/ターミナルで/)).toBeTruthy();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send" })));
+  expect(await screen.findByText(/in a terminal/)).toBeTruthy();
   expect(screen.getByText("claude")).toBeTruthy();
 });
 
@@ -81,25 +81,25 @@ test("tool lines are labelled for both Claude and Codex names, and denied ones s
       { kind: "tool", id: "3", title: "Bash", status: "denied" },
     ],
   });
-  expect(screen.getByText("検索")).toBeTruthy();
-  expect(screen.getByText("テーブル構成を確認")).toBeTruthy();
-  expect(screen.getByText(/許可されていない操作を止めました（Bash）/)).toBeTruthy();
+  expect(screen.getByText("Searching")).toBeTruthy();
+  expect(screen.getByText("Checking the tables")).toBeTruthy();
+  expect(screen.getByText(/Stopped an operation that isn.t allowed \(Bash\)/)).toBeTruthy();
 });
 
 test("a spawn failure shows the reason", async () => {
   const { ApiError } = await import("@/lib/api");
   start.mockRejectedValue(new ApiError(502, "no such file", { code: "spawn" }));
   renderPanel();
-  fireEvent.change(screen.getByRole("textbox", { name: "AI への依頼" }), { target: { value: "hi" } });
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "送信" })));
-  expect(await screen.findByText(/起動できませんでした: no such file/)).toBeTruthy();
+  fireEvent.change(screen.getByRole("textbox", { name: "Request to the AI" }), { target: { value: "hi" } });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send" })));
+  expect(await screen.findByText(/Couldn.t start .*: no such file/)).toBeTruthy();
 });
 
 test("a busy chat shows stop instead of send", async () => {
   renderPanel();
   await setChat({ busy: true });
-  expect(screen.queryByRole("button", { name: "送信" })).toBeNull();
-  expect(screen.getByRole("button", { name: /停止/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.getByRole("button", { name: /Stop/ })).toBeTruthy();
 });
 
 const proposal = (id: string, title: string, conversationId: string): import("@/lib/agent").Proposal => ({
@@ -118,10 +118,10 @@ test("pending proposals from earlier conversations are listed above the chat", a
   try {
     renderPanel();
     await setChat({ items: [{ kind: "proposal", proposal: current }] });
-    const earlier = screen.getByRole("region", { name: "未適用の提案" });
+    const earlier = screen.getByRole("region", { name: "Unapplied proposals" });
     expect(earlier.textContent).toContain("前の会話の提案");
     expect(earlier.textContent).not.toContain("今の提案");
-    expect(screen.getAllByRole("region", { name: "提案: 今の提案" })).toHaveLength(1);
+    expect(screen.getAllByRole("region", { name: "Proposal: 今の提案" })).toHaveLength(1);
   } finally {
     pending.list = [];
   }
@@ -129,7 +129,7 @@ test("pending proposals from earlier conversations are listed above the chat", a
 
 test("no earlier section when every pending proposal is in the chat", async () => {
   renderPanel();
-  expect(screen.queryByRole("region", { name: "未適用の提案" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Unapplied proposals" })).toBeNull();
 });
 
 test("a status row shows while the agent is working and is gone otherwise", async () => {
@@ -137,7 +137,7 @@ test("a status row shows while the agent is working and is gone otherwise", asyn
   expect(screen.getByRole("status").textContent).toBe("");
   await setChat({ busy: true, items: [{ kind: "user", text: "hi" }] });
   const status = screen.getByRole("status");
-  expect(status.textContent).toContain("考えています");
+  expect(status.textContent).toContain("Thinking");
   expect(status.getAttribute("aria-live")).toBe("polite");
   await setChat({ busy: false, items: [{ kind: "user", text: "hi" }] });
   expect(screen.getByRole("status").textContent).toBe("");
@@ -149,7 +149,7 @@ test("the status row names the tool that is running", async () => {
     busy: true,
     items: [{ kind: "tool", id: "1", title: "mcp__yamlite__query", status: "in_progress" }],
   });
-  expect(screen.getByRole("status").textContent).toContain("検索 を実行中");
+  expect(screen.getByRole("status").textContent).toContain("Searching…");
 });
 
 test("log children never shrink, so a proposal card cannot collapse in a long chat", () => {
@@ -159,7 +159,7 @@ test("log children never shrink, so a proposal card cannot collapse in a long ch
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
-test("the 会話 menu lists conversations and opens the chosen one", async () => {
+test("the Conversations menu lists conversations and opens the chosen one", async () => {
   const { agentApi } = await import("@/lib/agent");
   vi.spyOn(agentApi, "conversations").mockResolvedValue({
     conversations: [
@@ -169,18 +169,18 @@ test("the 会話 menu lists conversations and opens the chosen one", async () =>
     ],
   });
   renderPanel();
-  fireEvent.keyDown(screen.getByRole("button", { name: "会話" }), { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("button", { name: "Conversations" }), { key: "Enter" });
   const item = await screen.findByRole("menuitem", { name: /牛乳を完了に/ });
-  expect(item.textContent).toContain("休止中");
-  expect(screen.getByRole("menuitem", { name: /古い会話/ }).textContent).toContain("再開できません");
-  expect(screen.getByRole("menuitem", { name: /今週のタスク/ }).textContent).not.toMatch(/休止中|再開できません/);
+  expect(item.textContent).toContain("Dormant");
+  expect(screen.getByRole("menuitem", { name: /古い会話/ }).textContent).toContain("Can't resume");
+  expect(screen.getByRole("menuitem", { name: /今週のタスク/ }).textContent).not.toMatch(/Dormant|Can.t resume/);
   fireEvent.click(item);
   expect(open).toHaveBeenCalledWith("c1", "claude");
 });
 
-test("新しい会話 starts a fresh chat without ending the old one", async () => {
+test("New conversation starts a fresh chat without ending the old one", async () => {
   renderPanel();
-  fireEvent.click(screen.getByRole("button", { name: "新しい会話" }));
+  fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
   expect(reset).toHaveBeenCalled();
 });
 
@@ -188,9 +188,9 @@ test("a failed conversation keeps its history and disables the input with a note
   renderPanel();
   await setChat({ failed: true, items: [{ kind: "user", text: "前の依頼" }] });
   expect(screen.getByText("前の依頼")).toBeTruthy();
-  expect(screen.getByText("この会話は再開できませんでした。新しい会話で続けてください。")).toBeTruthy();
-  expect((screen.getByRole("textbox", { name: "AI への依頼" }) as HTMLTextAreaElement).disabled).toBe(true);
-  expect((screen.getByRole("button", { name: "送信" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("This conversation couldn't be resumed. Continue in a new conversation.")).toBeTruthy();
+  expect((screen.getByRole("textbox", { name: "Request to the AI" }) as HTMLTextAreaElement).disabled).toBe(true);
+  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("Escape closes the panel", async () => {
@@ -215,7 +215,7 @@ test("Escape leaves the panel open while composing, or while a menu, dialog or r
     '<div data-radix-popper-content-wrapper=""></div>',
     '<div role="dialog"></div>',
     '<div role="alertdialog"></div>',
-    '<aside aria-label="record"></aside>',
+    "<aside data-record-drawer></aside>",
   ]) {
     const layer = document.createElement("div");
     layer.innerHTML = html;
@@ -227,12 +227,12 @@ test("Escape leaves the panel open while composing, or while a menu, dialog or r
   close.mockRestore();
 });
 
-test("Escape with the 会話 menu open closes only the menu", async () => {
+test("Escape with the Conversations menu open closes only the menu", async () => {
   const { agentApi, agentPanel } = await import("@/lib/agent");
   vi.spyOn(agentApi, "conversations").mockResolvedValue({ conversations: [] });
   const close = vi.spyOn(agentPanel, "close");
   renderPanel();
-  fireEvent.keyDown(screen.getByRole("button", { name: "会話" }), { key: "Enter" });
+  fireEvent.keyDown(screen.getByRole("button", { name: "Conversations" }), { key: "Enter" });
   const menu = await screen.findByRole("menu");
   fireEvent.keyDown(menu, { key: "Escape" });
   expect(close).not.toHaveBeenCalled();
@@ -244,7 +244,7 @@ test("Escape keeps the panel open with an unsent draft, and in another text fiel
   const { agentPanel } = await import("@/lib/agent");
   const close = vi.spyOn(agentPanel, "close");
   renderPanel();
-  const box = screen.getByRole("textbox", { name: "AI への依頼" });
+  const box = screen.getByRole("textbox", { name: "Request to the AI" });
   fireEvent.change(box, { target: { value: "書きかけ" } });
   fireEvent.keyDown(box, { key: "Escape" });
   expect(close).not.toHaveBeenCalled();

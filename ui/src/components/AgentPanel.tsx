@@ -22,26 +22,28 @@ import {
 import { ApiError } from "@/lib/api";
 import { useDrawerWidth } from "@/lib/drawerWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
+import { formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { ProposalCard } from "./ProposalCard";
+import { m } from "@/paraglide/messages.js";
 
 const markdownStyle =
   "max-w-none min-w-0 [overflow-wrap:anywhere] [&_a]:underline [&_code]:font-mono [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_pre]:overflow-auto [&_table]:text-[14px] [&_ul]:list-disc [&_ul]:pl-5";
 const TOOL_NAME = /^(?:mcp__yamlite__|mcp\.yamlite\.)(\w+)$/;
-const TOOL_LABEL: Record<string, string> = {
-  schema: "テーブル構成を確認",
-  query: "検索",
-  get_records: "レコードを読み込み",
-  propose_changes: "変更を提案",
-  propose_sql: "変更を提案",
-  propose_table: "テーブルを提案",
-  check: "ルールを確認",
+const TOOL_LABEL: Record<string, () => string> = {
+  schema: m.agent_tool_schema,
+  query: m.agent_tool_query,
+  get_records: m.agent_tool_get_records,
+  propose_changes: m.agent_tool_propose_changes,
+  propose_sql: m.agent_tool_propose_changes,
+  propose_table: m.agent_tool_propose_table,
+  check: m.agent_tool_check,
 };
 
 const toolLabel = (title: string) => {
   const tool = TOOL_NAME.exec(title)?.[1];
-  return tool ? (TOOL_LABEL[tool] ?? tool) : title;
+  return tool ? (TOOL_LABEL[tool]?.() ?? tool) : title;
 };
 
 function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefined }) {
@@ -59,7 +61,7 @@ function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefin
               />
             ))}
           </span>
-          {running ? `${running} を実行中…` : "考えています…"}
+          {running ? m.agent_running({ tool: running }) : m.agent_thinking()}
         </>
       )}
     </p>
@@ -67,7 +69,7 @@ function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefin
 }
 
 function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
-  const label = item.status === "denied" ? `許可されていない操作を止めました（${item.title}）` : toolLabel(item.title);
+  const label = item.status === "denied" ? m.agent_denied({ tool: item.title }) : toolLabel(item.title);
   const sql = (item.input as { sql?: string } | undefined)?.sql;
   return (
     <details
@@ -91,21 +93,10 @@ function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
 
 const newConversation = () => chat.reset().catch(() => {});
 
-const hhmm = new Intl.DateTimeFormat("ja-JP", { hour: "2-digit", minute: "2-digit" });
-const dayHhmm = new Intl.DateTimeFormat("ja-JP", {
-  month: "numeric",
-  day: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const when = (iso: string) => {
-  const d = new Date(iso);
-  return (d.toDateString() === new Date().toDateString() ? hhmm : dayHhmm).format(d);
-};
-const STATUS_LABEL: Record<ConversationSummary["status"], string | null> = {
+const STATUS_LABEL: Record<ConversationSummary["status"], (() => string) | null> = {
   active: null,
-  dormant: "休止中",
-  failed: "再開できません",
+  dormant: m.agent_status_dormant,
+  failed: m.agent_status_failed,
 };
 
 function ConversationMenu({ current, onPick }: { current: string | null; onPick: (c: ConversationSummary) => void }) {
@@ -118,17 +109,17 @@ function ConversationMenu({ current, onPick }: { current: string | null; onPick:
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="text-[14px]">
           <History className="size-4" />
-          会話
+          {m.agent_conversations()}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80 max-w-[calc(100vw-2rem)]">
         {conversations.length === 0 ? (
           <DropdownMenuItem disabled className="text-[14px]">
-            {loading ? "読み込み中…" : "まだ会話はありません"}
+            {loading ? m.common_loading() : m.agent_no_conversations()}
           </DropdownMenuItem>
         ) : (
           conversations.map((c) => {
-            const status = STATUS_LABEL[c.status];
+            const status = STATUS_LABEL[c.status]?.();
             const name = agentName(c.agent);
             return (
               <DropdownMenuItem
@@ -137,9 +128,9 @@ function ConversationMenu({ current, onPick }: { current: string | null; onPick:
                 className="flex cursor-pointer flex-col items-stretch gap-0.5 py-2 aria-[current]:bg-panel-2"
                 onSelect={() => onPick(c)}
               >
-                <span className="truncate text-[15px]">{c.title || "（メッセージなし）"}</span>
+                <span className="truncate text-[15px]">{c.title || m.agent_untitled()}</span>
                 <span className="flex gap-2 text-[14px] text-muted-foreground">
-                  <span>{when(c.updatedAt)}</span>
+                  <span>{formatWhen(c.updatedAt)}</span>
                   {name && <span>{name}</span>}
                   {status && <span className={cn(c.status === "failed" && "text-err")}>{status}</span>}
                 </span>
@@ -155,11 +146,11 @@ function ConversationMenu({ current, onPick }: { current: string | null; onPick:
 function startErrorText(e: unknown, agent: { name: string; login: string }): { text: string; command?: string } {
   if (e instanceof ApiError && e.body.code === "login")
     return {
-      text: `${agent.name} にログインが必要です。ターミナルで次を実行してから、もう一度送信してください。`,
+      text: m.agent_login_required({ agent: agent.name }),
       command: agent.login,
     };
   if (e instanceof ApiError && e.body.code === "spawn")
-    return { text: `${agent.name} を起動できませんでした: ${e.message}` };
+    return { text: m.agent_spawn_failed({ agent: agent.name, error: e.message }) };
   return { text: e instanceof Error ? e.message : String(e) };
 }
 
@@ -183,7 +174,7 @@ export function AgentPanel() {
   useEffect(() => {
     // menus, dialogs and the record drawer take Escape first; Radix layers mark it handled and may already be gone
     const layer =
-      '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], aside[aria-label="record"]';
+      '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], aside[data-record-drawer]';
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented || e.isComposing || e.keyCode === 229) return;
       if (document.querySelector(layer)) return;
@@ -232,7 +223,7 @@ export function AgentPanel() {
 
   return (
     <aside
-      aria-label="AI に依頼"
+      aria-label={m.nav_ask_ai()}
       className={cn(
         "relative flex min-h-0 flex-col border-l bg-background",
         mobile && "fixed inset-0 z-40 h-dvh border-l-0",
@@ -244,7 +235,7 @@ export function AgentPanel() {
         <div className="flex min-w-0 items-center gap-1">
           {agents.length > 1 ? (
             <label className="relative flex items-center">
-              <span className="sr-only">エージェント</span>
+              <span className="sr-only">{m.agent_agent()}</span>
               <select
                 className="appearance-none rounded-md border bg-panel py-1.5 pr-8 pl-2.5 text-[15px]"
                 value={agent.id}
@@ -283,9 +274,9 @@ export function AgentPanel() {
               void newConversation();
             }}
           >
-            新しい会話
+            {m.agent_new_conversation()}
           </Button>
-          <Button variant="ghost" size="icon" aria-label="閉じる" onClick={agentPanel.close}>
+          <Button variant="ghost" size="icon" aria-label={m.common_close()} onClick={agentPanel.close}>
             <X className="size-5" />
           </Button>
         </div>
@@ -295,19 +286,15 @@ export function AgentPanel() {
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3.5 text-[15px] leading-relaxed [&>*]:shrink-0"
       >
         {earlier.length > 0 && (
-          <section aria-label="未適用の提案" className="flex flex-col gap-3 border-b pb-3">
-            <h2 className="text-[15px] font-semibold">未適用の提案</h2>
-            <p className="text-[14px] text-muted-foreground">前の会話で作られ、まだ適用も破棄もしていない提案です。</p>
+          <section aria-label={m.agent_pending_proposals()} className="flex flex-col gap-3 border-b pb-3">
+            <h2 className="text-[15px] font-semibold">{m.agent_pending_proposals()}</h2>
+            <p className="text-[14px] text-muted-foreground">{m.agent_pending_proposals_note()}</p>
             {earlier.map((p) => (
               <ProposalCard key={p.id} proposal={p} />
             ))}
           </section>
         )}
-        {state.items.length === 0 && (
-          <p className="text-muted-foreground">
-            データの検索や編集を頼めます。例:「来週締め切りのタスクを一覧して」「errand タグのタスクを全部完了にして」
-          </p>
-        )}
+        {state.items.length === 0 && <p className="text-muted-foreground">{m.agent_intro()}</p>}
         {state.items.map((item, i) =>
           item.kind === "user" ? (
             <p
@@ -338,12 +325,8 @@ export function AgentPanel() {
           ),
         )}
         <WorkingStatus busy={state.busy} last={state.items.at(-1)} />
-        {state.failed && (
-          <p className="text-muted-foreground">この会話は再開できませんでした。新しい会話で続けてください。</p>
-        )}
-        {state.closed && (
-          <p className="text-muted-foreground">会話が終了しました。次のメッセージは新しい会話で送られます。</p>
-        )}
+        {state.failed && <p className="text-muted-foreground">{m.agent_resume_failed()}</p>}
+        {state.closed && <p className="text-muted-foreground">{m.agent_closed()}</p>}
         {startError && (
           <div role="alert" className="rounded-md border border-err px-3 py-2 text-err">
             <p>{startError.text}</p>
@@ -360,24 +343,24 @@ export function AgentPanel() {
       >
         <textarea
           ref={input}
-          aria-label="AI への依頼"
+          aria-label={m.agent_input()}
           rows={3}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={state.failed}
-          placeholder="例: 来週締め切りのタスクを一覧して"
+          placeholder={m.agent_placeholder()}
           className="w-full resize-none rounded-lg border bg-panel px-3 py-2.5 text-[16px] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[14px] text-muted-foreground">読み取りと提案のみ。適用するまで保存されません</span>
+          <span className="text-[14px] text-muted-foreground">{m.agent_read_only_note()}</span>
           {state.busy ? (
             <Button type="button" variant="outline" onClick={() => void chat.stop()}>
-              <Square className="size-4" /> 停止
+              <Square className="size-4" /> {m.agent_stop()}
             </Button>
           ) : (
             <Button type="submit" disabled={sending || state.failed || text.trim() === ""}>
-              送信
+              {m.agent_send()}
             </Button>
           )}
         </div>

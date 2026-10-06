@@ -6,6 +6,7 @@ import type { ErdColumn, ErdNode } from "@/lib/erd";
 import { HEADER_HEIGHT, NODE_WIDTH, ROW_HEIGHT } from "@/lib/erdLayout";
 import { cn } from "@/lib/utils";
 import { HintPopover } from "./HintPopover";
+import { m } from "@/paraglide/messages.js";
 
 export type ErdFlowNode = Node<{ node: ErdNode }, "erd">;
 
@@ -25,9 +26,9 @@ export const columnHandle = (column: string, side: "in" | "out"): string => `c:$
 const handle = "!size-1.5 !min-h-0 !min-w-0 !border-0 !bg-transparent";
 
 function Mark({ column }: { column: ErdColumn }) {
-  if (column.problems.length > 0) return <TriangleAlert aria-label="problem" className="size-3 text-warn" />;
-  if (column.key) return <KeyRound aria-label="key" className="size-3 text-tomato" />;
-  if (column.ref) return <ArrowRight aria-label="reference" className="size-3 opacity-70" />;
+  if (column.problems.length > 0) return <TriangleAlert aria-label={m.erd_problem()} className="size-3 text-warn" />;
+  if (column.key) return <KeyRound aria-label={m.erd_key()} className="size-3 text-tomato" />;
+  if (column.ref) return <ArrowRight aria-label={m.erd_reference()} className="size-3 opacity-70" />;
   return null;
 }
 
@@ -67,7 +68,7 @@ export function ErdNodeView({ data: { node } }: NodeProps<ErdFlowNode>) {
         </Link>
         {node.warnings > 0 && (
           <span
-            title={`${node.warnings} 件の警告`}
+            title={m.table_warnings({ count: node.warnings })}
             className="flex shrink-0 items-center gap-0.5 rounded-full bg-warn-soft px-1 text-[10.5px] font-semibold text-warn"
           >
             <TriangleAlert className="size-3" />

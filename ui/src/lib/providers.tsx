@@ -22,6 +22,7 @@ import { staticSnapshot } from "./mode";
 import { EventStore } from "./events";
 import { invalidationsFor } from "./invalidate";
 import { type ReflectAction, type ReflectMap, recordFileOf, reflectKey, reflectReducer } from "./reflect";
+import { m } from "@/paraglide/messages.js";
 
 const EventsContext = createContext<EventStore | null>(null);
 const ReflectContext = createContext<{ state: ReflectMap; dispatch: (a: ReflectAction) => void } | null>(null);
@@ -29,7 +30,7 @@ const ReflectContext = createContext<{ state: ReflectMap; dispatch: (a: ReflectA
 // a 503 that survived request()'s retries means the database is still busy
 const notifyBusy = (error: unknown) => {
   if (error instanceof ApiError && error.status === 503) {
-    toast.error("データベースが使用中です。少し待ってから再試行してください", { id: "db-busy" });
+    toast.error(m.toast_db_busy(), { id: "db-busy" });
   }
 };
 
@@ -100,7 +101,7 @@ function Wiring({ store, children }: { store: EventStore; children: ReactNode })
         toasted.current.delete(k);
       } else if (toasted.current.get(k) !== r.reason) {
         toasted.current.set(k, r.reason);
-        toast.error(`反映されませんでした: ${k.replace("\u0000", "/")}`, { id: k, description: r.reason });
+        toast.error(m.toast_not_reflected({ record: k.replace("\u0000", "/") }), { id: k, description: r.reason });
       }
     }
   }, [state]);

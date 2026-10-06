@@ -1,3 +1,4 @@
+import "./lib/locale";
 import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -5,10 +6,12 @@ import { LoadFailure } from "./components/LoadFailure";
 import { setBackend } from "./lib/api";
 import { enterStatic, isStaticPage } from "./lib/mode";
 import { Providers } from "./lib/providers";
+import { getLocale } from "./paraglide/runtime.js";
 import { router } from "./router";
 import "./styles.css";
 
 async function boot() {
+  document.documentElement.lang = getLocale();
   const root = createRoot(document.getElementById("root") as HTMLElement);
   if (isStaticPage()) {
     try {

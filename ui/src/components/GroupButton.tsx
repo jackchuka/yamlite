@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import { groupNames } from "@/lib/groups";
 import { useEvents, useMeta } from "@/lib/providers";
 import type { TableMeta } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 
 // the sidebar group a table is listed under, written to yamlite.yaml
 export function GroupButton({ table }: { table: TableMeta }) {
@@ -34,8 +35,12 @@ export function GroupButton({ table }: { table: TableMeta }) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" aria-label={`group: ${table.group ?? "none"}`}>
-          <Tag className="size-3.5" /> {table.group ?? "Group"}
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label={m.table_group_label({ group: table.group ?? m.table_group_none() })}
+        >
+          <Tag className="size-3.5" /> {table.group ?? m.table_group()}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="flex w-[min(16rem,calc(100vw-2rem))] flex-col gap-2 p-3">
@@ -47,9 +52,9 @@ export function GroupButton({ table }: { table: TableMeta }) {
           }}
         >
           <label className="text-[11.5px] font-semibold text-muted-foreground">
-            グループ
+            {m.table_group()}
             <Input
-              aria-label="group name"
+              aria-label={m.table_group_name()}
               role="combobox"
               list={listId}
               value={value}
@@ -73,11 +78,11 @@ export function GroupButton({ table }: { table: TableMeta }) {
                 disabled={save.isPending || !connected}
                 onClick={() => save.mutate(null)}
               >
-                グループなし
+                {m.table_ungroup()}
               </Button>
             )}
             <Button type="submit" size="sm" disabled={save.isPending || !connected}>
-              保存
+              {m.common_save()}
             </Button>
           </div>
         </form>

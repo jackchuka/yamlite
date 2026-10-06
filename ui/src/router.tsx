@@ -15,12 +15,13 @@ import { useEvents, useMeta } from "./lib/providers";
 import { useIsMobile } from "./lib/useIsMobile";
 import type { TableMeta } from "./lib/types";
 import { erdRoute, pageRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
+import { m } from "@/paraglide/messages.js";
 
 function Home() {
   const { data } = useMeta();
   const first = data?.tables[0];
   if (!data) return null;
-  if (!first) return <Placeholder title="テーブルがありません" />;
+  if (!first) return <Placeholder title={m.common_no_tables()} />;
   return <Navigate to="/t/$table" params={{ table: first.name }} />;
 }
 
@@ -33,7 +34,7 @@ function NewRecordButton({ table }: { table: TableMeta }) {
       <Button
         size={mobile ? "lg" : "sm"}
         disabled={!connected}
-        title={connected ? undefined : "disconnected"}
+        title={connected ? undefined : m.common_disconnected_hint()}
         className={
           mobile
             ? "fixed right-4 bottom-[calc(56px+env(safe-area-inset-bottom))] z-30 rounded-full shadow-lg"
@@ -41,7 +42,7 @@ function NewRecordButton({ table }: { table: TableMeta }) {
         }
         onClick={() => setOpen(true)}
       >
-        + New record
+        {m.nav_new_record()}
       </Button>
       <NewRecordDialog table={table} open={open} onOpenChange={setOpen} />
     </>
@@ -55,12 +56,12 @@ function RenameButton({ table, recordKey }: { table: TableMeta; recordKey: strin
     <>
       <button
         type="button"
-        aria-label="rename key"
+        aria-label={m.nav_rename_key()}
         disabled={!connected}
         className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 max-md:px-2 max-md:py-2 max-md:text-[13px]"
         onClick={() => setOpen(true)}
       >
-        rename
+        {m.nav_rename()}
       </button>
       {open && <RenameKeyDialog table={table} recordKey={recordKey} open onOpenChange={setOpen} />}
     </>

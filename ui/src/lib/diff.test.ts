@@ -14,7 +14,7 @@ test("fields are compared side by side, the key is left out", () => {
 });
 
 test("the restore button names the side that comes back", () => {
-  expect(restoreLabel("file")).toBe("DB 側に戻す");
-  expect(restoreLabel("db")).toBe("ファイル側に戻す");
-  expect(restoreLabel(null)).toBe("復元できません");
+  expect(restoreLabel("file")).toBe("Restore the DB side");
+  expect(restoreLabel("db")).toBe("Restore the file side");
+  expect(restoreLabel(null)).toBe("Can't restore");
 });

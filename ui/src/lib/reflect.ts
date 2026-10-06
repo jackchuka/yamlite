@@ -1,4 +1,5 @@
 import type { Meta, ServeEvent } from "./types";
+import { m } from "@/paraglide/messages.js";
 
 export type Reflect =
   | { state: "pending"; since: number }
@@ -45,7 +46,7 @@ export function reflectReducer(
     if (!k.startsWith(prefix) || !open(r)) continue;
     const key = k.slice(prefix.length);
     if (!e.ok) {
-      next = { ...next, [k]: { state: "failed", reason: e.error ?? "sync failed" } };
+      next = { ...next, [k]: { state: "failed", reason: e.error ?? m.activity_sync_failed() } };
       continue;
     }
     if (e.changes.some((c) => c.key === key && (c.op === "toFile" || c.op === "deleteFile"))) {

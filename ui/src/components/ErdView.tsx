@@ -27,6 +27,7 @@ import type { Meta, TableSchema } from "@/lib/types";
 import { columnHandle, type ErdFlowNode, ErdNodeView, headerHandle, HighlightContext } from "./ErdNode";
 import { ErdSelfLoop } from "./ErdSelfLoop";
 import { Placeholder } from "./Placeholder";
+import { m } from "@/paraglide/messages.js";
 
 const nodeTypes = { erd: ErdNodeView };
 const edgeTypes = { self: ErdSelfLoop };
@@ -149,18 +150,16 @@ function Diagram({ meta, schemas, warnings }: DiagramProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5 max-md:px-3">
-        <h1 className="max-md:sr-only text-[15px] font-bold">ERD</h1>
+        <h1 className="max-md:sr-only text-[15px] font-bold">{m.nav_erd()}</h1>
         <label className="flex items-center gap-2 text-[12px]">
           <Switch checked={showViews} onCheckedChange={setShowViews} />
-          ビューを表示
+          {m.erd_show_views()}
         </label>
         <Button size="sm" variant="outline" onClick={() => setRound((r) => r + 1)}>
-          <RotateCcw className="size-3.5" /> 再レイアウト
+          <RotateCcw className="size-3.5" /> {m.erd_relayout()}
         </Button>
         <span className="text-[12px] text-muted-foreground max-md:basis-full max-md:text-[12.5px] md:ml-auto">
-          {mobile
-            ? "タップで関連をハイライト · タイトルをタップでテーブルを開く"
-            : "クリックで関連をハイライト · ダブルクリックでテーブルを開く"}
+          {mobile ? m.erd_hint_touch() : m.erd_hint_pointer()}
         </span>
       </header>
       <div className="min-h-0 flex-1">
@@ -216,6 +215,6 @@ export function ErdView() {
     return out;
   }, [tables, results]);
   if (!meta) return null;
-  if (meta.tables.length === 0) return <Placeholder title="テーブルがありません" />;
+  if (meta.tables.length === 0) return <Placeholder title={m.common_no_tables()} />;
   return <ErdDiagram meta={meta} schemas={schemas} warnings={warnings} />;
 }

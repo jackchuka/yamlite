@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { JsonTree } from "./JsonTree";
+import { m } from "@/paraglide/messages.js";
 
 export function JsonPopover({ title, value, children }: { title: string; value: unknown; children: ReactNode }) {
   return (
@@ -14,7 +15,7 @@ export function JsonPopover({ title, value, children }: { title: string; value: 
             className="hover:text-foreground"
             onClick={() => void navigator.clipboard?.writeText(JSON.stringify(value, null, 2))}
           >
-            Copy
+            {m.json_copy()}
           </button>
         </div>
         <JsonTree value={value} />

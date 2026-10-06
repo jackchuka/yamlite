@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import type { Row } from "@/lib/types";
 import { FieldDiff } from "./FieldDiff";
+import { m } from "@/paraglide/messages.js";
 
 export function StaleDialog({
   stale,
@@ -29,11 +30,11 @@ export function StaleDialog({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>他で変更されました</DialogTitle>
-          <DialogDescription>読み込んだあとに、ファイルか DB で次のフィールドが変わりました。</DialogDescription>
+          <DialogTitle>{m.record_stale_title()}</DialogTitle>
+          <DialogDescription>{m.record_stale_description()}</DialogDescription>
         </DialogHeader>
         <FieldDiff
-          labels={["いまの値", "あなたの編集"]}
+          labels={[m.record_stale_theirs(), m.record_stale_mine()]}
           rows={stale.map((f) => ({
             field: f,
             a: JSON.stringify(current[f] ?? null),
@@ -42,9 +43,9 @@ export function StaleDialog({
         />
         <DialogFooter>
           <Button variant="outline" onClick={onReload}>
-            最新を読み込む
+            {m.record_reload()}
           </Button>
-          <Button onClick={onOverwrite}>上書き</Button>
+          <Button onClick={onOverwrite}>{m.record_overwrite()}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

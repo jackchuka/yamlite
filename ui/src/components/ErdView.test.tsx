@@ -128,7 +128,7 @@ test("double-clicking a table opens it", async () => {
 test("the views switch hides the views", async () => {
   render(diagram(meta()));
   await screen.findByTestId("erd-node-tasks__subtasks");
-  fireEvent.click(screen.getByRole("switch", { name: "ビューを表示" }));
+  fireEvent.click(screen.getByRole("switch", { name: "Show views" }));
   await waitFor(() => expect(screen.queryByTestId("erd-node-tasks__subtasks")).toBeNull());
   expect(screen.getByTestId("erd-node-tasks")).toBeTruthy();
 });
@@ -140,7 +140,7 @@ test("a change in the data alone updates the nodes without laying them out again
   rerender(diagram(meta(9)));
   await waitFor(() => expect(screen.getByTestId("erd-node-tasks").textContent).toContain("9"));
   expect(vi.mocked(layoutErd).mock.calls.length).toBe(laidOut);
-  fireEvent.click(screen.getByRole("button", { name: /再レイアウト/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Re-layout/ }));
   expect(vi.mocked(layoutErd).mock.calls.length).toBe(laidOut + 1);
 });
 
@@ -224,5 +224,5 @@ test("the minimap is left out on a phone", async () => {
   render(diagram(meta()));
   await screen.findByTestId("erd-node-tags");
   expect(document.querySelector(".react-flow__minimap")).toBeNull();
-  expect(screen.getByText(/タイトルをタップ/)).toBeTruthy();
+  expect(screen.getByText(/tap a title/)).toBeTruthy();
 });

@@ -10,6 +10,7 @@ import { fieldError } from "@/lib/fielderror";
 import { groupNames } from "@/lib/groups";
 import { useEvents, useMeta } from "@/lib/providers";
 import type { ColumnType } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 
 const TYPES: ColumnType[] = ["TEXT", "INTEGER", "REAL", "BOOLEAN", "JSON"];
 
@@ -54,12 +55,12 @@ export function NewTableDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{adopt ? `${adopt} を yamlite.yaml に追加` : "新しいテーブル"}</DialogTitle>
+          <DialogTitle>{adopt ? m.dialog_adopt_title({ table: adopt }) : m.dialog_new_table()}</DialogTitle>
         </DialogHeader>
         <label className="text-[11.5px] font-semibold text-muted-foreground">
-          名前
+          {m.dialog_name()}
           <Input
-            aria-label="table name"
+            aria-label={m.dialog_table_name()}
             value={name}
             disabled={adopt !== undefined}
             onChange={(e) => setName(e.target.value)}
@@ -69,18 +70,18 @@ export function NewTableDialog({
         {errorFor("name")}
         <fieldset className="flex gap-4 text-[12px]">
           <label>
-            <input type="radio" checked={mode === "files"} onChange={() => setMode("files")} /> フォルダ（1 レコード 1
-            ファイル: {name || "name"}/*.yaml）
+            <input type="radio" checked={mode === "files"} onChange={() => setMode("files")} />{" "}
+            {m.dialog_mode_files({ name: name || "name" })}
           </label>
           <label>
-            <input type="radio" checked={mode === "list"} onChange={() => setMode("list")} /> 1 ファイルのリスト（
-            {name || "name"}.yaml）
+            <input type="radio" checked={mode === "list"} onChange={() => setMode("list")} />{" "}
+            {m.dialog_mode_list({ name: name || "name" })}
           </label>
         </fieldset>
         <label className="text-[11.5px] font-semibold text-muted-foreground">
-          キー列
+          {m.dialog_key_column_label()}
           <Input
-            aria-label="key column"
+            aria-label={m.dialog_key_column()}
             value={key}
             onChange={(e) => setKey(e.target.value)}
             className="mt-1 font-mono"
@@ -88,9 +89,9 @@ export function NewTableDialog({
         </label>
         {errorFor("key")}
         <label className="text-[11.5px] font-semibold text-muted-foreground">
-          グループ（任意）
+          {m.dialog_group_optional()}
           <Input
-            aria-label="group name"
+            aria-label={m.table_group_name()}
             list={groupList}
             value={group}
             onChange={(e) => setGroup(e.target.value)}
@@ -105,19 +106,17 @@ export function NewTableDialog({
         {errorFor("group")}
         {!adopt && (
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11.5px] font-semibold text-muted-foreground">
-              列（あとで YAML に書いても自動で増えます）
-            </span>
+            <span className="text-[11.5px] font-semibold text-muted-foreground">{m.dialog_columns()}</span>
             {columns.map((c, i) => (
               <div key={i} className="flex flex-wrap gap-1.5">
                 <Input
-                  aria-label={`column ${i + 1} name`}
+                  aria-label={m.dialog_column_name({ n: i + 1 })}
                   value={c.name}
                   onChange={(e) => setColumns(columns.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                   className="font-mono max-md:basis-full"
                 />
                 <select
-                  aria-label={`column ${i + 1} type`}
+                  aria-label={m.dialog_column_type({ n: i + 1 })}
                   className="rounded border bg-background px-2 max-md:h-9 max-md:flex-1"
                   value={c.type}
                   onChange={(e) =>
@@ -131,7 +130,7 @@ export function NewTableDialog({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`remove column ${i + 1}`}
+                  aria-label={m.dialog_remove_column({ n: i + 1 })}
                   onClick={() => setColumns(columns.filter((_, j) => j !== i))}
                 >
                   <X className="size-4" />
@@ -139,7 +138,7 @@ export function NewTableDialog({
               </div>
             ))}
             <Button variant="outline" size="sm" onClick={() => setColumns([...columns, { name: "", type: "TEXT" }])}>
-              + 列
+              {m.dialog_add_column()}
             </Button>
             {errorFor("columns")}
           </div>
@@ -147,14 +146,14 @@ export function NewTableDialog({
         {err && err.field === null && <p className="text-[11px] text-err">{err.message}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {m.common_cancel()}
           </Button>
           <Button
             disabled={name === "" || create.isPending || !connected}
-            title={connected ? undefined : "disconnected"}
+            title={connected ? undefined : m.common_disconnected_hint()}
             onClick={() => create.mutate()}
           >
-            作成
+            {m.dialog_create()}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -4,6 +4,7 @@ import { request } from "./api";
 import { isReadOnly } from "./mode";
 import { queryClient, useMeta } from "./providers";
 import type { Row } from "./types";
+import { m } from "@/paraglide/messages.js";
 
 export interface AgentMeta {
   id: string;
@@ -208,7 +209,7 @@ export class Chat {
       if (!this.state.closed) {
         const failed = reduceChat(this.state, {
           type: "error",
-          message: "接続が切れました。新しい会話を始めてください。",
+          message: m.agent_disconnected(),
         });
         this.set(reduceChat(failed, { type: "closed" }));
       }

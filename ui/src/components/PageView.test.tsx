@@ -66,7 +66,7 @@ test("the page runs in a sandboxed frame behind the injected policy", async () =
 
 test("an unknown page says so", async () => {
   await show("nope");
-  expect(await screen.findByText("ページが見つかりません")).toBeTruthy();
+  expect(await screen.findByText("Page not found")).toBeTruthy();
 });
 
 test("a frame that loads a second time has navigated away and is cut off", async () => {
@@ -80,7 +80,7 @@ test("a frame that loads a second time has navigated away and is cut off", async
   document.removeEventListener("load", count, true);
   expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.load(frame);
-  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("別の URL に移動したため"));
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("moved to another URL"));
   expect(screen.queryByTitle("Board")).toBeNull();
 });
 

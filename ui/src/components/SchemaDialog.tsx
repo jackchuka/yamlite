@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import type { Bound, ViewMeta } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 
 const rangeText = (min: Bound | undefined, max: Bound | undefined): string | null =>
   min !== undefined && max !== undefined
@@ -28,22 +29,22 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 const cell = "border-b px-2 py-1.5 text-left align-top";
-const empty = <p className="text-[12px] text-muted-foreground">なし</p>;
+const Empty = () => <p className="text-[12px] text-muted-foreground">{m.schema_none()}</p>;
 
 function ViewSchema({ view }: { view: ViewMeta }) {
   return (
     <div className="flex flex-col gap-5 text-[12.5px]">
-      <Section title="View">
+      <Section title={m.schema_view()}>
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-          <dt className="text-muted-foreground">parent</dt>
+          <dt className="text-muted-foreground">{m.schema_parent()}</dt>
           <dd className="font-mono">{view.parent}</dd>
-          <dt className="text-muted-foreground">identity</dt>
+          <dt className="text-muted-foreground">{m.schema_identity()}</dt>
           <dd className="font-mono">{view.identity.length > 0 ? view.identity.join(", ") : "—"}</dd>
-          <dt className="text-muted-foreground">DB</dt>
-          <dd>{view.inDb ? "VIEW あり" : "まだありません"}</dd>
+          <dt className="text-muted-foreground">{m.schema_db()}</dt>
+          <dd>{view.inDb ? m.schema_view_in_db() : m.schema_not_yet()}</dd>
         </dl>
       </Section>
-      <Section title="Columns">
+      <Section title={m.schema_columns()}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <tbody>
@@ -53,10 +54,10 @@ function ViewSchema({ view }: { view: ViewMeta }) {
                   <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
                   <td className={`${cell} text-muted-foreground`}>
                     {view.identity.includes(name)
-                      ? "identity"
+                      ? m.schema_identity()
                       : [
-                          Object.hasOwn(view.declared, name) ? "宣言済み" : "推論",
-                          ...(view.required.includes(name) ? ["required"] : []),
+                          Object.hasOwn(view.declared, name) ? m.schema_declared() : m.schema_inferred(),
+                          ...(view.required.includes(name) ? [m.schema_required()] : []),
                           ...(ownOf(view.formats, name) ? [ownOf(view.formats, name) as string] : []),
                           ...(() => {
                             const range = rangeText(ownOf(view.min, name), ownOf(view.max, name));
@@ -100,12 +101,8 @@ export function SchemaDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-auto sm:max-w-2xl md:max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>{table} のスキーマ</DialogTitle>
-          <DialogDescription>
-            {view
-              ? "VIEW は yamlite.yaml の expand から作られる読み取り専用の表です。"
-              : "yamlite.yaml の宣言と、DB 上の状態です。変更は yamlite.yaml を編集してください。"}
-          </DialogDescription>
+          <DialogTitle>{m.schema_title({ table })}</DialogTitle>
+          <DialogDescription>{view ? m.schema_view_description() : m.schema_table_description()}</DialogDescription>
           {path && <p className="font-mono text-[12px] break-all text-muted-foreground md:hidden">{path}</p>}
         </DialogHeader>
         {view ? (
@@ -115,17 +112,17 @@ export function SchemaDialog({
             {error && <p className="text-[12px] text-err">{error.message}</p>}
             {data && (
               <div className="flex flex-col gap-5 text-[12.5px]">
-                <Section title="Table">
+                <Section title={m.schema_table()}>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                    <dt className="text-muted-foreground">path</dt>
+                    <dt className="text-muted-foreground">{m.schema_path()}</dt>
                     <dd className="font-mono">{data.mode === "files" ? data.files : data.path}</dd>
-                    <dt className="text-muted-foreground">key</dt>
+                    <dt className="text-muted-foreground">{m.schema_key()}</dt>
                     <dd className="font-mono">{data.key}</dd>
-                    <dt className="text-muted-foreground">DB</dt>
-                    <dd>{data.inDb ? "テーブルあり" : "まだありません"}</dd>
+                    <dt className="text-muted-foreground">{m.schema_db()}</dt>
+                    <dd>{data.inDb ? m.schema_table_in_db() : m.schema_not_yet()}</dd>
                   </dl>
                 </Section>
-                <Section title="Columns">
+                <Section title={m.schema_columns()}>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <tbody>
@@ -135,10 +132,10 @@ export function SchemaDialog({
                             <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
                             <td className={`${cell} text-muted-foreground`}>
                               {name === data.key
-                                ? "key"
+                                ? m.schema_key()
                                 : [
-                                    name in data.declared ? "宣言済み" : "推論",
-                                    ...(data.required.includes(name) ? ["required"] : []),
+                                    name in data.declared ? m.schema_declared() : m.schema_inferred(),
+                                    ...(data.required.includes(name) ? [m.schema_required()] : []),
                                     ...(ownOf(data.formats, name) ? [ownOf(data.formats, name) as string] : []),
                                     ...(() => {
                                       const range = rangeText(ownOf(data.min, name), ownOf(data.max, name));
@@ -155,34 +152,36 @@ export function SchemaDialog({
                     </table>
                   </div>
                 </Section>
-                <Section title="References">
-                  {data.references.length === 0
-                    ? empty
-                    : data.references.map((r) => (
-                        <div key={r.column} className="rounded-md border px-3 py-2">
-                          <div className="flex items-center gap-2 font-mono">
-                            <span>{r.column}</span>
-                            <span className="text-muted-foreground">→</span>
-                            <span>{`${r.table}.${r.target}`}</span>
-                            <span
-                              className={`ml-auto font-sans text-[11px] ${r.problems.length > 0 ? "text-warn" : "text-ok"}`}
-                            >
-                              {r.problems.length > 0 ? `⚠ ${r.problems.length} 件の参照切れ` : "OK"}
-                            </span>
-                          </div>
-                          {r.problems.length > 0 && (
-                            <ul className="mt-1.5 list-disc pl-5 text-[11.5px] text-muted-foreground">
-                              {r.problems.map((p) => (
-                                <li key={p}>{p}</li>
-                              ))}
-                            </ul>
-                          )}
+                <Section title={m.schema_references()}>
+                  {data.references.length === 0 ? (
+                    <Empty />
+                  ) : (
+                    data.references.map((r) => (
+                      <div key={r.column} className="rounded-md border px-3 py-2">
+                        <div className="flex items-center gap-2 font-mono">
+                          <span>{r.column}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span>{`${r.table}.${r.target}`}</span>
+                          <span
+                            className={`ml-auto font-sans text-[11px] ${r.problems.length > 0 ? "text-warn" : "text-ok"}`}
+                          >
+                            {r.problems.length > 0 ? m.schema_broken_refs({ count: r.problems.length }) : "OK"}
+                          </span>
                         </div>
-                      ))}
+                        {r.problems.length > 0 && (
+                          <ul className="mt-1.5 list-disc pl-5 text-[11.5px] text-muted-foreground">
+                            {r.problems.map((p) => (
+                              <li key={p}>{p}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </Section>
-                <Section title="Indexes">
+                <Section title={m.schema_indexes()}>
                   {data.indexes.length === 0 && data.otherIndexes.length === 0 ? (
-                    empty
+                    <Empty />
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
@@ -192,7 +191,7 @@ export function SchemaDialog({
                               <td className={`${cell} font-mono`}>{i.definition}</td>
                               <td className={`${cell} font-mono text-[11px] text-muted-foreground`}>{i.name}</td>
                               <td className={`${cell} ${i.inDb ? "text-ok" : "text-warn"}`}>
-                                {i.inDb ? "作成済み" : "未作成"}
+                                {i.inDb ? m.schema_created() : m.schema_not_created()}
                               </td>
                             </tr>
                           ))}
@@ -200,7 +199,7 @@ export function SchemaDialog({
                             <tr key={name}>
                               <td className={`${cell} font-mono`}>{name}</td>
                               <td className={`${cell} text-[11px] text-muted-foreground`} colSpan={2}>
-                                yamlite の管理外（SQL などで作成）
+                                {m.schema_unmanaged_index()}
                               </td>
                             </tr>
                           ))}
@@ -209,44 +208,46 @@ export function SchemaDialog({
                     </div>
                   )}
                   {data.indexes.some((i) => !i.inDb) && (
-                    <p className="text-[11px] text-muted-foreground">未作成の理由は Sync 画面の警告に出ます。</p>
+                    <p className="text-[11px] text-muted-foreground">{m.schema_not_created_hint()}</p>
                   )}
                 </Section>
-                <Section title="Expanded views">
-                  {data.views.length === 0
-                    ? empty
-                    : data.views.map((v) => (
-                        <div
-                          key={v.name}
-                          className="rounded-md border px-3 py-2"
-                          style={{ marginLeft: `${(v.depth - 1) * 16}px` }}
-                        >
-                          <div className="flex items-center gap-2 font-mono">
-                            <a
-                              href={`#/t/${encodeURIComponent(v.name)}`}
-                              className="underline-offset-2 hover:underline"
-                              onClick={() => onOpenChange(false)}
-                            >
-                              {v.name}
-                            </a>
-                            <span className={`ml-auto font-sans text-[11px] ${v.inDb ? "text-ok" : "text-warn"}`}>
-                              {v.inDb ? "作成済み" : "未作成"}
-                            </span>
-                          </div>
-                          {v.inDb && (
-                            <p className="mt-1 font-mono text-[11.5px] text-muted-foreground">
-                              {Object.keys(v.columns).join(", ")}
-                            </p>
-                          )}
-                          {v.problems.length > 0 && (
-                            <ul className="mt-1.5 list-disc pl-5 text-[11.5px] text-muted-foreground">
-                              {v.problems.map((p) => (
-                                <li key={p}>{p}</li>
-                              ))}
-                            </ul>
-                          )}
+                <Section title={m.schema_expanded_views()}>
+                  {data.views.length === 0 ? (
+                    <Empty />
+                  ) : (
+                    data.views.map((v) => (
+                      <div
+                        key={v.name}
+                        className="rounded-md border px-3 py-2"
+                        style={{ marginLeft: `${(v.depth - 1) * 16}px` }}
+                      >
+                        <div className="flex items-center gap-2 font-mono">
+                          <a
+                            href={`#/t/${encodeURIComponent(v.name)}`}
+                            className="underline-offset-2 hover:underline"
+                            onClick={() => onOpenChange(false)}
+                          >
+                            {v.name}
+                          </a>
+                          <span className={`ml-auto font-sans text-[11px] ${v.inDb ? "text-ok" : "text-warn"}`}>
+                            {v.inDb ? m.schema_created() : m.schema_not_created()}
+                          </span>
                         </div>
-                      ))}
+                        {v.inDb && (
+                          <p className="mt-1 font-mono text-[11.5px] text-muted-foreground">
+                            {Object.keys(v.columns).join(", ")}
+                          </p>
+                        )}
+                        {v.problems.length > 0 && (
+                          <ul className="mt-1.5 list-disc pl-5 text-[11.5px] text-muted-foreground">
+                            {v.problems.map((p) => (
+                              <li key={p}>{p}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </Section>
               </div>
             )}

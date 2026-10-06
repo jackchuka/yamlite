@@ -68,14 +68,14 @@ async function runUnmanagedWrite() {
 
 test("the adopt-table banner is offered when the server can write", async () => {
   await runUnmanagedWrite();
-  expect(screen.getByRole("button", { name: "yamlite.yaml に追加" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Add to yamlite.yaml" })).toBeTruthy();
 });
 
 test("the adopt-table banner is hidden in a static export", async () => {
   enterStatic({} as Snapshot);
   await runUnmanagedWrite();
-  expect(screen.queryByRole("button", { name: "yamlite.yaml に追加" })).toBeNull();
-  expect(screen.queryByText(/同期されません/)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add to yamlite.yaml" })).toBeNull();
+  expect(screen.queryByText(/not synced/)).toBeNull();
 });
 
 test("on a phone, one Run button sits under the editor without the shortcut hint", () => {
