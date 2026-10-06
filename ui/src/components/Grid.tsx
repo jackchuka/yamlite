@@ -9,7 +9,7 @@ import {
 import type { RowPreview } from "@/lib/agent";
 import { cellView } from "@/lib/cell";
 import { Highlight } from "@/lib/highlight";
-import type { ColumnType, Reference, Row } from "@/lib/types";
+import type { ColumnFormat, ColumnType, Reference, Row } from "@/lib/types";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
 import { Cell, chip } from "./Cell";
@@ -20,6 +20,7 @@ import { m } from "@/paraglide/messages.js";
 export interface GridColumn {
   name: string;
   type: ColumnType;
+  format?: ColumnFormat;
   // "→ projects" for reference columns
   note?: string;
   reference?: Reference;
@@ -27,7 +28,7 @@ export interface GridColumn {
 
 function GridCell({ column, row, rowKey }: { column: GridColumn; row: Row; rowKey: string }) {
   const value = row[column.name];
-  const v = cellView(value, column.type);
+  const v = cellView(value, column.type, column.format);
   const { reference } = column;
   if (reference && (v.kind === "text" || v.kind === "number"))
     return (
@@ -47,7 +48,7 @@ function GridCell({ column, row, rowKey }: { column: GridColumn; row: Row; rowKe
       </span>
     );
   }
-  return <Cell value={value} type={column.type} column={column.name} rowKey={rowKey} />;
+  return <Cell value={value} type={column.type} format={column.format} column={column.name} rowKey={rowKey} />;
 }
 
 const ROW_HEIGHT = 34;

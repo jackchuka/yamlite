@@ -107,8 +107,10 @@ export function TableView({
     // the key column comes first, where it can stay in place while the rest scrolls
     .sort(([a], [b]) => Number(b === keyCol) - Number(a === keyCol))
     .map(([name, type]) => {
-      const reference = (t ?? (view as ViewMeta)).references.find((r) => r.column === name);
-      return { name, type, note: reference ? `→ ${reference.table}` : undefined, reference };
+      const meta = t ?? (view as ViewMeta);
+      const reference = meta.references.find((r) => r.column === name);
+      const format = Object.hasOwn(meta.formats, name) ? meta.formats[name] : undefined;
+      return { name, type, format, note: reference ? `→ ${reference.table}` : undefined, reference };
     });
   const rowId = view ? (row: Row) => view.identity.map((c) => String(row[c])).join("/") : undefined;
   const onSelect = view
