@@ -168,10 +168,11 @@ withRoot(program.command("serve").description("open the web UI and sync continuo
   .option("--port <number>", "port to listen on", "4610")
   .option("--host <address>", "address to listen on", "127.0.0.1")
   .option("--open", "open the UI in the browser")
-  .action(async (root: string, o: { db?: string; port: string; host: string; open?: boolean }) => {
+  .option("--no-agent", "do not offer AI agents in the web UI")
+  .action(async (root: string, o: { db?: string; port: string; host: string; open?: boolean; agent: boolean }) => {
     const port = Number(o.port);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`invalid port: ${o.port}`);
-    const s = await serve({ root, db: o.db, port, host: o.host });
+    const s = await serve({ root, db: o.db, port, host: o.host, agent: o.agent });
     if (!isLoopback(o.host)) {
       console.error(
         painter(process.stderr)(

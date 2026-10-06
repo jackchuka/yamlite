@@ -149,8 +149,10 @@ export function serveStatic(uiDir: string, pathname: string, res: ServerResponse
   pipeline(createReadStream(file), res, () => {});
 }
 
-export function createHandler(router: Router, policy: () => AccessPolicy, uiDir: string) {
-  const handle = handleRequest(router, policy, uiDir);
+export type McpHandler = (req: IncomingMessage, res: ServerResponse) => Promise<void>;
+
+export function createHandler(router: Router, policy: () => AccessPolicy, uiDir: string, mcp?: McpHandler) {
+  const handle = handleRequest(router, policy, uiDir, mcp);
   // no request may reject this promise: an unhandled rejection would end the process
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
@@ -164,9 +166,23 @@ export function createHandler(router: Router, policy: () => AccessPolicy, uiDir:
   };
 }
 
-function handleRequest(router: Router, policy: () => AccessPolicy, uiDir: string) {
+function handleRequest(router: Router, policy: () => AccessPolicy, uiDir: string, mcp?: McpHandler) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    if (url.pathname === "/mcp" && mcp) {
+      const p = policy();
+      if (p.allowedHosts && !p.allowedHosts.has(req.headers.host ?? "")) {
+        sendJson(res, 403, { error: "unexpected Host header" });
+        return;
+      }
+      // agents call from outside any browser; a browser page must never reach this
+      if (req.headers.origin !== undefined) {
+        sendJson(res, 403, { error: "cross-origin request" });
+        return;
+      }
+      await mcp(req, res);
+      return;
+    }
     const access = checkAccess(req, url, policy());
     if (access.kind === "deny") {
       sendJson(res, access.status, { error: access.message });

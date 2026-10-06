@@ -19,7 +19,7 @@ export const isLoopback = (host: string): boolean => host === "127.0.0.1" || hos
 export const loopbackHosts = (port: number): Set<string> =>
   new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
 
-const same = (a: string, b: string): boolean => {
+export const same = (a: string, b: string): boolean => {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
   return x.length === y.length && timingSafeEqual(x, y);
