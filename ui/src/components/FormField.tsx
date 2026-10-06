@@ -1,5 +1,6 @@
 import { json } from "@codemirror/lang-json";
 import { useQuery } from "@tanstack/react-query";
+import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { ArrowUpRight, Calendar, Clock, Type, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
@@ -58,13 +59,13 @@ function ChipsInput({
       {value.map((chip, i) => (
         <span
           key={`${i}-${chip}`}
-          className="inline-flex items-center rounded-full bg-chip pl-2 pr-1 text-[11.5px] text-chip-foreground"
+          className="inline-flex items-center rounded-full bg-chip pl-2 pr-1 text-[11.5px] text-chip-foreground max-md:py-0.5 max-md:text-[13px]"
         >
           {chip}
           <button
             type="button"
             aria-label={`remove ${chip}`}
-            className="ml-1 opacity-60"
+            className="ml-1 opacity-60 max-md:grid max-md:size-7 max-md:place-items-center"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
           >
             <X className="size-3" />
@@ -85,6 +86,16 @@ function ChipsInput({
         }}
         onBlur={add}
       />
+      <button
+        type="button"
+        aria-label={`add to ${label(path)}`}
+        className="rounded-md px-2 text-[13px] text-muted-foreground md:hidden"
+        // keeps focus in the input, so its blur does not add the chip first
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={add}
+      >
+        追加
+      </button>
     </div>
   );
 }
@@ -113,7 +124,7 @@ function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) 
       <CodeMirror
         aria-label={id}
         value={text}
-        extensions={[json()]}
+        extensions={[json(), EditorView.lineWrapping]}
         theme={theme}
         editable={!readOnly}
         basicSetup={{ lineNumbers: false, foldGutter: false }}
@@ -187,7 +198,11 @@ function RefField({ path, value, reference, onChange }: FieldProps) {
           onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
         />
         {reference && text !== "" && (
-          <RefLink reference={reference} value={text} className="shrink-0 text-muted-foreground hover:text-foreground">
+          <RefLink
+            reference={reference}
+            value={text}
+            className="shrink-0 text-muted-foreground hover:text-foreground max-md:grid max-md:size-9 max-md:place-items-center max-md:text-foreground"
+          >
             <ArrowUpRight className="size-4" />
           </RefLink>
         )}
@@ -210,7 +225,7 @@ function MapField(props: FieldProps) {
     <div className="rounded-lg border bg-panel px-2.5 pt-2.5 pb-1">
       {entries.map(([k, v]) => (
         <div key={k} className="mb-2.5 grid grid-cols-[minmax(34px,auto)_1fr_auto] items-start gap-1.5">
-          <span className="pt-1.5 font-mono text-[11px] text-syn-key">{k}</span>
+          <span className="pt-1.5 font-mono text-[11px] text-syn-key max-md:text-[12.5px]">{k}</span>
           <FormField
             {...props}
             path={[...path, k]}
@@ -225,7 +240,7 @@ function MapField(props: FieldProps) {
           <button
             type="button"
             aria-label={`remove ${label([...path, k])}`}
-            className="pt-1.5 text-muted-foreground"
+            className="pt-1.5 text-muted-foreground max-md:grid max-md:size-8 max-md:place-items-center max-md:pt-0"
             onClick={() => {
               const { [k]: _gone, ...rest } = value as Record<string, unknown>;
               onChange(rest);
@@ -236,7 +251,11 @@ function MapField(props: FieldProps) {
         </div>
       ))}
       {newKey === null ? (
-        <button type="button" className="pb-2 text-[11.5px] text-muted-foreground" onClick={() => setNewKey("")}>
+        <button
+          type="button"
+          className="pb-2 text-[11.5px] text-muted-foreground max-md:py-2 max-md:text-[13px]"
+          onClick={() => setNewKey("")}
+        >
           + key
         </button>
       ) : (
@@ -266,7 +285,7 @@ function DateField({ path, value, min, max, problem, onChange }: FieldProps) {
     <Input
       type="date"
       aria-label={label(path)}
-      className={`w-44 font-mono ${warnBorder(problem)}`}
+      className={`w-44 font-mono max-md:w-full ${warnBorder(problem)}`}
       value={typeof value === "string" ? value : ""}
       min={typeof min === "string" ? min : undefined}
       max={typeof max === "string" ? max : undefined}
@@ -286,11 +305,11 @@ function DatetimeField({ path, value, min, max, problem, onChange }: FieldProps)
   const last = useRef(text);
   if (text !== "") last.current = text;
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 max-md:flex-wrap">
       <Input
         type="datetime-local"
         aria-label={label(path)}
-        className={`w-60 font-mono ${warnBorder(problem)}`}
+        className={`w-60 font-mono max-md:w-full ${warnBorder(problem)}`}
         step={picker?.step ?? 60}
         value={picker?.value ?? ""}
         min={pickerBound(min, boundOffset)}
@@ -327,7 +346,7 @@ function Widget(props: FieldProps) {
     <button
       type="button"
       aria-label={`${label(path)} as ${to}`}
-      className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground"
+      className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground max-md:grid max-md:min-h-8 max-md:min-w-8 max-md:place-items-center"
       onClick={() => setKind(to === "text" ? "text" : fieldKind(value, type, false, format))}
     >
       {to === "text" ? (
@@ -349,7 +368,7 @@ function Widget(props: FieldProps) {
         <Input
           aria-label={label(path)}
           inputMode={type === "REAL" ? "decimal" : "numeric"}
-          className={`w-40 font-mono ${warnBorder(problem)}`}
+          className={`w-40 font-mono max-md:w-full ${warnBorder(problem)}`}
           value={numText}
           onChange={(e) => {
             const raw = e.target.value;

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { TableMeta } from "@/lib/types";
+import { setMobile } from "@/test/media";
 import { RecordDrawer } from "./RecordDrawer";
 
 const dispatch = vi.hoisted(() => vi.fn());
@@ -337,4 +338,81 @@ test("restoring a version fills the form, marks it unsaved, and Discard undoes i
   expect(screen.getByText("7be0d44 の値に戻しました · 2 項目が未保存")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Discard" }));
   expect(((await screen.findByLabelText("title")) as HTMLInputElement).value).toBe("new");
+});
+
+test("fills the screen on a phone, without a resize handle, and the back button closes it", async () => {
+  act(() => setMobile(true));
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "x", prio: 1 }, file: "f", yaml: "" });
+  const onClose = vi.fn();
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" onClose={onClose} />
+    </QueryClientProvider>,
+  );
+  await screen.findByLabelText("title");
+  const panel = screen.getByRole("complementary", { name: "record" });
+  expect(panel.className).toContain("max-md:fixed");
+  expect(panel.style.width).toBe("");
+  expect(screen.queryByRole("separator")).toBeNull();
+  expect(screen.getByRole("button", { name: "Save" }).textContent).not.toContain("⌘");
+  fireEvent.click(screen.getByRole("button", { name: "close" }));
+  expect(onClose).toHaveBeenCalled();
+});
+
+test("keeps the draft when the screen crosses the breakpoint", async () => {
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "x", prio: 1 }, file: "f", yaml: "" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(await screen.findByLabelText("title"), { target: { value: "edited" } });
+  act(() => setMobile(true));
+  expect((screen.getByLabelText("title") as HTMLInputElement).value).toBe("edited");
+  expect(screen.getByRole("complementary", { name: "record" }).style.width).toBe("");
+});
+
+test("on a phone the panel shrinks to the space the keyboard leaves", async () => {
+  act(() => setMobile(true));
+  const listeners = new Set<() => void>();
+  const viewport = {
+    height: 800,
+    addEventListener: (_: string, l: () => void) => listeners.add(l),
+    removeEventListener: (_: string, l: () => void) => listeners.delete(l),
+  };
+  Object.defineProperty(window, "visualViewport", { configurable: true, value: viewport });
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "x", prio: 1 }, file: "f", yaml: "" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  await screen.findByLabelText("title");
+  const panel = screen.getByRole("complementary", { name: "record" });
+  expect(panel.style.height).toBe("800px");
+  act(() => {
+    viewport.height = 420;
+    for (const l of listeners) l();
+  });
+  expect(panel.style.height).toBe("420px");
+  Object.defineProperty(window, "visualViewport", { configurable: true, value: undefined });
+});
+
+test("on a phone only a text field scrolls into view when focused", async () => {
+  act(() => setMobile(true));
+  const scroll = vi.fn();
+  Element.prototype.scrollIntoView = scroll;
+  vi.mocked(api.record).mockResolvedValue({ row: { id: "a", title: "x", prio: 1 }, file: "f", yaml: "" });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={table} recordKey="a" />
+    </QueryClientProvider>,
+  );
+  fireEvent.focus(await screen.findByLabelText("title"));
+  expect(scroll).toHaveBeenCalledTimes(1);
+  // anything else in the form, such as a switch or a chip's add button, leaves the scroll alone
+  const other = document.createElement("button");
+  screen.getByLabelText("title").closest("fieldset")?.append(other);
+  fireEvent.focus(other);
+  expect(scroll).toHaveBeenCalledTimes(1);
 });

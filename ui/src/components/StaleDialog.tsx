@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { Row } from "@/lib/types";
+import { FieldDiff } from "./FieldDiff";
 
 export function StaleDialog({
   stale,
@@ -31,18 +32,14 @@ export function StaleDialog({
           <DialogTitle>他で変更されました</DialogTitle>
           <DialogDescription>読み込んだあとに、ファイルか DB で次のフィールドが変わりました。</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-1 font-mono text-[12px]">
-          <span />
-          <span className="font-sans text-muted-foreground">いまの値</span>
-          <span className="font-sans text-muted-foreground">あなたの編集</span>
-          {stale.map((f) => (
-            <div key={f} className="contents">
-              <span className="text-syn-key">{f}</span>
-              <span>{JSON.stringify(current[f] ?? null)}</span>
-              <span>{JSON.stringify(draft[f] ?? null)}</span>
-            </div>
-          ))}
-        </div>
+        <FieldDiff
+          labels={["いまの値", "あなたの編集"]}
+          rows={stale.map((f) => ({
+            field: f,
+            a: JSON.stringify(current[f] ?? null),
+            b: JSON.stringify(draft[f] ?? null),
+          }))}
+        />
         <DialogFooter>
           <Button variant="outline" onClick={onReload}>
             最新を読み込む

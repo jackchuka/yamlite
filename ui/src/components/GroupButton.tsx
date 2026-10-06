@@ -38,7 +38,7 @@ export function GroupButton({ table }: { table: TableMeta }) {
           <Tag className="size-3.5" /> {table.group ?? "Group"}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="flex w-64 flex-col gap-2 p-3">
+      <PopoverContent align="end" className="flex w-[min(16rem,calc(100vw-2rem))] flex-col gap-2 p-3">
         <form
           className="flex flex-col gap-2"
           onSubmit={(e) => {

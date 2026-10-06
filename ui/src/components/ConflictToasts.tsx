@@ -14,7 +14,7 @@ export function ConflictToasts() {
         toast.warning(`Conflict in ${e.table}/${e.key}`, {
           description: `ファイルと DB の両方が変更されました。${won}側を採用し、${lost}側の内容をバックアップしました。`,
           action: { label: "差分を見る", onClick: () => void navigate({ to: "/sync" }) },
-          duration: 10_000,
+          duration: 15_000,
         });
       }),
     [store, navigate],

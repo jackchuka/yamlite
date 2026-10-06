@@ -43,7 +43,7 @@ export function NewRecordDialog({
   const err = fieldError(create.error);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] overflow-auto">
+      <DialogContent className="overflow-auto md:max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>{table.name} に追加</DialogTitle>
         </DialogHeader>

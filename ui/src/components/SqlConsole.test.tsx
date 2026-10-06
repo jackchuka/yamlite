@@ -4,6 +4,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import { enterStatic } from "@/lib/mode";
 import type { ServeEvent, Snapshot, SqlResult } from "@/lib/types";
+import { setMobile } from "@/test/media";
 import { SqlConsole } from "./SqlConsole";
 
 let emit: (e: ServeEvent) => void = () => {};
@@ -75,4 +76,15 @@ test("the adopt-table banner is hidden in a static export", async () => {
   await runUnmanagedWrite();
   expect(screen.queryByRole("button", { name: "yamlite.yaml に追加" })).toBeNull();
   expect(screen.queryByText(/同期されません/)).toBeNull();
+});
+
+test("on a phone, one Run button sits under the editor without the shortcut hint", () => {
+  act(() => setMobile(true));
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SqlConsole />
+    </QueryClientProvider>,
+  );
+  const run = screen.getByRole("button", { name: /Run/ });
+  expect(run.textContent).not.toContain("⌘");
 });

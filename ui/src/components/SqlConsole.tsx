@@ -1,6 +1,6 @@
 import { sql as sqlLang } from "@codemirror/lang-sql";
 import { Prec } from "@codemirror/state";
-import { keymap } from "@codemirror/view";
+import { EditorView, keymap } from "@codemirror/view";
 import { useMutation } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
 import { History, Play } from "lucide-react";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
 import { loadHistory, pushHistory } from "@/lib/history";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useEventStore, useMeta } from "@/lib/providers";
 import { recordFileOf } from "@/lib/reflect";
 import { isReadOnly } from "@/lib/mode";
@@ -34,6 +35,7 @@ const OP_LABEL: Record<ChangeOp, string> = { toFile: "M", deleteFile: "−", toD
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
 export function SqlConsole() {
+  const mobile = useIsMobile();
   const { data: meta } = useMeta();
   const store = useEventStore();
   const [history, setHistory] = useState(loadHistory);
@@ -86,6 +88,7 @@ export function SqlConsole() {
     () => [
       sqlLang({ schema: Object.fromEntries((meta?.tables ?? []).map((t) => [t.name, Object.keys(t.columns)])) }),
       Prec.highest(keymap.of([{ key: "Mod-Enter", run: () => (submitRef.current(), true) }])),
+      EditorView.lineWrapping,
     ],
     [meta],
   );
@@ -94,8 +97,8 @@ export function SqlConsole() {
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <div className="flex items-center gap-2.5 border-b px-[18px] py-3">
-        <h1 className="text-lg font-semibold tracking-tight">SQL console</h1>
+      <div className="flex items-center gap-2.5 border-b px-[18px] py-3 max-md:px-3">
+        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">SQL console</h1>
         <span className="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -103,7 +106,7 @@ export function SqlConsole() {
               <History className="size-3.5" /> History
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="max-w-[480px]">
+          <DropdownMenuContent className="max-w-[min(480px,calc(100vw-2rem))]">
             {history.map((h) => (
               <DropdownMenuItem key={h} className="truncate font-mono text-[12px]" onSelect={() => setText(h)}>
                 {h}
@@ -111,11 +114,13 @@ export function SqlConsole() {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button size="sm" onClick={() => submitRef.current()} disabled={run.isPending}>
-          <Play className="size-3.5" /> Run ⌘↵
-        </Button>
+        {!mobile && (
+          <Button size="sm" onClick={() => submitRef.current()} disabled={run.isPending}>
+            <Play className="size-3.5" /> Run ⌘↵
+          </Button>
+        )}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-[18px] py-3.5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 px-[18px] py-3.5 max-md:px-3">
         <CodeMirror
           aria-label="SQL"
           value={text}
@@ -125,6 +130,11 @@ export function SqlConsole() {
           minHeight="110px"
           className="overflow-hidden rounded-lg border text-[12.5px]"
         />
+        {mobile && (
+          <Button size="lg" className="w-full" onClick={() => submitRef.current()} disabled={run.isPending}>
+            <Play className="size-4" /> Run
+          </Button>
+        )}
         {run.isError && (
           <div role="alert" className="rounded-md bg-err-soft px-3 py-2 font-mono text-[12px] text-err">
             {run.error.message}
@@ -139,6 +149,7 @@ export function SqlConsole() {
               columns={result.columns.map((name) => ({ name, type: "TEXT" as const }))}
               rows={result.rows.map((r, i) => ({ ...r, __row: i }))}
               keyCol="__row"
+              stickyCol={result.columns[0]}
             />
           </>
         )}
@@ -151,7 +162,7 @@ export function SqlConsole() {
               <span>{result.ms} ms</span>
             </div>
             {!isReadOnly() && result.unmanaged && (
-              <div className="flex items-center gap-3 rounded-md bg-warn-soft px-3 py-2 text-[12px] text-warn">
+              <div className="flex flex-wrap items-center gap-3 rounded-md bg-warn-soft px-3 py-2 text-[12px] text-warn">
                 {result.unmanaged} は yamlite.yaml にないため同期されません。
                 <Button size="sm" variant="outline" onClick={() => setAdopt(result.unmanaged ?? null)}>
                   yamlite.yaml に追加

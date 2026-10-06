@@ -2,8 +2,9 @@ import { json } from "@codemirror/lang-json";
 import { yaml } from "@codemirror/lang-yaml";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
+import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
-import { Trash2, X } from "lucide-react";
+import { ArrowLeft, Trash2, X } from "lucide-react";
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -19,6 +20,8 @@ import { buildPatch, changedFields } from "@/lib/form";
 import { cn } from "@/lib/utils";
 import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
 import { isReadOnly } from "@/lib/mode";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { useViewportHeight } from "@/lib/viewportHeight";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
 import { historyCount, restoreDraft, useRecordHistory } from "@/lib/recordHistory";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
@@ -37,9 +40,11 @@ const columnValues = (table: TableMeta, field: string): AllowedValue[] | undefin
 const columnBound = (bounds: Record<string, Bound>, field: string): Bound | undefined =>
   Object.hasOwn(bounds, field) ? bounds[field] : undefined;
 
-// laid over the table, so opening a record does not reflow the page under it
-const panel = "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl";
+// laid over the table, so opening a record does not reflow the page under it; a phone gives it the whole screen
+const panel =
+  "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl max-md:fixed max-md:inset-0 max-md:z-40 max-md:h-dvh max-md:border-l-0 max-md:shadow-none max-md:animate-[y-slide-up_160ms_ease-out]";
 const RESIZE_STEP = 16;
+const tabTrigger = "max-md:flex-1 max-md:text-[14px]";
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
 
@@ -78,6 +83,9 @@ export function RecordDrawer({
   const [version, setVersion] = useState(0);
   const dirty = base !== null && draft !== null && changedFields(base, draft).length > 0;
   const [width, setWidth] = useDrawerWidth();
+  const mobile = useIsMobile();
+  const viewportHeight = useViewportHeight(mobile);
+  const size = mobile ? (viewportHeight ? { height: viewportHeight } : undefined) : { width };
 
   // a refetch (the file changed, or our own save came back) replaces the form only when nothing is being edited
   useEffect(() => {
@@ -188,12 +196,12 @@ export function RecordDrawer({
 
   if (error) {
     return (
-      <aside aria-label="record" className={cn(panel, "p-4 text-err")} style={{ width }}>
+      <aside aria-label="record" className={cn(panel, "p-4 text-err")} style={size}>
         {error.message}
       </aside>
     );
   }
-  if (!draft || !base || !data) return <aside aria-label="record" className={panel} style={{ width }} />;
+  if (!draft || !base || !data) return <aside aria-label="record" className={panel} style={size} />;
 
   const fields = Object.keys(table.columns).filter((c) => c !== table.key);
   const extra = Object.keys(draft).filter((c) => c !== table.key && !fields.includes(c));
@@ -202,8 +210,8 @@ export function RecordDrawer({
   const count = historyCount(history.data?.pages);
 
   return (
-    <aside aria-label="record" className={cn(panel, "flex flex-col")} style={{ width }}>
-      <ResizeHandle width={width} onResize={setWidth} />
+    <aside aria-label="record" className={cn(panel, "flex flex-col")} style={size}>
+      {!mobile && <ResizeHandle width={width} onResize={setWidth} />}
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -214,26 +222,50 @@ export function RecordDrawer({
         }}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="flex items-center gap-2 border-b px-4 py-3">
-          <span className="truncate font-mono font-bold">{recordKey}</span>
+        <div className="flex items-center gap-2 border-b px-4 py-3 max-md:flex-wrap max-md:gap-1 max-md:px-2 max-md:pt-[calc(0.5rem+env(safe-area-inset-top))] max-md:pb-2">
+          {mobile && (
+            <button type="button" aria-label="close" onClick={close} className="grid size-10 place-items-center">
+              <ArrowLeft className="size-5" />
+            </button>
+          )}
+          <span className="min-w-0 truncate font-mono font-bold max-md:flex-1">{recordKey}</span>
           {headerActions}
-          <TabsList className="ml-auto h-7">
-            <TabsTrigger value="form">Form</TabsTrigger>
-            <TabsTrigger value="json">JSON</TabsTrigger>
-            <TabsTrigger value="yaml">File</TabsTrigger>
+          <TabsList className="ml-auto h-7 max-md:order-last max-md:ml-0 max-md:h-9 max-md:w-full">
+            <TabsTrigger value="form" className={tabTrigger}>
+              Form
+            </TabsTrigger>
+            <TabsTrigger value="json" className={tabTrigger}>
+              JSON
+            </TabsTrigger>
+            <TabsTrigger value="yaml" className={tabTrigger}>
+              File
+            </TabsTrigger>
             {!isReadOnly() && (
-              <TabsTrigger value="history">
+              <TabsTrigger value="history" className={tabTrigger}>
                 History
                 {count !== null && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{count}</span>}
               </TabsTrigger>
             )}
           </TabsList>
-          <button type="button" aria-label="close" onClick={close} className="text-muted-foreground">
-            <X className="size-4" />
-          </button>
+          {!mobile && (
+            <button type="button" aria-label="close" onClick={close} className="text-muted-foreground">
+              <X className="size-4" />
+            </button>
+          )}
         </div>
-        <div className="px-4 pt-3 font-mono text-[11px] text-muted-foreground">{data.file}</div>
-        <TabsContent value="form" className="min-h-0 flex-1 overflow-auto px-4 py-3">
+        <div className="truncate px-4 pt-3 font-mono text-[11px] text-muted-foreground max-md:text-[12px]">
+          {data.file}
+        </div>
+        <TabsContent
+          value="form"
+          className="min-h-0 flex-1 overflow-auto px-4 py-3"
+          // the on-screen keyboard covers the lower half; keep the field being typed into above it
+          onFocus={(e) =>
+            mobile &&
+            e.target.matches("input, textarea, [contenteditable]") &&
+            e.target.scrollIntoView?.({ block: "center" })
+          }
+        >
           {!connected && <p className="mb-2 text-[11.5px] text-err">接続が切れています</p>}
           <fieldset disabled={!editable} className="m-0 min-w-0 border-0 p-0">
             {[...fields, ...extra].map((f) => {
@@ -243,12 +275,12 @@ export function RecordDrawer({
                   key={f}
                   className={cn("mb-3.5", restoredFrom && changed.has(f) && "-mx-2 rounded-md bg-warn-soft px-2 py-1")}
                 >
-                  <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground">
+                  <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground max-md:text-[13px]">
                     <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
                       {f}
                       {table.required.includes(f) && <span aria-label="required"> *</span>}
                     </span>
-                    <span className="font-mono text-[10px] font-medium">
+                    <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
                       {reference ? `→ ${reference.table}` : (columnFormat(table, f) ?? columnType(table, f) ?? "new")}
                     </span>
                   </div>
@@ -282,7 +314,7 @@ export function RecordDrawer({
           <CodeMirror
             aria-label="record JSON"
             value={JSON.stringify(draft, null, 2)}
-            extensions={[json()]}
+            extensions={[json(), EditorView.lineWrapping]}
             theme={isDark() ? "dark" : "light"}
             editable={editable}
             onChange={(text) => {
@@ -307,7 +339,7 @@ export function RecordDrawer({
           <CodeMirror
             aria-label="record file"
             value={data.yaml ?? "# not written to a file yet"}
-            extensions={[yaml()]}
+            extensions={[yaml(), EditorView.lineWrapping]}
             editable={false}
             theme={isDark() ? "dark" : "light"}
           />
@@ -327,8 +359,8 @@ export function RecordDrawer({
         )}
       </Tabs>
       {!isReadOnly() && (
-        <div className="flex items-center gap-2 border-t px-4 py-2.5">
-          <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 border-t px-4 py-2.5 max-md:flex-wrap max-md:pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
+          <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground max-md:basis-full max-md:text-[12px]">
             {changes > 0 ? (
               restoredFrom ? (
                 `${restoredFrom} の値に戻しました · ${changes} 項目が未保存`
@@ -351,16 +383,17 @@ export function RecordDrawer({
           >
             <Trash2 className="size-4" />
           </Button>
-          <Button variant="outline" size="sm" disabled={!dirty} onClick={() => reset(base)}>
+          <Button variant="outline" size={mobile ? "lg" : "sm"} disabled={!dirty} onClick={() => reset(base)}>
             Discard
           </Button>
           <Button
-            size="sm"
+            size={mobile ? "lg" : "sm"}
+            className="max-md:flex-1"
             disabled={!dirty || invalid.size > 0 || save.isPending || !connected}
             title={connected ? undefined : "disconnected"}
             onClick={submit}
           >
-            Save ⌘S
+            {mobile ? "Save" : "Save ⌘S"}
           </Button>
         </div>
       )}

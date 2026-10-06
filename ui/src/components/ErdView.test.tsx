@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { layoutErd } from "@/lib/erdLayout";
 import type { Meta } from "@/lib/types";
+import { setMobile } from "@/test/media";
 import { mockReactFlow } from "@/test/reactflow";
 import { buildErd } from "@/lib/erd";
 import { ErdDiagram, toEdges } from "./ErdView";
@@ -216,4 +217,12 @@ test("a column named like the header handle gets a handle of its own", () => {
   const parent = edges.find((e) => e.id === "parent:tasks__subtasks");
   expect(ref?.sourceHandle).not.toBe(parent?.sourceHandle);
   expect(ref?.sourceHandle).not.toBe(parent?.targetHandle);
+});
+
+test("the minimap is left out on a phone", async () => {
+  act(() => setMobile(true));
+  render(diagram(meta()));
+  await screen.findByTestId("erd-node-tags");
+  expect(document.querySelector(".react-flow__minimap")).toBeNull();
+  expect(screen.getByText(/タイトルをタップ/)).toBeTruthy();
 });

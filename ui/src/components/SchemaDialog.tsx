@@ -19,7 +19,9 @@ const ownOf = <T,>(record: Record<string, T>, key: string): T | undefined =>
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-1.5">
-      <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{title}</h3>
+      <h3 className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -42,32 +44,34 @@ function ViewSchema({ view }: { view: ViewMeta }) {
         </dl>
       </Section>
       <Section title="Columns">
-        <table className="w-full">
-          <tbody>
-            {Object.entries(view.columns).map(([name, type]) => (
-              <tr key={name}>
-                <td className={`${cell} font-mono`}>{name}</td>
-                <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
-                <td className={`${cell} text-muted-foreground`}>
-                  {view.identity.includes(name)
-                    ? "identity"
-                    : [
-                        Object.hasOwn(view.declared, name) ? "宣言済み" : "推論",
-                        ...(view.required.includes(name) ? ["required"] : []),
-                        ...(ownOf(view.formats, name) ? [ownOf(view.formats, name) as string] : []),
-                        ...(() => {
-                          const range = rangeText(ownOf(view.min, name), ownOf(view.max, name));
-                          return range ? [range] : [];
-                        })(),
-                      ].join(" · ")}
-                </td>
-                <td className={`${cell} font-mono text-muted-foreground`}>
-                  {Object.hasOwn(view.values, name) ? view.values[name]?.map(String).join(", ") : ""}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <tbody>
+              {Object.entries(view.columns).map(([name, type]) => (
+                <tr key={name}>
+                  <td className={`${cell} font-mono`}>{name}</td>
+                  <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
+                  <td className={`${cell} text-muted-foreground`}>
+                    {view.identity.includes(name)
+                      ? "identity"
+                      : [
+                          Object.hasOwn(view.declared, name) ? "宣言済み" : "推論",
+                          ...(view.required.includes(name) ? ["required"] : []),
+                          ...(ownOf(view.formats, name) ? [ownOf(view.formats, name) as string] : []),
+                          ...(() => {
+                            const range = rangeText(ownOf(view.min, name), ownOf(view.max, name));
+                            return range ? [range] : [];
+                          })(),
+                        ].join(" · ")}
+                  </td>
+                  <td className={`${cell} font-mono text-muted-foreground`}>
+                    {Object.hasOwn(view.values, name) ? view.values[name]?.map(String).join(", ") : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Section>
     </div>
   );
@@ -76,11 +80,14 @@ function ViewSchema({ view }: { view: ViewMeta }) {
 export function SchemaDialog({
   table,
   view,
+  path,
   open,
   onOpenChange,
 }: {
   table: string;
   view?: ViewMeta;
+  // where the table lives; the table header hides it on a phone, so it shows here
+  path?: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
@@ -91,7 +98,7 @@ export function SchemaDialog({
   });
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
+      <DialogContent className="overflow-auto sm:max-w-2xl md:max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>{table} のスキーマ</DialogTitle>
           <DialogDescription>
@@ -99,6 +106,7 @@ export function SchemaDialog({
               ? "VIEW は yamlite.yaml の expand から作られる読み取り専用の表です。"
               : "yamlite.yaml の宣言と、DB 上の状態です。変更は yamlite.yaml を編集してください。"}
           </DialogDescription>
+          {path && <p className="font-mono text-[12px] break-all text-muted-foreground md:hidden">{path}</p>}
         </DialogHeader>
         {view ? (
           <ViewSchema view={view} />
@@ -118,32 +126,34 @@ export function SchemaDialog({
                   </dl>
                 </Section>
                 <Section title="Columns">
-                  <table className="w-full">
-                    <tbody>
-                      {Object.entries(data.columns).map(([name, type]) => (
-                        <tr key={name}>
-                          <td className={`${cell} font-mono`}>{name}</td>
-                          <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
-                          <td className={`${cell} text-muted-foreground`}>
-                            {name === data.key
-                              ? "key"
-                              : [
-                                  name in data.declared ? "宣言済み" : "推論",
-                                  ...(data.required.includes(name) ? ["required"] : []),
-                                  ...(ownOf(data.formats, name) ? [ownOf(data.formats, name) as string] : []),
-                                  ...(() => {
-                                    const range = rangeText(ownOf(data.min, name), ownOf(data.max, name));
-                                    return range ? [range] : [];
-                                  })(),
-                                ].join(" · ")}
-                          </td>
-                          <td className={`${cell} font-mono text-muted-foreground`}>
-                            {Object.hasOwn(data.values, name) ? data.values[name]?.map(String).join(", ") : ""}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <tbody>
+                        {Object.entries(data.columns).map(([name, type]) => (
+                          <tr key={name}>
+                            <td className={`${cell} font-mono`}>{name}</td>
+                            <td className={`${cell} font-mono text-muted-foreground`}>{type}</td>
+                            <td className={`${cell} text-muted-foreground`}>
+                              {name === data.key
+                                ? "key"
+                                : [
+                                    name in data.declared ? "宣言済み" : "推論",
+                                    ...(data.required.includes(name) ? ["required"] : []),
+                                    ...(ownOf(data.formats, name) ? [ownOf(data.formats, name) as string] : []),
+                                    ...(() => {
+                                      const range = rangeText(ownOf(data.min, name), ownOf(data.max, name));
+                                      return range ? [range] : [];
+                                    })(),
+                                  ].join(" · ")}
+                            </td>
+                            <td className={`${cell} font-mono text-muted-foreground`}>
+                              {Object.hasOwn(data.values, name) ? data.values[name]?.map(String).join(", ") : ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </Section>
                 <Section title="References">
                   {data.references.length === 0
@@ -174,27 +184,29 @@ export function SchemaDialog({
                   {data.indexes.length === 0 && data.otherIndexes.length === 0 ? (
                     empty
                   ) : (
-                    <table className="w-full">
-                      <tbody>
-                        {data.indexes.map((i) => (
-                          <tr key={i.name}>
-                            <td className={`${cell} font-mono`}>{i.definition}</td>
-                            <td className={`${cell} font-mono text-[11px] text-muted-foreground`}>{i.name}</td>
-                            <td className={`${cell} ${i.inDb ? "text-ok" : "text-warn"}`}>
-                              {i.inDb ? "作成済み" : "未作成"}
-                            </td>
-                          </tr>
-                        ))}
-                        {data.otherIndexes.map((name) => (
-                          <tr key={name}>
-                            <td className={`${cell} font-mono`}>{name}</td>
-                            <td className={`${cell} text-[11px] text-muted-foreground`} colSpan={2}>
-                              yamlite の管理外（SQL などで作成）
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <tbody>
+                          {data.indexes.map((i) => (
+                            <tr key={i.name}>
+                              <td className={`${cell} font-mono`}>{i.definition}</td>
+                              <td className={`${cell} font-mono text-[11px] text-muted-foreground`}>{i.name}</td>
+                              <td className={`${cell} ${i.inDb ? "text-ok" : "text-warn"}`}>
+                                {i.inDb ? "作成済み" : "未作成"}
+                              </td>
+                            </tr>
+                          ))}
+                          {data.otherIndexes.map((name) => (
+                            <tr key={name}>
+                              <td className={`${cell} font-mono`}>{name}</td>
+                              <td className={`${cell} text-[11px] text-muted-foreground`} colSpan={2}>
+                                yamlite の管理外（SQL などで作成）
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   )}
                   {data.indexes.some((i) => !i.inDb) && (
                     <p className="text-[11px] text-muted-foreground">未作成の理由は Sync 画面の警告に出ます。</p>

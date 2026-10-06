@@ -3,8 +3,10 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { cellView } from "@/lib/cell";
 import type { ColumnType, Reference, Row } from "@/lib/types";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
 import { Cell, chip } from "./Cell";
+import { HintPopover } from "./HintPopover";
 import { RefLink } from "./RefLink";
 
 export interface GridColumn {
@@ -35,11 +37,15 @@ function GridCell({ column, row, rowKey }: { column: GridColumn; row: Row; rowKe
 }
 
 const ROW_HEIGHT = 34;
+const MOBILE_ROW_HEIGHT = 44;
+// the key column stays put while the rest scrolls sideways
+const pin = "sticky left-0 z-[1] bg-background shadow-[1px_0_0_var(--border)]";
 
 export function Grid({
   columns,
   rows,
   keyCol,
+  stickyCol = keyCol,
   rowId,
   selectedKey,
   onSelect,
@@ -51,6 +57,7 @@ export function Grid({
   columns: GridColumn[];
   rows: Row[];
   keyCol: string;
+  stickyCol?: string;
   rowId?: (row: Row) => string;
   selectedKey?: string;
   onSelect?: (key: string, row: Row) => void;
@@ -61,21 +68,32 @@ export function Grid({
   onSort?: (column: string) => void;
 }) {
   const parent = useRef<HTMLDivElement>(null);
+  const mobile = useIsMobile();
+  const rowHeight = mobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT;
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parent.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => rowHeight,
     overscan: 10,
   });
+  useEffect(() => virtualizer.measure(), [rowHeight, virtualizer]);
   const items = virtualizer.getVirtualItems();
   const last = items.at(-1)?.index ?? 0;
   useEffect(() => {
     if (rows.length > 0 && last >= rows.length - 20) onEndReached?.();
   }, [last, rows.length, onEndReached]);
-  const template = columns.map((c) => (c.name === keyCol ? "minmax(160px, 220px)" : "minmax(110px, 1fr)")).join(" ");
+  const [keyWidth, colWidth] = mobile
+    ? ["minmax(120px, 160px)", "minmax(96px, 1fr)"]
+    : ["minmax(160px, 220px)", "minmax(110px, 1fr)"];
+  const template = columns.map((c) => (c.name === keyCol ? keyWidth : colWidth)).join(" ");
   const [sortCol, sortDir] = (sort ?? "").split(":");
   return (
-    <div ref={parent} role="grid" aria-rowcount={rows.length} className="min-h-0 flex-1 overflow-auto text-[12.5px]">
+    <div
+      ref={parent}
+      role="grid"
+      aria-rowcount={rows.length}
+      className="min-h-0 flex-1 overflow-auto text-[12.5px] max-md:text-[14px]"
+    >
       {/* as wide as the columns need, so row borders and backgrounds span the whole scrolled width */}
       <div className="w-max min-w-full">
         <div
@@ -88,11 +106,14 @@ export function Grid({
               key={c.name}
               type="button"
               role="columnheader"
-              className="flex items-center gap-1 px-3 py-[7px] text-left text-[11.5px] font-semibold whitespace-nowrap text-muted-foreground"
+              className={cn(
+                "flex items-center gap-1 px-3 py-[7px] text-left text-[11.5px] font-semibold whitespace-nowrap text-muted-foreground max-md:text-[12.5px]",
+                c.name === stickyCol && pin,
+              )}
               onClick={() => onSort?.(c.name)}
             >
               {c.name}
-              <span className="rounded bg-panel-2 px-1 font-mono text-[9.5px] font-medium">
+              <span className="rounded bg-panel-2 px-1 font-mono text-[9.5px] font-medium max-md:text-[11px]">
                 {c.name === keyCol ? "key" : (c.note ?? c.type)}
               </span>
               {sortCol === c.name &&
@@ -112,10 +133,10 @@ export function Grid({
                 aria-selected={selected}
                 data-key={key}
                 className={cn(
-                  "absolute inset-x-0 grid cursor-pointer border-b hover:bg-panel",
-                  selected && "bg-tomato-soft hover:bg-tomato-soft",
+                  "group absolute inset-x-0 grid cursor-pointer border-b md:hover:bg-panel",
+                  selected && "bg-tomato-soft md:hover:bg-tomato-soft",
                 )}
-                style={{ gridTemplateColumns: template, height: ROW_HEIGHT, transform: `translateY(${item.start}px)` }}
+                style={{ gridTemplateColumns: template, height: rowHeight, transform: `translateY(${item.start}px)` }}
                 onClick={() => onSelect?.(key, row)}
               >
                 {columns.map((c) => (
@@ -124,19 +145,20 @@ export function Grid({
                     role="gridcell"
                     className={cn(
                       "flex items-center overflow-hidden px-3 whitespace-nowrap",
-                      c.name === keyCol && "font-mono text-[12px]",
+                      c.name === keyCol && "font-mono text-[12px] max-md:text-[13px]",
+                      c.name === stickyCol && pin,
+                      c.name === stickyCol && (selected ? "bg-tomato-soft" : "md:group-hover:bg-panel"),
                     )}
                   >
                     {c.name === keyCol &&
                       (flagged?.has(key) ? (
-                        <span
-                          role="img"
-                          aria-label="has warnings"
-                          title={flagged.get(key)?.join("\n")}
-                          className="mr-1.5 shrink-0 text-warn"
+                        <HintPopover
+                          label="has warnings"
+                          hint={flagged.get(key)?.join("\n")}
+                          className="mr-1.5 grid min-h-6 min-w-[1em] place-items-center text-warn max-md:-my-2 max-md:-ml-2 max-md:mr-0 max-md:min-h-8 max-md:min-w-8"
                         >
                           ⚠
-                        </span>
+                        </HintPopover>
                       ) : (
                         <span aria-hidden className="mr-1.5 w-[1em] shrink-0" />
                       ))}
