@@ -6,6 +6,20 @@ import { DatabaseSync } from "node:sqlite";
 
 const bin = resolve(import.meta.dirname, "../../dist/cli.mjs");
 
+export const FAKE_AGENT = resolve(import.meta.dirname, "../fixtures/fake-agent.mjs");
+
+export function agentEnv(turns: unknown[][]): Record<string, string> {
+  const dir = mkdtempSync(join(tmpdir(), "yamlite-agent-"));
+  const scenario = join(dir, "scenario.json");
+  writeFileSync(scenario, JSON.stringify(turns));
+  return {
+    YAMLITE_AGENT_COMMAND: JSON.stringify([process.execPath, FAKE_AGENT]),
+    YAMLITE_AGENT_NAME: "Claude Code",
+    FAKE_AGENT_SCENARIO: scenario,
+    FAKE_AGENT_STATE_DIR: dir,
+  };
+}
+
 export interface Running {
   root: string;
   url: string;
@@ -32,11 +46,15 @@ export async function start(
   files: Record<string, string>,
   track?: (r: Running) => void,
   config?: string,
+  env: Record<string, string> = {},
 ): Promise<Running> {
   const root = mkdtempSync(join(tmpdir(), "yamlite-e2e-"));
   put(join(root, "yamlite.yaml"), config ?? "tables: {}\n");
   for (const [path, content] of Object.entries(files)) put(join(root, path), content);
-  const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], { stdio: ["ignore", "pipe", "inherit"] });
+  const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], {
+    stdio: ["ignore", "pipe", "inherit"],
+    env: { ...process.env, ...env },
+  });
   const running: Running = { root, url: "", child };
   track?.(running);
   running.url = await new Promise<string>((done, fail) => {
