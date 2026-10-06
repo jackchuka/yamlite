@@ -181,6 +181,10 @@ export class Store {
     this.db.exec(sql);
   }
 
+  authorize(fn: Parameters<DatabaseSync["setAuthorizer"]>[0]): void {
+    this.db.setAuthorizer(fn);
+  }
+
   query(sql: string, ...params: DbValue[]): DbRow[] {
     const stmt = this.db.prepare(sql);
     stmt.setReadBigInts(true);

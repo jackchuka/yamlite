@@ -14,6 +14,7 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import { ProposalStore } from "./agent/proposals.ts";
 import { configPath } from "./config.ts";
 import { q } from "./ident.ts";
 import { withScratch } from "./scratch.ts";
@@ -146,6 +147,16 @@ export async function writeSnapshotData(opts: {
         configFile: configPath(root) ?? join(root, "yamlite.yaml"),
         dbPath,
         hub: new EventHub(),
+        // the export routes are GET-only, so the shared store is never begun or rolled back here
+        agent: null,
+        proposals: new ProposalStore({
+          store,
+          dry: store,
+          tables: () => y.tables,
+          createTable: () => {
+            throw new Error("an export cannot create tables");
+          },
+        }),
       };
       const router = new Router();
       for (const routes of ROUTES) routes(router, ctx);

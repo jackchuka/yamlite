@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { previewFor, usePendingProposals } from "@/lib/agent";
 import { api } from "@/lib/api";
 import { useGridPrefs } from "@/lib/gridPrefs";
 import { SearchTerm } from "@/lib/highlight";
@@ -73,6 +74,14 @@ export function TableView({
     enabled: t !== undefined || view !== undefined,
   });
   const rows = useMemo(() => query.data?.pages.flatMap((p) => p.rows) ?? [], [query.data]);
+  const proposals = usePendingProposals();
+  const tableName = t?.name;
+  const preview = useMemo(() => (tableName ? previewFor(proposals, tableName) : undefined), [proposals, tableName]);
+  const shown = useMemo(() => {
+    if (!preview) return rows;
+    const inserts = [...preview.values()].filter((p) => p.op === "insert" && p.after).map((p) => p.after as Row);
+    return inserts.length > 0 ? [...inserts, ...rows] : rows;
+  }, [preview, rows]);
   const total = query.data?.pages[0]?.total ?? 0;
   const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = query;
   const onEndReached = useCallback(() => {
@@ -188,7 +197,8 @@ export function TableView({
           <SearchTerm.Provider value={search.q?.trim() ?? ""}>
             <Grid
               columns={columns}
-              rows={rows}
+              rows={shown}
+              preview={preview}
               keyCol={keyCol}
               rowId={rowId}
               selectedKey={t ? search.key : undefined}

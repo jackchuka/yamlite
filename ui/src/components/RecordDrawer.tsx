@@ -5,20 +5,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { ArrowLeft, Trash2, X } from "lucide-react";
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  useEffect,
-  useState,
-} from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
 import { cn } from "@/lib/utils";
-import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
+import { useDrawerWidth } from "@/lib/drawerWidth";
+import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isReadOnly } from "@/lib/mode";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { useViewportHeight } from "@/lib/viewportHeight";
@@ -43,7 +38,6 @@ const columnBound = (bounds: Record<string, Bound>, field: string): Bound | unde
 // laid over the table, so opening a record does not reflow the page under it; a phone gives it the whole screen
 const panel =
   "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl max-md:fixed max-md:inset-0 max-md:z-40 max-md:h-dvh max-md:border-l-0 max-md:shadow-none max-md:animate-[y-slide-up_160ms_ease-out]";
-const RESIZE_STEP = 16;
 const tabTrigger = "max-md:flex-1 max-md:text-[14px]";
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
@@ -211,7 +205,7 @@ export function RecordDrawer({
 
   return (
     <aside aria-label="record" className={cn(panel, "flex flex-col")} style={size}>
-      {!mobile && <ResizeHandle width={width} onResize={setWidth} />}
+      {!mobile && <PanelResizeHandle width={width} label="Resize record panel" onResize={setWidth} />}
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -448,57 +442,5 @@ export function RecordDrawer({
         </Dialog>
       )}
     </aside>
-  );
-}
-
-function ResizeHandle({ width, onResize }: { width: number; onResize: (w: number | null) => void }) {
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const el = e.currentTarget;
-    // without capture, the pointer entering a page's iframe stops the moves from reaching this document
-    el.setPointerCapture?.(e.pointerId);
-    document.body.setAttribute("data-resizing", "");
-    const startX = e.clientX;
-    const move = (ev: PointerEvent) => onResize(width + startX - ev.clientX);
-    let ended = false;
-    const end = () => {
-      if (ended) return;
-      ended = true;
-      document.removeEventListener("pointermove", move);
-      document.removeEventListener("pointerup", end);
-      document.removeEventListener("pointercancel", end);
-      el.removeEventListener("lostpointercapture", end);
-      document.body.removeAttribute("data-resizing");
-      // a drag released outside the panel ends in a click there, which would otherwise close it
-      const swallow = (ev: MouseEvent) => ev.stopPropagation();
-      window.addEventListener("click", swallow, { capture: true, once: true });
-      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-    };
-    document.addEventListener("pointermove", move);
-    document.addEventListener("pointerup", end);
-    document.addEventListener("pointercancel", end);
-    el.addEventListener("lostpointercapture", end);
-  };
-  const onKeyDown = (e: ReactKeyboardEvent) => {
-    const delta = e.key === "ArrowLeft" ? RESIZE_STEP : e.key === "ArrowRight" ? -RESIZE_STEP : 0;
-    if (delta === 0) return;
-    e.preventDefault();
-    onResize(width + delta);
-  };
-  return (
-    <div
-      role="separator"
-      aria-label="Resize record panel"
-      aria-orientation="vertical"
-      aria-valuenow={width}
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={maxWidth()}
-      tabIndex={0}
-      onPointerDown={onPointerDown}
-      onDoubleClick={() => onResize(null)}
-      onKeyDown={onKeyDown}
-      className="absolute inset-y-0 -left-0.5 z-10 w-1 cursor-col-resize outline-none hover:bg-primary/40 focus-visible:bg-primary/40"
-    />
   );
 }

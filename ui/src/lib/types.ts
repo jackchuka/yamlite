@@ -63,6 +63,8 @@ export interface Meta {
   tables: TableMeta[];
   views: ViewMeta[];
   pages: PageMeta[];
+  // absent in a static export
+  agents?: Array<{ id: string; name: string; login: string }>;
 }
 
 export interface TableSchema {

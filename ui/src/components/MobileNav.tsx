@@ -1,7 +1,8 @@
 import { useRouterState } from "@tanstack/react-router";
-import { Menu, Search } from "lucide-react";
+import { Menu, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { agentPanel, useAgents } from "@/lib/agent";
 import { openCommandMenu } from "@/lib/commandMenu";
 import { useMeta } from "@/lib/providers";
 import { screenTitle } from "@/lib/screen";
@@ -12,6 +13,7 @@ const button = "grid size-10 shrink-0 place-items-center rounded-md hover:bg-pan
 export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: meta } = useMeta();
+  const agents = useAgents();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className="flex items-center gap-1 border-b bg-background px-2 pt-[env(safe-area-inset-top)]">
@@ -22,6 +24,11 @@ export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
       <button type="button" aria-label="search" className={button} onClick={openCommandMenu}>
         <Search className="size-5" />
       </button>
+      {agents.length > 0 && (
+        <button type="button" aria-label="AI に依頼" className={button} onClick={agentPanel.open}>
+          <Sparkles className="size-5" />
+        </button>
+      )}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="left"

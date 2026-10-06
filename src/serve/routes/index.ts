@@ -1,5 +1,6 @@
 import type { ApiContext } from "../context.ts";
 import type { Router } from "../http.ts";
+import { agentRoutes } from "./agent.ts";
 import { conflictRoutes } from "./conflicts.ts";
 import { eventRoutes } from "./events.ts";
 import { historyRoutes } from "./history.ts";
@@ -22,4 +23,5 @@ export const ROUTES: Routes[] = [
   sqlRoutes,
   pageRoutes,
   conflictRoutes,
+  agentRoutes,
 ];

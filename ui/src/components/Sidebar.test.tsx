@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { agentPanel, useAgentPanelOpen, type AgentMeta } from "@/lib/agent";
 import { api } from "@/lib/api";
 import { enterStatic } from "@/lib/mode";
 import type { Snapshot, TableMeta } from "@/lib/types";
@@ -9,6 +10,11 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, params }: { children: React.ReactNode; params?: { table?: string } }) => (
     <a href={`#${params?.table ?? ""}`}>{children}</a>
   ),
+}));
+let agents: AgentMeta[] = [];
+vi.mock("@/lib/agent", async (orig) => ({
+  ...(await orig<typeof import("@/lib/agent")>()),
+  useAgents: () => agents,
 }));
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
@@ -64,13 +70,17 @@ beforeEach(() => {
   enterStatic({ version: 1, generatedAt: "2026-10-05T00:00:00.000Z", meta, schemas: {}, warnings: {} });
   vi.mocked(api.meta).mockResolvedValue(meta);
 });
-afterEach(() => enterStatic(null));
+afterEach(() => {
+  enterStatic(null);
+  agents = [];
+  act(() => agentPanel.close());
+});
 
-async function renderSidebar() {
+async function renderSidebar(props: { onSearch?: () => void } = {}) {
   const { Providers } = await import("@/lib/providers");
   return render(
     <Providers>
-      <Sidebar />
+      <Sidebar {...props} />
     </Providers>,
   );
 }
@@ -106,4 +116,32 @@ test("without groups there are no group headings", async () => {
   await renderSidebar();
   expect(await screen.findByText("deals")).toBeTruthy();
   expect(screen.queryByRole("group")).toBeNull();
+});
+
+test("the AI button shows only when an agent exists and toggles the panel", async () => {
+  agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
+  await renderSidebar();
+  const { result } = renderHook(() => useAgentPanelOpen());
+  fireEvent.click(await screen.findByRole("button", { name: "AI に依頼" }));
+  expect(result.current).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "AI に依頼" }));
+  expect(result.current).toBe(false);
+});
+
+test("no AI button without agents", async () => {
+  await renderSidebar();
+  await screen.findByText("deals");
+  expect(screen.queryByRole("button", { name: "AI に依頼" })).toBeNull();
+});
+
+test("in the phone menu the AI button closes the menu and keeps the panel open", async () => {
+  agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
+  const onSearch = vi.fn();
+  await renderSidebar({ onSearch });
+  const { result } = renderHook(() => useAgentPanelOpen());
+  const button = await screen.findByRole("button", { name: "AI に依頼" });
+  fireEvent.click(button);
+  fireEvent.click(button);
+  expect(onSearch).toHaveBeenCalledTimes(2);
+  expect(result.current).toBe(true);
 });

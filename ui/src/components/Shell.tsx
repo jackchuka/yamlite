@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { useAgentPanelOpen, useAgents } from "@/lib/agent";
 import { useEvents } from "@/lib/providers";
 import { useIsMobile } from "@/lib/useIsMobile";
+import { AgentPanel } from "./AgentPanel";
 import { CommandMenu } from "./CommandMenu";
 import { SessionBanner } from "./SessionBanner";
 import { ConflictToasts } from "./ConflictToasts";
@@ -15,6 +17,8 @@ export function Shell() {
   const { configError } = useEvents();
   const [newTable, setNewTable] = useState(false);
   const mobile = useIsMobile();
+  const agents = useAgents();
+  const agentOpen = useAgentPanelOpen() && agents.length > 0;
   return (
     <div className="grid h-dvh grid-cols-1 grid-rows-[auto_1fr_auto]">
       <div>
@@ -29,7 +33,10 @@ export function Shell() {
       <div className="grid min-h-0 grid-cols-1 md:grid-cols-[220px_1fr]">
         {!mobile && <Sidebar onNewTable={() => setNewTable(true)} />}
         <main className="flex min-h-0 min-w-0">
-          <Outlet />
+          <div className="flex min-h-0 min-w-0 flex-1">
+            <Outlet />
+          </div>
+          {agentOpen && <AgentPanel />}
         </main>
       </div>
       <StatusBar />

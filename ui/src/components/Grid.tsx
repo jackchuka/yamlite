@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
 } from "react";
+import type { RowPreview } from "@/lib/agent";
 import { cellView } from "@/lib/cell";
 import { Highlight } from "@/lib/highlight";
 import type { ColumnType, Reference, Row } from "@/lib/types";
@@ -122,6 +123,7 @@ export function Grid({
   onResize,
   pinned = true,
   onTogglePin,
+  preview,
 }: {
   columns: GridColumn[];
   rows: Row[];
@@ -140,6 +142,8 @@ export function Grid({
   onResize?: (column: string, width: number | null) => void;
   pinned?: boolean;
   onTogglePin?: () => void;
+  // pending AI proposals by row key; nothing is written until they are applied
+  preview?: Map<string, RowPreview>;
 }) {
   const parent = useRef<HTMLDivElement>(null);
   const mobile = useIsMobile();
@@ -227,18 +231,23 @@ export function Grid({
             const row = rows[item.index] as Row;
             const key = rowId ? rowId(row) : String(row[keyCol]);
             const selected = key === selectedKey;
+            const pv = preview?.get(key);
             return (
               <div
                 key={key}
                 role="row"
                 aria-selected={selected}
                 data-key={key}
+                data-preview={pv?.op}
                 className={cn(
                   "group absolute inset-x-0 grid cursor-pointer border-b md:hover:bg-panel",
                   selected && "bg-tomato-soft md:hover:bg-tomato-soft",
+                  pv && "bg-warn-soft md:hover:bg-warn-soft",
+                  pv?.op === "delete" && "line-through opacity-60",
+                  pv?.op === "insert" && "cursor-default",
                 )}
                 style={{ gridTemplateColumns: template, height: rowHeight, transform: `translateY(${item.start}px)` }}
-                onClick={() => onSelect?.(key, row)}
+                onClick={() => pv?.op !== "insert" && onSelect?.(key, row)}
               >
                 {columns.map((c) => (
                   <div
@@ -248,7 +257,8 @@ export function Grid({
                       "flex items-center overflow-hidden px-3 whitespace-nowrap",
                       c.name === keyCol && "font-mono text-[12px] max-md:text-[13px]",
                       c.name === sticky && pin,
-                      c.name === sticky && (selected ? "bg-tomato-soft" : "md:group-hover:bg-panel"),
+                      c.name === sticky && pv && "bg-warn-soft",
+                      c.name === sticky && !pv && (selected ? "bg-tomato-soft" : "md:group-hover:bg-panel"),
                     )}
                   >
                     {c.name === keyCol &&
@@ -263,9 +273,21 @@ export function Grid({
                       ) : (
                         <span aria-hidden className="mr-1.5 w-[1em] shrink-0" />
                       ))}
-                    <span className="truncate">
-                      <GridCell column={c} row={row} rowKey={key} />
-                    </span>
+                    {pv?.op === "update" && pv.changed.includes(c.name) ? (
+                      <span className="flex min-w-0 items-center gap-1.5 truncate">
+                        <span data-testid="preview-old" className="text-muted-foreground line-through">
+                          <GridCell column={c} row={pv.before ?? row} rowKey={key} />
+                        </span>
+                        →
+                        <span className="font-semibold text-ok">
+                          <GridCell column={c} row={pv.after ?? row} rowKey={key} />
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="truncate">
+                        <GridCell column={c} row={row} rowKey={key} />
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
