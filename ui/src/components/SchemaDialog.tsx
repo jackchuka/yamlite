@@ -2,7 +2,19 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
-import type { ViewMeta } from "@/lib/types";
+import type { Bound, ViewMeta } from "@/lib/types";
+
+const rangeText = (min: Bound | undefined, max: Bound | undefined): string | null =>
+  min !== undefined && max !== undefined
+    ? `${min} – ${max}`
+    : min !== undefined
+      ? `≥ ${min}`
+      : max !== undefined
+        ? `≤ ${max}`
+        : null;
+
+const ownOf = <T,>(record: Record<string, T>, key: string): T | undefined =>
+  Object.hasOwn(record, key) ? record[key] : undefined;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -42,6 +54,11 @@ function ViewSchema({ view }: { view: ViewMeta }) {
                     : [
                         Object.hasOwn(view.declared, name) ? "宣言済み" : "推論",
                         ...(view.required.includes(name) ? ["required"] : []),
+                        ...(ownOf(view.formats, name) ? [ownOf(view.formats, name) as string] : []),
+                        ...(() => {
+                          const range = rangeText(ownOf(view.min, name), ownOf(view.max, name));
+                          return range ? [range] : [];
+                        })(),
                       ].join(" · ")}
                 </td>
                 <td className={`${cell} font-mono text-muted-foreground`}>
@@ -113,6 +130,11 @@ export function SchemaDialog({
                               : [
                                   name in data.declared ? "宣言済み" : "推論",
                                   ...(data.required.includes(name) ? ["required"] : []),
+                                  ...(ownOf(data.formats, name) ? [ownOf(data.formats, name) as string] : []),
+                                  ...(() => {
+                                    const range = rangeText(ownOf(data.min, name), ownOf(data.max, name));
+                                    return range ? [range] : [];
+                                  })(),
                                 ].join(" · ")}
                           </td>
                           <td className={`${cell} font-mono text-muted-foreground`}>

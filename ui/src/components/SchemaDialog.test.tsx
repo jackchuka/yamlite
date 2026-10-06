@@ -24,6 +24,9 @@ test("references show their problems and indexes show whether they exist", async
     ],
     values: {},
     required: [],
+    formats: {},
+    min: {},
+    max: {},
     indexes: [
       { name: "yamlite_tasks_1", definition: "(project)", columns: ["project"], unique: false, inDb: true },
       { name: "yamlite_tasks_2", definition: "(nope)", columns: ["nope"], unique: false, inDb: false },
@@ -57,6 +60,9 @@ test("a table's expanded views link to them and show their problems", async () =
     references: [],
     values: {},
     required: [],
+    formats: {},
+    min: {},
+    max: {},
     indexes: [],
     otherIndexes: [],
     views: [
@@ -108,6 +114,9 @@ test("a view's schema comes from its meta, without a request", () => {
           references: [],
           values: { title: ["Design", "Launch"] },
           required: ["title"],
+          formats: {},
+          min: {},
+          max: {},
           count: 2,
           inDb: true,
         }}
@@ -137,6 +146,9 @@ test("a column's allowed values are listed", async () => {
     references: [],
     values: { status: ["todo", "done"] },
     required: ["status"],
+    formats: {},
+    min: {},
+    max: {},
     indexes: [],
     otherIndexes: [],
     views: [],
@@ -148,4 +160,36 @@ test("a column's allowed values are listed", async () => {
   );
   expect(await screen.findByText("todo, done")).toBeTruthy();
   expect(screen.getByText("status").closest("tr")?.children[2]?.textContent).toBe("宣言済み · required");
+});
+
+test("columns show their format and bounds", async () => {
+  vi.mocked(api.schema).mockResolvedValue({
+    name: "tasks",
+    mode: "files",
+    path: "tasks",
+    files: "tasks/**/*.{yaml,yml}",
+    key: "id",
+    inDb: true,
+    columns: { id: "TEXT", priority: "INTEGER", due: "TEXT" },
+    declared: { priority: "INTEGER", due: "TEXT" },
+    references: [],
+    values: {},
+    required: [],
+    formats: { due: "date" },
+    min: { priority: 1, due: "2026-01-01" },
+    max: { priority: 5 },
+    indexes: [],
+    otherIndexes: [],
+    views: [],
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  const priority = (await screen.findByText("priority")).closest("tr") as HTMLElement;
+  expect(priority.textContent).toContain("1 – 5");
+  const due = screen.getByText("due").closest("tr") as HTMLElement;
+  expect(due.textContent).toContain("date");
+  expect(due.textContent).toContain("≥ 2026-01-01");
 });

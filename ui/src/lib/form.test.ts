@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { buildPatch, changedFields, emptyValueFor, fieldKind, removeIn, setIn } from "./form";
+import { buildPatch, changedFields, emptyValueFor, fieldKind, fieldProblem, removeIn, setIn } from "./form";
 
 test("field kinds follow the value and the column type", () => {
   expect(fieldKind(true, "BOOLEAN", false)).toBe("switch");
@@ -61,4 +61,21 @@ test("editing and undoing leaves nothing to save", () => {
   const edited = setIn(base, ["meta", "owner"], "bo") as typeof base;
   const undone = setIn(edited, ["meta", "owner"], "al") as typeof base;
   expect(changedFields(base, undone)).toEqual([]);
+});
+
+test("date and datetime formats pick a picker, also for a missing value; anything else is text", () => {
+  expect(fieldKind("2026-10-06", "TEXT", false, "date")).toBe("date");
+  expect(fieldKind(null, "TEXT", false, "date")).toBe("date");
+  expect(fieldKind("2026-02-31", "TEXT", false, "date")).toBe("text");
+  expect(fieldKind("2026-10-06T09:00+09:00", "TEXT", false, "datetime")).toBe("datetime");
+  expect(fieldKind(undefined, "TEXT", false, "datetime")).toBe("datetime");
+  expect(fieldKind("yesterday", "TEXT", false, "datetime")).toBe("text");
+});
+
+test("fieldProblem names a broken format or a value out of bounds, and nothing for an empty value", () => {
+  expect(fieldProblem("2026-02-31", "date", undefined, undefined)).toBe("not a date");
+  expect(fieldProblem(7, undefined, 1, 5)).toBe("above max 5");
+  expect(fieldProblem("2025-12-31", "date", "2026-01-01", undefined)).toBe("below min 2026-01-01");
+  expect(fieldProblem(null, "date", "2026-01-01", undefined)).toBe(null);
+  expect(fieldProblem(3, undefined, 1, 5)).toBe(null);
 });

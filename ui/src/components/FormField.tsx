@@ -1,15 +1,17 @@
 import { json } from "@codemirror/lang-json";
 import { useQuery } from "@tanstack/react-query";
 import CodeMirror from "@uiw/react-codemirror";
-import { ArrowUpRight, X } from "lucide-react";
+import { ArrowUpRight, Calendar, Clock, Type, X } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { parseDatetime } from "../../../src/datetime.ts";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
-import { emptyValueFor, fieldKind } from "@/lib/form";
+import { fromPicker, localOffset, pickerBound, toPicker } from "@/lib/datetime";
+import { emptyValueFor, fieldKind, fieldProblem } from "@/lib/form";
 import { useTheme } from "@/lib/theme";
-import type { AllowedValue, ColumnFormat, ColumnType, Reference } from "@/lib/types";
+import type { AllowedValue, Bound, ColumnFormat, ColumnType, Reference } from "@/lib/types";
 import { RefLink } from "./RefLink";
 
 export interface FieldProps {
@@ -20,6 +22,11 @@ export interface FieldProps {
   reference?: Reference;
   // the column's declared values: edited with a select, a value outside the list kept and marked
   allowed?: AllowedValue[];
+  // the column's bounds: shown as a warning when the value is outside them, never enforced
+  min?: Bound;
+  max?: Bound;
+  // the value breaks its format or bounds: the input is drawn with a warning border
+  problem?: boolean;
   onChange: (next: unknown) => void;
   onRemove?: () => void;
   onValidity?: (path: string, ok: boolean) => void;
@@ -210,6 +217,8 @@ function MapField(props: FieldProps) {
             value={v}
             type={undefined}
             format={undefined}
+            min={undefined}
+            max={undefined}
             reference={undefined}
             onChange={(next) => onChange({ ...(value as object), [k]: next })}
           />
@@ -250,12 +259,60 @@ function MapField(props: FieldProps) {
   );
 }
 
+const warnBorder = (problem?: boolean) => (problem ? "border-warn" : "");
+
+function DateField({ path, value, min, max, problem, onChange }: FieldProps) {
+  return (
+    <Input
+      type="date"
+      aria-label={label(path)}
+      className={`w-44 font-mono ${warnBorder(problem)}`}
+      value={typeof value === "string" ? value : ""}
+      min={typeof min === "string" ? min : undefined}
+      max={typeof max === "string" ? max : undefined}
+      onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+    />
+  );
+}
+
+// the picker edits the time; the offset, separator and seconds stay as the value spells them
+function DatetimeField({ path, value, min, max, problem, onChange }: FieldProps) {
+  const text = typeof value === "string" ? value : "";
+  const picker = text === "" ? null : toPicker(text);
+  const offset = parseDatetime(text)?.offset ?? null;
+  // bounds are read in the offset the picker shows: the value's, else the browser's for a new value, else UTC
+  const boundOffset = text === "" ? localOffset(new Date().toISOString().slice(0, 10), "12", "00") : offset;
+  // a cleared segment empties the picker for a moment; the spelling to keep is the last one it had
+  const last = useRef(text);
+  if (text !== "") last.current = text;
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        type="datetime-local"
+        aria-label={label(path)}
+        className={`w-60 font-mono ${warnBorder(problem)}`}
+        step={picker?.step ?? 60}
+        value={picker?.value ?? ""}
+        min={pickerBound(min, boundOffset)}
+        max={pickerBound(max, boundOffset)}
+        onChange={(e) => {
+          if (e.target.value === "") return onChange(null);
+          const next = fromPicker(e.target.value, last.current === "" ? null : last.current);
+          if (next !== null) onChange(next);
+        }}
+      />
+      {offset && <span className="font-mono text-[12px] text-muted-foreground">{offset}</span>}
+    </div>
+  );
+}
+
 const INTEGER = /^-?\d+$/;
 const DECIMAL = /^-?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
 
 // the widget is chosen once per mount so typing never swaps it; the parent remounts on reload
-export function FormField(props: FieldProps) {
-  const { path, value, type, format, reference, onChange } = props;
+function Widget(props: FieldProps) {
+  const { path, value, type, format, reference, problem, onChange } = props;
+  const dated = format === "date" || format === "datetime";
   const [kind, setKind] = useState(() => fieldKind(value, type, reference !== undefined, format));
   const [numText, setNumText] = useState(value == null ? "" : String(value));
   const text = value == null ? "" : String(value);
@@ -266,6 +323,22 @@ export function FormField(props: FieldProps) {
     }
     onChange(next);
   };
+  const toggle = (to: "text" | "picker") => (
+    <button
+      type="button"
+      aria-label={`${label(path)} as ${to}`}
+      className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground"
+      onClick={() => setKind(to === "text" ? "text" : fieldKind(value, type, false, format))}
+    >
+      {to === "text" ? (
+        <Type className="size-3.5" />
+      ) : format === "date" ? (
+        <Calendar className="size-3.5" />
+      ) : (
+        <Clock className="size-3.5" />
+      )}
+    </button>
+  );
   if (props.allowed && type !== "JSON") return <ValuesField {...props} allowed={props.allowed} />;
   switch (kind) {
     case "switch":
@@ -276,7 +349,7 @@ export function FormField(props: FieldProps) {
         <Input
           aria-label={label(path)}
           inputMode={type === "REAL" ? "decimal" : "numeric"}
-          className="w-40 font-mono"
+          className={`w-40 font-mono ${warnBorder(problem)}`}
           value={numText}
           onChange={(e) => {
             const raw = e.target.value;
@@ -293,10 +366,42 @@ export function FormField(props: FieldProps) {
           }}
         />
       );
-    case "text":
-      return <Input aria-label={label(path)} value={text} onChange={(e) => change(e.target.value)} />;
+    case "date":
+    case "datetime":
+      return (
+        <div className="flex items-center gap-1.5">
+          {kind === "date" ? <DateField {...props} /> : <DatetimeField {...props} />}
+          {toggle("text")}
+        </div>
+      );
+    case "text": {
+      const input = (
+        <Input
+          aria-label={label(path)}
+          className={warnBorder(problem)}
+          value={text}
+          onChange={(e) => change(dated && e.target.value === "" ? null : e.target.value)}
+        />
+      );
+      if (!dated) return input;
+      const canPick = fieldKind(value, type, false, format) === format;
+      return (
+        <div className="flex items-center gap-1.5">
+          {input}
+          {canPick && toggle("picker")}
+        </div>
+      );
+    }
     case "textarea":
-      return <Textarea aria-label={label(path)} rows={4} value={text} onChange={(e) => change(e.target.value)} />;
+      return (
+        <Textarea
+          aria-label={label(path)}
+          className={warnBorder(problem)}
+          rows={4}
+          value={text}
+          onChange={(e) => change(e.target.value)}
+        />
+      );
     case "markdown":
       return (
         <Suspense fallback={<Textarea aria-label={label(path)} rows={4} value={text} readOnly />}>
@@ -345,4 +450,14 @@ export function FormField(props: FieldProps) {
         </button>
       );
   }
+}
+
+export function FormField(props: FieldProps) {
+  const problem = fieldProblem(props.value, props.format, props.min, props.max);
+  return (
+    <div data-problem={problem ?? undefined}>
+      <Widget {...props} problem={problem !== null} />
+      {problem && <p className="mt-1 text-[11px] text-warn">{problem}</p>}
+    </div>
+  );
 }

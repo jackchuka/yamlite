@@ -14,6 +14,8 @@ const table = (name: string, group: string | null): TableMeta => ({
   formats: {},
   values: {},
   required: [],
+  min: {},
+  max: {},
   references: [],
   count: 0,
   inDb: true,

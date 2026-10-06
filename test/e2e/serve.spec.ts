@@ -248,3 +248,23 @@ test("a column with values is edited with a select and saved to the file", async
   expect(text).toContain("# errand");
   expect(text).toContain("status: done");
 });
+
+test("dates are edited with pickers, keep their offset, and values out of bounds are marked", async ({ page }) => {
+  app = await start(
+    { "tasks/release.yaml": "# release\ndue: 2026-10-01\nat: 2026-10-06T09:00:00+09:00\npriority: 7\n" },
+    (r) => (app = r),
+    "tables:\n  tasks:\n    columns: { due: TEXT, at: TEXT, priority: INTEGER }\n    formats: { due: date, at: datetime }\n    max: { priority: 5 }\n",
+  );
+  await page.goto(app.url);
+  await page.getByRole("row", { name: /release/ }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await expect(drawer.getByText("above max 5")).toBeVisible();
+  await drawer.getByLabel("due", { exact: true }).fill("2026-10-31");
+  await drawer.getByLabel("at", { exact: true }).fill("2026-10-06T12:30");
+  await drawer.getByRole("button", { name: /Save/ }).click();
+  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  const text = file(app, "tasks/release.yaml");
+  expect(text).toContain("# release");
+  expect(text).toMatch(/due: "?2026-10-31"?\n/);
+  expect(text).toMatch(/at: "?2026-10-06T12:30:00\+09:00"?\n/);
+});
