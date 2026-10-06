@@ -47,8 +47,7 @@ function viewRows(ctx: ApiContext, view: ViewTarget, rq: RowQuery) {
   if (!view.record) return { rows: [], total: 0 };
   const { identity } = view.record;
   const types = new Map(Object.entries(view.record.columns));
-  // prefix searches the table's key, the first identity column
-  const { where, params: values } = buildWhere(rq, types, identity[0] as string);
+  const { where, params: values } = buildWhere(rq, types);
   const total = Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(view.name)} ${where}`, ...values)[0]?.n ?? 0);
   const found = ctx.store.query(
     `SELECT * FROM ${q(view.name)} ${where} ${orderBy(rq, types, identity)} LIMIT ? OFFSET ?`,
@@ -67,7 +66,7 @@ export const rowRoutes: Routes = (router, ctx) => {
     if (!ctx.store.tableExists(spec.name)) return { rows: [], total: 0 };
     const types = ctx.store.columns(spec.name);
     const rq = parseRowQuery(query);
-    const { where, params: values } = buildWhere(rq, types, spec.key);
+    const { where, params: values } = buildWhere(rq, types);
     const total = Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(spec.name)} ${where}`, ...values)[0]?.n ?? 0);
     const found = ctx.store.query(
       `SELECT * FROM ${q(spec.name)} ${where} ${orderBy(rq, types, [spec.key])} LIMIT ? OFFSET ?`,

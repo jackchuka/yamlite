@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { api } from "@/lib/api";
+import { useGridPrefs } from "@/lib/gridPrefs";
+import { SearchTerm } from "@/lib/highlight";
 import { warningLinks, warningsByKey } from "@/lib/activity";
 import { useEvents, useMeta } from "@/lib/providers";
 import type { Filter, Row, TableMeta, ViewMeta } from "@/lib/types";
@@ -55,13 +57,14 @@ export function TableView({
   const filters = search.filter ?? [];
   const [hidden, setHidden] = useState(() => hiddenColumns(table));
   const [schemaOpen, setSchemaOpen] = useState(false);
+  const gridPrefs = useGridPrefs(table);
 
   const query = useInfiniteQuery({
     queryKey: view
-      ? ["rows", view.table, view.name, { sort: search.sort, filters, prefix: search.prefix }]
-      : ["rows", table, { sort: search.sort, filters, prefix: search.prefix }],
+      ? ["rows", view.table, view.name, { sort: search.sort, filters, search: search.q }]
+      : ["rows", table, { sort: search.sort, filters, search: search.q }],
     queryFn: ({ pageParam }) =>
-      api.rows(table, { limit: PAGE, offset: pageParam, sort: search.sort, filters, prefix: search.prefix }),
+      api.rows(table, { limit: PAGE, offset: pageParam, sort: search.sort, filters, search: search.q }),
     initialPageParam: 0,
     getNextPageParam: (last, pages) => {
       const loaded = pages.reduce((n, p) => n + p.rows.length, 0);
@@ -80,8 +83,8 @@ export function TableView({
     [navigate],
   );
   const onFilters = useCallback(
-    (next: { filters: Filter[]; prefix?: string }) =>
-      setSearch({ filter: next.filters.length > 0 ? next.filters : undefined, prefix: next.prefix }),
+    (next: { filters: Filter[]; search?: string }) =>
+      setSearch({ filter: next.filters.length > 0 ? next.filters : undefined, q: next.search }),
     [setSearch],
   );
 
@@ -175,25 +178,31 @@ export function TableView({
             {t && headerActions?.(t)}
           </div>
         </div>
-        <FilterBar columns={all} filters={filters} prefix={search.prefix} onChange={onFilters} />
+        <FilterBar columns={all} filters={filters} search={search.q} onChange={onFilters} />
         {query.isError && (
           <div role="alert" className="border-b px-[18px] py-2 text-err">
             {query.error.message}
           </div>
         )}
         {(!query.isError || rows.length > 0) && (
-          <Grid
-            columns={columns}
-            rows={rows}
-            keyCol={keyCol}
-            rowId={rowId}
-            selectedKey={t ? search.key : undefined}
-            onSelect={onSelect}
-            onEndReached={onEndReached}
-            flagged={t ? warningsByKey(links) : undefined}
-            sort={search.sort}
-            onSort={onSort}
-          />
+          <SearchTerm.Provider value={search.q?.trim() ?? ""}>
+            <Grid
+              columns={columns}
+              rows={rows}
+              keyCol={keyCol}
+              rowId={rowId}
+              selectedKey={t ? search.key : undefined}
+              onSelect={onSelect}
+              onEndReached={onEndReached}
+              flagged={t ? warningsByKey(links) : undefined}
+              sort={search.sort}
+              onSort={onSort}
+              widths={gridPrefs.widths}
+              onResize={gridPrefs.setWidth}
+              pinned={!gridPrefs.unpinned}
+              onTogglePin={gridPrefs.togglePin}
+            />
+          </SearchTerm.Provider>
         )}
       </section>
       {t && search.key !== undefined && drawer?.(t, search.key)}

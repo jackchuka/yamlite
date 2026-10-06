@@ -85,14 +85,14 @@ export interface RowsParams {
   offset: number;
   sort?: string;
   filters: Filter[];
-  prefix?: string;
+  search?: string;
 }
 
 export function rowsQuery(p: RowsParams): URLSearchParams {
   const qs = new URLSearchParams({ limit: String(p.limit), offset: String(p.offset) });
   if (p.sort) qs.set("sort", p.sort);
   if (p.filters.length > 0) qs.set("filter", JSON.stringify(p.filters));
-  if (p.prefix) qs.set("prefix", p.prefix);
+  if (p.search) qs.set("q", p.search);
   return qs;
 }
 

@@ -78,7 +78,7 @@ test("rows go to the api with defaults, only for names in access", async () => {
     offset: 0,
     sort: "idx:desc",
     filters: [],
-    prefix: undefined,
+    search: undefined,
   });
   expect((await ask("rows", "secret")).error).toEqual({
     status: 403,

@@ -1,7 +1,13 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowUp } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { ArrowDown, ArrowUp, Pin, PinOff } from "lucide-react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  useEffect,
+  useRef,
+} from "react";
 import { cellView } from "@/lib/cell";
+import { Highlight } from "@/lib/highlight";
 import type { ColumnType, Reference, Row } from "@/lib/types";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
@@ -22,12 +28,18 @@ function GridCell({ column, row, rowKey }: { column: GridColumn; row: Row; rowKe
   const v = cellView(value, column.type);
   const { reference } = column;
   if (reference && (v.kind === "text" || v.kind === "number"))
-    return <RefLink reference={reference} value={String(value)} />;
+    return (
+      <RefLink reference={reference} value={String(value)}>
+        <Highlight text={String(value)} />
+      </RefLink>
+    );
   if (reference && v.kind === "chips") {
     return (
       <span>
         {v.items.map((item, i) => (
-          <RefLink key={`${i}-${item}`} reference={reference} value={item} className={`${chip} hover:underline`} />
+          <RefLink key={`${i}-${item}`} reference={reference} value={item} className={`${chip} hover:underline`}>
+            <Highlight text={item} />
+          </RefLink>
         ))}
         {v.more > 0 && <span className={chip}>+{v.more}</span>}
       </span>
@@ -40,6 +52,59 @@ const ROW_HEIGHT = 34;
 const MOBILE_ROW_HEIGHT = 44;
 // the key column stays put while the rest scrolls sideways
 const pin = "sticky left-0 z-[1] bg-background shadow-[1px_0_0_var(--border)]";
+const RESIZE_STEP = 16;
+
+function ResizeEdge({
+  column,
+  width,
+  onResize,
+}: {
+  column: string;
+  width?: number;
+  onResize: (column: string, width: number | null) => void;
+}) {
+  const widthOf = (el: HTMLElement) => width ?? el.parentElement?.getBoundingClientRect().width ?? 0;
+  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const el = e.currentTarget;
+    el.setPointerCapture?.(e.pointerId);
+    document.body.setAttribute("data-resizing", "");
+    const startX = e.clientX;
+    const startWidth = widthOf(el);
+    const move = (ev: PointerEvent) => onResize(column, startWidth + ev.clientX - startX);
+    const end = () => {
+      document.removeEventListener("pointermove", move);
+      document.removeEventListener("pointerup", end);
+      document.removeEventListener("pointercancel", end);
+      el.removeEventListener("lostpointercapture", end);
+      document.body.removeAttribute("data-resizing");
+    };
+    document.addEventListener("pointermove", move);
+    document.addEventListener("pointerup", end);
+    document.addEventListener("pointercancel", end);
+    el.addEventListener("lostpointercapture", end);
+  };
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const delta = e.key === "ArrowRight" ? RESIZE_STEP : e.key === "ArrowLeft" ? -RESIZE_STEP : 0;
+    if (delta === 0) return;
+    e.preventDefault();
+    onResize(column, widthOf(e.currentTarget) + delta);
+  };
+  return (
+    <div
+      role="separator"
+      aria-label={`Resize ${column}`}
+      aria-orientation="vertical"
+      aria-valuenow={width}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => onResize(column, null)}
+      onKeyDown={onKeyDown}
+      className="absolute inset-y-0 -right-[3px] z-[2] w-1.5 cursor-col-resize touch-none outline-none hover:bg-primary/40 focus-visible:bg-primary/40"
+    />
+  );
+}
 
 export function Grid({
   columns,
@@ -53,6 +118,10 @@ export function Grid({
   flagged,
   sort,
   onSort,
+  widths,
+  onResize,
+  pinned = true,
+  onTogglePin,
 }: {
   columns: GridColumn[];
   rows: Row[];
@@ -66,6 +135,11 @@ export function Grid({
   flagged?: Map<string, string[]>;
   sort?: string;
   onSort?: (column: string) => void;
+  // px, for columns the viewer has resized
+  widths?: Record<string, number>;
+  onResize?: (column: string, width: number | null) => void;
+  pinned?: boolean;
+  onTogglePin?: () => void;
 }) {
   const parent = useRef<HTMLDivElement>(null);
   const mobile = useIsMobile();
@@ -85,7 +159,13 @@ export function Grid({
   const [keyWidth, colWidth] = mobile
     ? ["minmax(120px, 160px)", "minmax(96px, 1fr)"]
     : ["minmax(160px, 220px)", "minmax(110px, 1fr)"];
-  const template = columns.map((c) => (c.name === keyCol ? keyWidth : colWidth)).join(" ");
+  const template = columns
+    .map((c) => {
+      const w = widths?.[c.name];
+      return w !== undefined ? `${w}px` : c.name === keyCol ? keyWidth : colWidth;
+    })
+    .join(" ");
+  const sticky = pinned ? stickyCol : undefined;
   const [sortCol, sortDir] = (sort ?? "").split(":");
   return (
     <div
@@ -102,23 +182,44 @@ export function Grid({
           style={{ gridTemplateColumns: template }}
         >
           {columns.map((c) => (
-            <button
+            <div
               key={c.name}
-              type="button"
               role="columnheader"
-              className={cn(
-                "flex items-center gap-1 px-3 py-[7px] text-left text-[11.5px] font-semibold whitespace-nowrap text-muted-foreground max-md:text-[12.5px]",
-                c.name === stickyCol && pin,
-              )}
-              onClick={() => onSort?.(c.name)}
+              className={cn("group/header relative flex min-w-0 items-center", c.name === sticky && pin)}
             >
-              {c.name}
-              <span className="rounded bg-panel-2 px-1 font-mono text-[9.5px] font-medium max-md:text-[11px]">
-                {c.name === keyCol ? "key" : (c.note ?? c.type)}
-              </span>
-              {sortCol === c.name &&
-                (sortDir === "desc" ? <ArrowDown className="size-3" /> : <ArrowUp className="size-3" />)}
-            </button>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-1 px-3 py-[7px] text-left text-[11.5px] font-semibold whitespace-nowrap text-muted-foreground max-md:text-[12.5px]"
+                onClick={() => onSort?.(c.name)}
+              >
+                <span className="truncate">{c.name}</span>
+                <span className="shrink-0 rounded bg-panel-2 px-1 font-mono text-[9.5px] font-medium max-md:text-[11px]">
+                  {c.name === keyCol ? "key" : (c.note ?? c.type)}
+                </span>
+                {sortCol === c.name &&
+                  (sortDir === "desc" ? (
+                    <ArrowDown className="size-3 shrink-0" />
+                  ) : (
+                    <ArrowUp className="size-3 shrink-0" />
+                  ))}
+              </button>
+              {c.name === stickyCol && onTogglePin && (
+                <button
+                  type="button"
+                  aria-label={pinned ? "unpin key column" : "pin key column"}
+                  aria-pressed={pinned}
+                  title={pinned ? "Let the key column scroll" : "Keep the key column in place"}
+                  className={cn(
+                    "mr-1 grid size-6 shrink-0 place-items-center rounded text-muted-foreground hover:bg-panel-2 hover:text-foreground focus-visible:opacity-100 max-md:size-8",
+                    pinned && "opacity-0 group-hover/header:opacity-100 max-md:opacity-100",
+                  )}
+                  onClick={onTogglePin}
+                >
+                  {pinned ? <Pin className="size-3.5" /> : <PinOff className="size-3.5" />}
+                </button>
+              )}
+              {onResize && !mobile && <ResizeEdge column={c.name} width={widths?.[c.name]} onResize={onResize} />}
+            </div>
           ))}
         </div>
         <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
@@ -146,8 +247,8 @@ export function Grid({
                     className={cn(
                       "flex items-center overflow-hidden px-3 whitespace-nowrap",
                       c.name === keyCol && "font-mono text-[12px] max-md:text-[13px]",
-                      c.name === stickyCol && pin,
-                      c.name === stickyCol && (selected ? "bg-tomato-soft" : "md:group-hover:bg-panel"),
+                      c.name === sticky && pin,
+                      c.name === sticky && (selected ? "bg-tomato-soft" : "md:group-hover:bg-panel"),
                     )}
                   >
                     {c.name === keyCol &&

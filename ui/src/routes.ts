@@ -4,7 +4,7 @@ import type { Filter } from "./lib/types";
 export interface TableSearch {
   key?: string;
   sort?: string;
-  prefix?: string;
+  q?: string;
   filter?: Filter[];
 }
 
@@ -16,7 +16,7 @@ export const tableRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): TableSearch => ({
     key: typeof s.key === "string" ? s.key : undefined,
     sort: typeof s.sort === "string" ? s.sort : undefined,
-    prefix: typeof s.prefix === "string" ? s.prefix : undefined,
+    q: typeof s.q === "string" ? s.q : undefined,
     filter: Array.isArray(s.filter) ? (s.filter as Filter[]) : undefined,
   }),
 });

@@ -1,3 +1,4 @@
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,13 +31,13 @@ export function parseFilterValue(text: string, type: ColumnType): unknown {
 export function FilterBar({
   columns,
   filters,
-  prefix,
+  search,
   onChange,
 }: {
   columns: Record<string, ColumnType>;
   filters: Filter[];
-  prefix?: string;
-  onChange: (next: { filters: Filter[]; prefix?: string }) => void;
+  search?: string;
+  onChange: (next: { filters: Filter[]; search?: string }) => void;
 }) {
   const names = Object.keys(columns);
   const [draft, setDraft] = useState<{ col: string; op: FilterOp; text: string }>({
@@ -44,38 +45,46 @@ export function FilterBar({
     op: "eq",
     text: "",
   });
-  const [prefixText, setPrefixText] = useState(prefix ?? "");
+  const [searchText, setSearchText] = useState(search ?? "");
   const [open, setOpen] = useState(false);
-  useEffect(() => setPrefixText(prefix ?? ""), [prefix]);
+  useEffect(() => setSearchText(search ?? ""), [search]);
   useEffect(() => {
     const t = setTimeout(() => {
-      if ((prefix ?? "") !== prefixText) onChange({ filters, prefix: prefixText || undefined });
+      if ((search ?? "") !== searchText) onChange({ filters, search: searchText || undefined });
     }, 300);
     return () => clearTimeout(t);
-  }, [prefixText, prefix, filters, onChange]);
+  }, [searchText, search, filters, onChange]);
   const add = () => {
     const needsValue = draft.op !== "null" && draft.op !== "notnull";
     const value = needsValue
       ? parseFilterValue(draft.text, (Object.hasOwn(columns, draft.col) ? columns[draft.col] : undefined) ?? "TEXT")
       : undefined;
-    onChange({ filters: [...filters, { col: draft.col, op: draft.op, ...(needsValue ? { value } : {}) }], prefix });
+    onChange({ filters: [...filters, { col: draft.col, op: draft.op, ...(needsValue ? { value } : {}) }], search });
     setOpen(false);
   };
   return (
     <div className="flex flex-wrap items-center gap-2 border-b px-[18px] py-2 max-md:px-3">
-      <Input
-        aria-label="key prefix"
-        placeholder="key prefix…"
-        className="h-7 max-w-[220px] text-[12px] max-md:h-9 max-md:max-w-none max-md:basis-full"
-        value={prefixText}
-        onChange={(e) => setPrefixText(e.target.value)}
-      />
+      <div className="relative w-full max-w-[280px] max-md:max-w-none max-md:basis-full">
+        <Search
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input
+          type="search"
+          aria-label="search"
+          placeholder="search all columns…"
+          className="h-7 pl-7 text-[12px] max-md:h-9"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setSearchText("")}
+        />
+      </div>
       {filters.map((f, i) => (
         <button
           key={`${i}-${label(f)}`}
           type="button"
           className="rounded-full border border-tomato bg-tomato-soft px-2 py-0.5 text-[11.5px] text-tomato max-md:min-h-8 max-md:px-3 max-md:text-[13px]"
-          onClick={() => onChange({ filters: filters.filter((_, j) => j !== i), prefix })}
+          onClick={() => onChange({ filters: filters.filter((_, j) => j !== i), search })}
         >
           {label(f)} ×
         </button>

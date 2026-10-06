@@ -175,11 +175,11 @@ test("rows page, sort and filter like the server", async () => {
           limit: 10,
           offset: 0,
           filters: [],
-          prefix: "a",
+          search: "MILK",
         })
       ).rows,
     ),
-  ).toEqual(["a", "a_1", "ab"]);
+  ).toEqual(["a"]);
 });
 
 test("values come back typed like the server", async () => {
@@ -203,18 +203,18 @@ test("big integers come back as strings like the server", async () => {
   expect(row.big).toBe("9007199254740993");
 });
 
-test("views page by their identity", async () => {
+test("views page by their identity and search their columns", async () => {
   const page = await make().rows("tasks__tags", {
     limit: 10,
     offset: 0,
     filters: [],
-    prefix: "a",
+    search: "E",
   });
   expect(page.total).toBe(3);
   expect(page.rows.map((r) => [r.tasks_id, r.idx])).toEqual([
     ["a", 0],
     ["a", 1],
-    ["a_1", 0],
+    ["b", 0],
   ]);
 });
 
