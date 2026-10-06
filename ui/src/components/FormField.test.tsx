@@ -166,6 +166,43 @@ test("a markdown preview opens links in a new tab, so following one keeps the ap
   expect(link.getAttribute("rel")).toBe("noopener noreferrer");
 });
 
+test("an MDX preview shows its JSX and expressions as written and renders the Markdown inside", async () => {
+  const body = 'import { Note } from "./Note";\n\n<Note kind="tip">\n  Read *this*.\n</Note>\n\nHi {props.name}.';
+  const { container } = render(
+    wrap(<FormField path={["body"]} value={body} type="TEXT" format="markdown" mdx onChange={() => {}} />),
+  );
+  expect((await screen.findByText('<Note kind="tip">')).className).toBe("mdx-tag");
+  expect(screen.getByText("this").tagName).toBe("EM");
+  expect(screen.getByText("{props.name}").className).toBe("mdx-expr");
+  expect(container.querySelector(".mdx-esm summary")?.textContent).toBe('import { Note } from "./Note";');
+});
+
+test("MDX that does not parse falls back to plain Markdown and says so", async () => {
+  render(
+    wrap(
+      <FormField path={["body"]} value={"# Title\n\n<Note"} type="TEXT" format="markdown" mdx onChange={() => {}} />,
+    ),
+  );
+  expect(await screen.findByRole("heading", { name: "Title" })).toBeTruthy();
+  expect(screen.getByText(/does not parse/)).toBeTruthy();
+});
+
+test("a fenced code block in the preview is highlighted", async () => {
+  const { container } = render(
+    wrap(
+      <FormField
+        path={["body"]}
+        value={"```ts\nconst x = 1;\n```"}
+        type="TEXT"
+        format="markdown"
+        onChange={() => {}}
+      />,
+    ),
+  );
+  await screen.findByText("const");
+  expect(container.querySelector("pre .tok-keyword")?.textContent).toBe("const");
+});
+
 test("a markdown editor follows a theme change made while it is open", async () => {
   document.documentElement.dataset.theme = "light";
   render(wrap(<FormField path={["body"]} value={""} type="TEXT" format="markdown" onChange={() => {}} />));

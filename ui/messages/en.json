@@ -202,6 +202,7 @@
   "form_unset": "— (unset)",
   "form_preview": "Preview",
   "form_edit": "Edit",
+  "form_mdx_error": "Shown as plain Markdown: the MDX does not parse ({error})",
   "common_loading": "Loading…",
   "history_fields": "Fields",
   "history_yaml_diff": "YAML diff",

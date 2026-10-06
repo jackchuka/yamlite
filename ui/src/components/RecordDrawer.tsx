@@ -31,6 +31,7 @@ const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
   Object.hasOwn(table.columns, field) ? table.columns[field] : undefined;
 const columnFormat = (table: TableMeta, field: string): ColumnFormat | undefined =>
   Object.hasOwn(table.formats, field) ? table.formats[field] : undefined;
+const isMdx = (table: TableMeta) => table.files?.endsWith(".mdx") ?? false;
 const columnValues = (table: TableMeta, field: string): AllowedValue[] | undefined =>
   Object.hasOwn(table.values, field) ? table.values[field] : undefined;
 const columnBound = (bounds: Record<string, Bound>, field: string): Bound | undefined =>
@@ -295,6 +296,7 @@ export function RecordDrawer({
                     value={draft[f]}
                     type={columnType(table, f)}
                     format={columnFormat(table, f)}
+                    mdx={isMdx(table)}
                     allowed={columnValues(table, f)}
                     min={columnBound(table.min, f)}
                     max={columnBound(table.max, f)}

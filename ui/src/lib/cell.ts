@@ -16,7 +16,7 @@ const isMap = (v: unknown): v is Record<string, unknown> => v !== null && typeof
 const sizeLabel = (v: unknown): string =>
   Array.isArray(v) ? `[${v.length}]` : isMap(v) ? `{${Object.keys(v).length}}` : "";
 
-const ESM = /^(import\s|export\s+(const|let|var|function|class|default|async|\{|\*))/;
+export const ESM = /^(import\s|export\s+(const|let|var|function|class|default|async|\{|\*))/;
 const RULE = /^\s*([-*_]\s*){3,}$|^\s*\|?\s*:?-{3,}/;
 
 // a cell has one line: the text a reader would see, paragraphs split by " · ", without the markup around them

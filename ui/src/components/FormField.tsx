@@ -21,6 +21,8 @@ export interface FieldProps {
   value: unknown;
   type?: ColumnType;
   format?: ColumnFormat;
+  // a markdown field read from an .mdx file: the preview shows its JSX and ESM
+  mdx?: boolean;
   reference?: Reference;
   // the column's declared values: edited with a select, a value outside the list kept and marked
   allowed?: AllowedValue[];
