@@ -8,6 +8,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { agentPanel, useAgents } from "@/lib/agent";
 import { setCommandMenuOpen, useCommandMenuOpen } from "@/lib/commandMenu";
 import { isReadOnly } from "@/lib/mode";
 import { useMeta } from "@/lib/providers";
@@ -16,6 +17,7 @@ export function CommandMenu() {
   const open = useCommandMenuOpen();
   const navigate = useNavigate();
   const { data: meta } = useMeta();
+  const agents = useAgents();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -73,6 +75,7 @@ export function CommandMenu() {
           <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
           <CommandItem onSelect={() => go(() => navigate({ to: "/erd" }))}>ERD</CommandItem>
           {!isReadOnly() && <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>}
+          {agents.length > 0 && <CommandItem onSelect={() => go(agentPanel.open)}>AI に依頼</CommandItem>}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

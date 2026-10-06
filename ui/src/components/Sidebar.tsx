@@ -7,11 +7,13 @@ import {
   LayoutDashboard,
   Network,
   Plus,
+  Sparkles,
   Table2,
   Terminal,
   TriangleAlert,
 } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
+import { agentPanel, useAgents } from "@/lib/agent";
 import { warningLinks } from "@/lib/activity";
 import { openCommandMenu } from "@/lib/commandMenu";
 import { groupTables, useCollapsedGroups } from "@/lib/groups";
@@ -43,6 +45,7 @@ function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
 
 export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onSearch?: () => void }) {
   const { data: meta } = useMeta();
+  const agents = useAgents();
   const { warnings, connected } = useEvents();
   const readOnly = isReadOnly();
   const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts, enabled: !readOnly });
@@ -98,6 +101,20 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
         <span>Search…</span>
         <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
       </button>
+      {agents.length > 0 && (
+        <button
+          type="button"
+          className="mx-2.5 mb-2 flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-[13px] max-md:py-2.5 max-md:text-[14px]"
+          onClick={() => {
+            if (!onSearch) return agentPanel.toggle();
+            onSearch();
+            agentPanel.open();
+          }}
+        >
+          <Sparkles className="size-4" />
+          AI に依頼
+        </button>
+      )}
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
         Tables
       </div>

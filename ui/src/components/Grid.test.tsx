@@ -216,3 +216,56 @@ test("search matches are marked in text and reference cells", () => {
   expect([...container.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["li", "li"]);
   expect(screen.getByRole("link").getAttribute("aria-label")).toBe("open people alice");
 });
+
+const previewColumns = [
+  { name: "id", type: "TEXT" as const },
+  { name: "done", type: "BOOLEAN" as const },
+];
+
+test("previewed rows are marked; updates show old → new; deletes are struck through", () => {
+  const preview = new Map([
+    [
+      "a",
+      { op: "update" as const, before: { id: "a", done: false }, after: { id: "a", done: true }, changed: ["done"] },
+    ],
+    ["b", { op: "delete" as const, before: { id: "b" }, after: null, changed: [] }],
+  ]);
+  render(
+    <Grid
+      columns={previewColumns}
+      rows={[
+        { id: "a", done: false },
+        { id: "b", done: false },
+      ]}
+      keyCol="id"
+      preview={preview}
+    />,
+  );
+  const a = document.querySelector('[data-key="a"]') as Element;
+  expect(a.getAttribute("data-preview")).toBe("update");
+  expect(a.querySelector('[data-testid="preview-old"]')).toBeTruthy();
+  expect(document.querySelector('[data-key="b"]')?.getAttribute("data-preview")).toBe("delete");
+});
+
+test("a provisional insert row cannot be selected", () => {
+  const onSelect = vi.fn();
+  const preview = new Map([
+    ["n", { op: "insert" as const, before: null, after: { id: "n", done: false }, changed: [] }],
+  ]);
+  render(
+    <Grid
+      columns={previewColumns}
+      rows={[
+        { id: "n", done: false },
+        { id: "a", done: false },
+      ]}
+      keyCol="id"
+      preview={preview}
+      onSelect={onSelect}
+    />,
+  );
+  fireEvent.click(document.querySelector('[data-key="n"]') as Element);
+  expect(onSelect).not.toHaveBeenCalled();
+  fireEvent.click(document.querySelector('[data-key="a"]') as Element);
+  expect(onSelect).toHaveBeenCalledOnce();
+});
