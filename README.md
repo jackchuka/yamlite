@@ -169,6 +169,10 @@ npx @jackchuka/yamlite status ./notes
 
 ## Web UI
 
+<p align="center">
+  <img src="assets/clients.gif" width="800" alt="Editing the YAML file updates the admin UI and the published site, an edit in the UI rewrites the file, and an AI proposal applied in the UI changes the file too">
+</p>
+
 ```bash
 yamlite serve notes --open
 ```

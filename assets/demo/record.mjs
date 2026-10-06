@@ -1,9 +1,12 @@
-// Renders index.html frame by frame in headless Chrome and encodes assets/demo.gif.
-// Usage: node assets/demo/record.mjs   (needs Google Chrome and ffmpeg; set CHROME to override the path)
+// Renders a demo page frame by frame in headless Chrome and encodes it as a GIF.
+// Usage: node assets/demo/record.mjs [page] [out] [query]   (needs Google Chrome and ffmpeg; set CHROME to override the path)
+//   node assets/demo/record.mjs                                        → assets/demo.gif
+//   node assets/demo/record.mjs clients.html clients.gif               → assets/clients.gif
+//   node assets/demo/record.mjs clients.html clients-ja.gif lang=ja    → assets/clients-ja.gif
 import { spawn, execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const FPS = 15;
@@ -11,7 +14,8 @@ const WIDTH = 960;
 const HEIGHT = 500;
 const PORT = 9333;
 const here = fileURLToPath(new URL(".", import.meta.url));
-const out = join(here, "..", "demo.gif");
+const [page = "index.html", outName = "demo.gif", query = ""] = process.argv.slice(2);
+const out = resolve(here, "..", outName);
 const chromePath = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const profile = mkdtempSync(join(tmpdir(), "yamlite-demo-"));
@@ -35,7 +39,9 @@ try {
     mobile: false,
   });
   await cdp("Page.enable");
-  await cdp("Page.navigate", { url: pathToFileURL(join(here, "index.html")).href });
+  const url = pathToFileURL(join(here, page));
+  url.search = query;
+  await cdp("Page.navigate", { url: url.href });
   const evaluate = async (expression) =>
     (await cdp("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true })).result.value;
   while ((await evaluate("document.readyState")) !== "complete") await sleep(50);
