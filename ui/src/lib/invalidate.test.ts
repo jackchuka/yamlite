@@ -20,6 +20,7 @@ test("a sync with changes refetches that table's rows and records and the counts
   expect(invalidationsFor(sync({ changes: [{ key: "a", op: "toDb" }] }))).toEqual([
     ["rows", "tasks"],
     ["record", "tasks"],
+    ["history", "tasks"],
     ["refKeys", "tasks"],
     ["schema"],
     ["meta"],

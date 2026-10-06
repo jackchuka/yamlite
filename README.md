@@ -183,6 +183,7 @@ yamlite serve notes --open
 - `serve` and `watch` cannot run on the same folder at the same time.
 - `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
 - The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
+- A record's History tab lists the git commits that changed it, newest first, with uncommitted changes on top: each shows the fields it changed, and the YAML diff on request. Renames are followed, and in a list file only the commits that changed that record are shown. "この版に戻す" (restore this version) puts an older version's values into the form without saving them. It needs `git` and only reads the repository; the static export has no History tab.
 
 ## Pages
 

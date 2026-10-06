@@ -2,6 +2,7 @@ import type {
   ConflictDetail,
   ConflictEntry,
   Filter,
+  HistoryPage,
   Meta,
   RecordDetail,
   Row,
@@ -107,6 +108,13 @@ export const httpApi = {
   rename: (table: string, key: string, to: string) =>
     request<{ key: string }>("POST", `${rowPath(table, key)}/rename`, { to }),
   remove: (table: string, key: string) => request<{ ok: true }>("DELETE", rowPath(table, key)),
+  history: (table: string, key: string, cursor?: string) =>
+    request<HistoryPage>(
+      "GET",
+      `${rowPath(table, key)}/history${cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`}`,
+    ),
+  historyDiff: (table: string, key: string, rev: string) =>
+    request<{ text: string }>("GET", `${rowPath(table, key)}/history/${enc(rev)}/diff`),
   createTable: (body: {
     name: string;
     mode?: "files" | "list";
@@ -148,6 +156,8 @@ export const api: Api = {
   update: (table, key, values, base) => backend.update(table, key, values, base),
   rename: (table, key, to) => backend.rename(table, key, to),
   remove: (table, key) => backend.remove(table, key),
+  history: (table, key, cursor) => backend.history(table, key, cursor),
+  historyDiff: (table, key, rev) => backend.historyDiff(table, key, rev),
   createTable: (body) => backend.createTable(body),
   setGroup: (table, group) => backend.setGroup(table, group),
   sql: (sql) => backend.sql(sql),

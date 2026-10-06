@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -267,4 +268,32 @@ test("dates are edited with pickers, keep their offset, and values out of bounds
   expect(text).toContain("# release");
   expect(text).toMatch(/due: "?2026-10-31"?\n/);
   expect(text).toMatch(/at: "?2026-10-06T12:30:00\+09:00"?\n/);
+});
+
+test("an edit from the form shows up in History as an uncommitted change", async ({ page }) => {
+  app = await start({ "tasks/fix-ci.yaml": "title: Fix CI\n" }, (r) => (app = r));
+  const running = app;
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "alice",
+    GIT_AUTHOR_EMAIL: "alice@example.com",
+    GIT_COMMITTER_NAME: "alice",
+    GIT_COMMITTER_EMAIL: "alice@example.com",
+  };
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: running.root, env });
+  git("init", "-q", "-b", "main");
+  writeFileSync(join(running.root, ".gitignore"), ".yamlite/\n");
+  git("add", "-A");
+  git("commit", "-q", "-m", "add fix-ci");
+  await page.goto(running.url);
+  await page.getByRole("row", { name: /fix-ci/ }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await drawer.getByLabel("title", { exact: true }).fill("Fix flaky CI");
+  await drawer.getByRole("button", { name: /Save/ }).click();
+  await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix flaky CI\n");
+  await drawer.getByRole("tab", { name: /History/ }).click();
+  await expect(drawer.getByText("未コミットの変更")).toBeVisible();
+  await expect(drawer.getByText("add fix-ci")).toBeVisible();
 });

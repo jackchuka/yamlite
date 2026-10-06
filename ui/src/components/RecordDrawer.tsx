@@ -20,8 +20,10 @@ import { cn } from "@/lib/utils";
 import { MIN_WIDTH, maxWidth, useDrawerWidth } from "@/lib/drawerWidth";
 import { isReadOnly } from "@/lib/mode";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
+import { historyCount, restoreDraft, useRecordHistory } from "@/lib/recordHistory";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
+import { RecordHistory } from "./RecordHistory";
 import { ReflectBadge } from "./ReflectBadge";
 import { StaleDialog } from "./StaleDialog";
 
@@ -69,6 +71,9 @@ export function RecordDrawer({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [tab, setTab] = useState("form");
+  // the short sha the form was filled from, until it is saved or discarded
+  const [restoredFrom, setRestoredFrom] = useState<string | null>(null);
+  const history = useRecordHistory(table.name, recordKey, tab === "history" && !isReadOnly());
   // bumped when the form is reloaded from outside, so every field remounts with fresh state
   const [version, setVersion] = useState(0);
   const dirty = base !== null && draft !== null && changedFields(base, draft).length > 0;
@@ -90,6 +95,16 @@ export function RecordDrawer({
     setInvalid(new Set());
     setJsonError(null);
     setVersion((v) => v + 1);
+    setRestoredFrom(null);
+  }
+
+  function restore(record: Row, sha: string) {
+    if (!base) return;
+    setDraft(restoreDraft(base, record, table.key));
+    setInvalid(new Set());
+    setVersion((v) => v + 1);
+    setRestoredFrom(sha.slice(0, 7));
+    setTab("form");
   }
 
   const save = useMutation({
@@ -100,6 +115,7 @@ export function RecordDrawer({
       const next = { ...base, ...vars.values };
       setBase(next);
       setDraft(next);
+      setRestoredFrom(null);
       // the cached row is pre-save; without this the refetch effect would revert the form to it
       client.setQueryData<RecordDetail>(["record", table.name, recordKey], (old) =>
         old ? { ...old, row: next } : old,
@@ -181,7 +197,9 @@ export function RecordDrawer({
 
   const fields = Object.keys(table.columns).filter((c) => c !== table.key);
   const extra = Object.keys(draft).filter((c) => c !== table.key && !fields.includes(c));
-  const changes = changedFields(base, draft).length;
+  const changed = new Set(changedFields(base, draft));
+  const changes = changed.size;
+  const count = historyCount(history.data?.pages);
 
   return (
     <aside aria-label="record" className={cn(panel, "flex flex-col")} style={{ width }}>
@@ -203,6 +221,12 @@ export function RecordDrawer({
             <TabsTrigger value="form">Form</TabsTrigger>
             <TabsTrigger value="json">JSON</TabsTrigger>
             <TabsTrigger value="yaml">File</TabsTrigger>
+            {!isReadOnly() && (
+              <TabsTrigger value="history">
+                History
+                {count !== null && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{count}</span>}
+              </TabsTrigger>
+            )}
           </TabsList>
           <button type="button" aria-label="close" onClick={close} className="text-muted-foreground">
             <X className="size-4" />
@@ -215,7 +239,10 @@ export function RecordDrawer({
             {[...fields, ...extra].map((f) => {
               const reference = table.references.find((r) => r.column === f);
               return (
-                <div key={f} className="mb-3.5">
+                <div
+                  key={f}
+                  className={cn("mb-3.5", restoredFrom && changed.has(f) && "-mx-2 rounded-md bg-warn-soft px-2 py-1")}
+                >
                   <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground">
                     <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
                       {f}
@@ -285,12 +312,29 @@ export function RecordDrawer({
             theme={isDark() ? "dark" : "light"}
           />
         </TabsContent>
+        {!isReadOnly() && (
+          <TabsContent value="history" className="min-h-0 flex-1 overflow-auto px-4 py-3">
+            <RecordHistory
+              table={table.name}
+              recordKey={recordKey}
+              query={history}
+              current={base}
+              keyColumn={table.key}
+              canRestore={editable}
+              onRestore={restore}
+            />
+          </TabsContent>
+        )}
       </Tabs>
       {!isReadOnly() && (
         <div className="flex items-center gap-2 border-t px-4 py-2.5">
           <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground">
             {changes > 0 ? (
-              `変更 ${changes} 件 · 保存するとファイルに反映`
+              restoredFrom ? (
+                `${restoredFrom} の値に戻しました · ${changes} 項目が未保存`
+              ) : (
+                `変更 ${changes} 件 · 保存するとファイルに反映`
+              )
             ) : (
               <ReflectBadge table={table.name} recordKey={recordKey} />
             )}
