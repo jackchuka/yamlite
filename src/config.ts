@@ -4,6 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { parse } from "yaml";
 import { instant, isDate, isDatetime } from "./datetime.ts";
 import { claims } from "./source/files.ts";
+import { markdownExt } from "./source/markdown.ts";
 import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
 import {
   type AllowedValue,
@@ -70,14 +71,14 @@ export function expandPath(p: string, base: string): string {
 }
 
 const WILDCARD = /[*?[{]/;
-const FILE_GLOB_TAIL = /\*\.(?:md|ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
+const FILE_GLOB_TAIL = /\*\.(?:mdx?|ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
 
 // "content/blog/**/*.yaml" → base "content/blog", glob "**/*.yaml"
 export function splitFiles(where: string, files: string): { base: string; glob: string } {
   const parts = files.split("/");
   const i = parts.findIndex((p) => WILDCARD.test(p));
   if (i < 0 || !FILE_GLOB_TAIL.test(files)) {
-    throw new Error(`${where}files must end in *.md, *.yaml, *.yml or *.{yaml,yml}`);
+    throw new Error(`${where}files must end in *.md, *.mdx, *.yaml, *.yml or *.{yaml,yml}`);
   }
   const tail = parts.slice(i);
   if (tail.some((p) => p === "." || p === "..")) throw new Error(`${where}files cannot use . or .. after a wildcard`);
@@ -237,9 +238,9 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
   }
   const where = `table "${t.name}": `;
   const columns = toColumns(where, t.columns);
-  const codec = t.glob !== null && t.glob.endsWith(".md") ? "markdown" : "yaml";
+  const codec = markdownExt(t.glob) !== null ? "markdown" : "yaml";
   if (t.body !== undefined) {
-    if (codec !== "markdown") throw new Error(`${where}body is only for *.md files`);
+    if (codec !== "markdown") throw new Error(`${where}body is only for *.md and *.mdx files`);
     if (typeof t.body !== "string" || t.body === "") throw new Error(`${where}body must be a column name`);
     if (t.body === (t.key ?? "id")) throw new Error(`${where}body cannot be the key column`);
   }
@@ -617,7 +618,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       inCode.add(t.name);
     }
     // a declared files table covering a folder or file keeps the conventions from making it a table of its own
-    const codecOf = (glob: string | null) => (glob !== null && glob.endsWith(".md") ? "markdown" : "yaml");
+    const codecOf = (glob: string | null) => (markdownExt(glob) !== null ? "markdown" : "yaml");
     const globs = [...declared.values()].filter((d) => d.glob !== null);
     const covered = (s: Located) =>
       s.glob !== null

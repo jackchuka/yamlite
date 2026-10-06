@@ -440,7 +440,7 @@ test("a path to the root suggests files without a leading slash", () => {
 
 test.each([
   ['    path: a.yaml\n    files: "a/*.yaml"\n', 'table "t": use either path or files, not both'],
-  ['    files: "a/*.json"\n', 'table "t": files must end in *.md, *.yaml, *.yml or *.{yaml,yml}'],
+  ['    files: "a/*.json"\n', 'table "t": files must end in *.md, *.mdx, *.yaml, *.yml or *.{yaml,yml}'],
   ['    files: "a/**/../*.yaml"\n', 'table "t": files cannot use . or .. after a wildcard'],
 ])("rejects files: %j", (entry, message) => {
   const root = tmpRoot();
@@ -505,8 +505,16 @@ test("a *.md glob makes a Markdown table whose body column is marked markdown", 
   expect(t.posts?.formats).toEqual({ content: "markdown", summary: "markdown" });
 });
 
+test("a *.mdx glob makes a Markdown table too", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "docs/**/*.mdx"\n');
+  const [t] = resolveConfig({ root }).tables;
+  expect(t).toMatchObject({ mode: "files", glob: "**/*.mdx", codec: "markdown", body: "body" });
+  expect(t?.formats).toEqual({ body: "markdown" });
+});
+
 test.each([
-  ['    files: "t/**/*.yaml"\n    body: text\n', 'table "t": body is only for *.md files'],
+  ['    files: "t/**/*.yaml"\n    body: text\n', 'table "t": body is only for *.md and *.mdx files'],
   ['    files: "t/*.md"\n    body: ""\n', 'table "t": body must be a column name'],
   ['    files: "t/*.md"\n    key: text\n    body: text\n', 'table "t": body cannot be the key column'],
 ])("rejects body: %j", (entry, message) => {

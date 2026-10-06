@@ -3,6 +3,7 @@ import { isAbsolute, join, relative } from "node:path";
 import { encode, recordToRow } from "../../codec.ts";
 import { canonical } from "../../hash.ts";
 import { invalidKey } from "../../source/files.ts";
+import { markdownExt } from "../../source/markdown.ts";
 import { q } from "../../store.ts";
 import { type DbRow, own, type TableSpec } from "../../types.ts";
 import { type ApiContext, displayPath, findView, tableSpec, type ViewTarget } from "../context.ts";
@@ -14,7 +15,7 @@ import type { Routes } from "./index.ts";
 
 export function recordFile(spec: TableSpec, key: string): string {
   if (spec.mode === "list") return spec.path;
-  const exts = spec.codec === "markdown" ? [".md"] : [".yaml", ".yml"];
+  const exts = spec.codec === "markdown" ? [markdownExt(spec.glob) ?? ".md"] : [".yaml", ".yml"];
   for (const ext of exts) {
     const path = join(spec.path, `${key}${ext}`);
     if (existsSync(path)) return path;

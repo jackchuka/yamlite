@@ -36,6 +36,28 @@ test("an Obsidian-like vault syncs both ways and leaves everything but notes alo
   await y.close();
 });
 
+test("an MDX docs folder: JSX in the body stays as written, and new records become .mdx files", async () => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "docs/**/*.mdx"\n');
+  const page = '---\ntitle: Guide\nlocale: ja\n---\n\n<Section id="intro">\n\n# Guide\n\n</Section>\n';
+  write(join(root, "docs/guide/ja.mdx"), page);
+  write(join(root, "docs/README.md"), "# not a record\n");
+  const y = await open({ root });
+  const [r] = await y.sync();
+  expect(r?.ok).toBe(true);
+  expect(sql(db(root), "SELECT id, title, body FROM docs")).toEqual([
+    { id: "guide/ja", title: "Guide", body: '\n<Section id="intro">\n\n# Guide\n\n</Section>\n' },
+  ]);
+
+  sql(db(root), "UPDATE docs SET title = 'Handbook' WHERE id = 'guide/ja'");
+  sql(db(root), "INSERT INTO docs (id, title, body) VALUES ('guide/en', 'Guide', '<Note />' || char(10))");
+  await y.sync();
+  expect(read(join(root, "docs/guide/ja.mdx"))).toBe(page.replace("title: Guide", "title: Handbook"));
+  expect(read(join(root, "docs/guide/en.mdx"))).toBe("---\ntitle: Guide\n---\n<Note />\n");
+  expect(read(join(root, "docs/README.md"))).toBe("# not a record\n");
+  await y.close();
+});
+
 test("an Astro-like posts folder: an UPDATE changes one front matter line and nothing else", async () => {
   const root = dataRoot();
   write(join(root, "yamlite.yaml"), 'tables:\n  posts:\n    files: "blog/**/*.md"\n    body: content\n');
