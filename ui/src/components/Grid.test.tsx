@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeAll, expect, test, vi } from "vitest";
 import { setMobile } from "@/test/media";
+import { SearchTerm } from "@/lib/highlight";
 import { Grid } from "./Grid";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -148,4 +149,70 @@ test("a row's warning mark is big enough to tap on a phone", () => {
   const mark = container.querySelector('[aria-label="has warnings"]');
   expect(mark?.className).toContain("max-md:min-w-8");
   expect(mark?.className).toContain("max-md:min-h-8");
+});
+
+test("the key column can be unpinned and pinned again", () => {
+  const onTogglePin = vi.fn();
+  const columns = [
+    { name: "id", type: "TEXT" as const },
+    { name: "title", type: "TEXT" as const },
+  ];
+  const { rerender } = render(
+    <Grid columns={columns} rows={[{ id: "a", title: "A" }]} keyCol="id" onTogglePin={onTogglePin} />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "unpin key column" }));
+  expect(onTogglePin).toHaveBeenCalledOnce();
+  rerender(
+    <Grid columns={columns} rows={[{ id: "a", title: "A" }]} keyCol="id" pinned={false} onTogglePin={onTogglePin} />,
+  );
+  expect(screen.getAllByRole("columnheader")[0]?.className).not.toContain("sticky");
+  expect(screen.getAllByRole("gridcell")[0]?.className).not.toContain("sticky");
+  expect(screen.getByRole("button", { name: "pin key column" }).getAttribute("aria-pressed")).toBe("false");
+});
+
+test("a resized column gets its width, and dragging its edge resizes it without sorting", () => {
+  const onResize = vi.fn();
+  const onSort = vi.fn();
+  const { container } = render(
+    <Grid
+      columns={[
+        { name: "id", type: "TEXT" },
+        { name: "title", type: "TEXT" },
+      ]}
+      rows={[{ id: "a", title: "A" }]}
+      keyCol="id"
+      widths={{ title: 300 }}
+      onResize={onResize}
+      onSort={onSort}
+    />,
+  );
+  const header = container.querySelector<HTMLElement>('[role="row"]');
+  expect(header?.style.gridTemplateColumns).toBe("minmax(160px, 220px) 300px");
+  const edge = screen.getByRole("separator", { name: "Resize title" });
+  fireEvent.pointerDown(edge, { button: 0, clientX: 100, pointerId: 1 });
+  fireEvent.pointerMove(document, { clientX: 140, pointerId: 1 });
+  fireEvent.pointerUp(document, { pointerId: 1 });
+  expect(onResize).toHaveBeenLastCalledWith("title", 340);
+  fireEvent.keyDown(edge, { key: "ArrowLeft" });
+  expect(onResize).toHaveBeenLastCalledWith("title", 284);
+  fireEvent.doubleClick(edge);
+  expect(onResize).toHaveBeenLastCalledWith("title", null);
+  expect(onSort).not.toHaveBeenCalled();
+});
+
+test("search matches are marked in text and reference cells", () => {
+  const { container } = render(
+    <SearchTerm.Provider value="li">
+      <Grid
+        columns={[
+          { name: "id", type: "TEXT" },
+          { name: "owner", type: "TEXT", reference: { column: "owner", table: "people" } },
+        ]}
+        rows={[{ id: "alice-task", owner: "alice" }]}
+        keyCol="id"
+      />
+    </SearchTerm.Provider>,
+  );
+  expect([...container.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["li", "li"]);
+  expect(screen.getByRole("link").getAttribute("aria-label")).toBe("open people alice");
 });

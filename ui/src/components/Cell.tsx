@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { cellView } from "@/lib/cell";
+import { Highlight } from "@/lib/highlight";
 import type { ColumnType } from "@/lib/types";
 import { JsonPopover } from "./JsonPopover";
 
@@ -31,15 +32,23 @@ export function Cell({
         </span>
       );
     case "number":
-      return <span className="font-mono tabular-nums">{v.text}</span>;
+      return (
+        <span className="font-mono tabular-nums">
+          <Highlight text={v.text} />
+        </span>
+      );
     case "text":
-      return <span>{v.text}</span>;
+      return (
+        <span>
+          <Highlight text={v.text} />
+        </span>
+      );
     case "chips":
       return (
         <span>
           {v.items.map((item, i) => (
             <span key={`${i}-${item}`} className={chip}>
-              {item}
+              <Highlight text={item} />
             </span>
           ))}
           {v.more > 0 && <span className={chip}>+{v.more}</span>}
@@ -52,7 +61,7 @@ export function Cell({
             {v.entries.map(([k, text]) => (
               <span key={k} className="mr-1.5">
                 <span className="mr-0.5 text-[11px] text-muted-foreground">{k}</span>
-                {text}
+                <Highlight text={text} />
               </span>
             ))}
             {v.more > 0 && <span className="text-muted-foreground">+{v.more}</span>}

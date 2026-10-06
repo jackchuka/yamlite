@@ -136,7 +136,7 @@ export class PageHost {
           offset: typeof o.offset === "number" ? o.offset : 0,
           sort: typeof o.sort === "string" ? o.sort : undefined,
           filters: Array.isArray(o.filter) ? (o.filter as Filter[]) : [],
-          prefix: typeof o.prefix === "string" ? o.prefix : undefined,
+          search: typeof o.search === "string" ? o.search : undefined,
         });
       }
       case "get": {

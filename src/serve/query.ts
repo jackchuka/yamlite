@@ -18,7 +18,7 @@ export interface RowQuery {
   offset: number;
   sort: { col: string; dir: "asc" | "desc" } | null;
   filters: Filter[];
-  prefix: string | null;
+  search: string | null;
 }
 
 const COMPARE: Partial<Record<FilterOp, string>> = { eq: "=", ne: "<>", lt: "<", lte: "<=", gt: ">", gte: ">=" };
@@ -59,15 +59,11 @@ export function parseRowQuery(params: URLSearchParams): RowQuery {
       return { col: f.col, op: f.op as FilterOp, value: f.value };
     });
   }
-  const prefix = params.get("prefix");
-  return { limit, offset, sort, filters, prefix: prefix === "" ? null : prefix };
+  const search = params.get("q")?.trim();
+  return { limit, offset, sort, filters, search: search ? search : null };
 }
 
-export function buildWhere(
-  query: RowQuery,
-  columns: Map<string, ColumnType>,
-  keyCol: string,
-): { where: string; params: DbValue[] } {
+export function buildWhere(query: RowQuery, columns: Map<string, ColumnType>): { where: string; params: DbValue[] } {
   const parts: string[] = [];
   const params: DbValue[] = [];
   for (const f of query.filters) {
@@ -89,10 +85,12 @@ export function buildWhere(
       parts.push(`${c} IS ${f.op === "null" ? "" : "NOT "}NULL`);
     }
   }
-  if (query.prefix !== null) {
-    // substr instead of LIKE: no wildcards to escape, and case-sensitive like file names
-    parts.push(`substr(${q(keyCol)}, 1, ?) = ?`);
-    params.push([...query.prefix].length, query.prefix);
+  if (query.search !== null) {
+    // instr instead of LIKE: no wildcards to escape; booleans are 0 or 1 and would match every digit search
+    const searched = [...columns].filter(([, type]) => type !== "BOOLEAN").map(([name]) => name);
+    const any = searched.map((name) => `instr(lower(CAST(${q(name)} AS TEXT)), lower(?)) > 0`);
+    parts.push(any.length > 0 ? `(${any.join(" OR ")})` : "0");
+    params.push(...searched.map(() => query.search as string));
   }
   return { where: parts.length > 0 ? `WHERE ${parts.join(" AND ")}` : "", params };
 }

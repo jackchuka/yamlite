@@ -76,7 +76,7 @@ test("meta lists the views under their table", async () => {
   ]);
 });
 
-test("a view's rows come back typed, in identity order, with sort, filters and prefix", async () => {
+test("a view's rows come back typed, in identity order, with sort, filters and search", async () => {
   t = await startServe(files, config);
   await ready(t);
   const rows = (query = "") => t!.api(`/api/tables/projects__milestones/rows${query}`);
@@ -93,7 +93,8 @@ test("a view's rows come back typed, in identity order, with sort, filters and p
   expect(ids((await rows("?sort=title:desc")).body).map((r) => r[2])).toEqual(["Launch", "Draft", "Design"]);
   const carol = encodeURIComponent(JSON.stringify([{ col: "owner", op: "eq", value: "carol" }]));
   expect(ids((await rows(`?filter=${carol}`)).body)).toEqual([["website", 1, "Launch"]]);
-  expect((await rows("?prefix=web")).body.total).toBe(2);
+  expect((await rows("?q=web")).body.total).toBe(2);
+  expect(ids((await rows("?q=launch")).body)).toEqual([["website", 1, "Launch"]]);
 });
 
 test("a view is read-only", async () => {

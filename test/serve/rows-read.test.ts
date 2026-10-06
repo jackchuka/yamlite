@@ -62,10 +62,19 @@ test("filters", async () => {
   expect((await rows(t, "?filter=not-json")).status).toBe(400);
 });
 
-test("the key prefix is literal, not a LIKE pattern", async () => {
+test("search matches any column, ignoring case, and is literal", async () => {
   t = await startServe(tasks);
-  expect(ids((await rows(t, "?prefix=a_")).body)).toEqual(["a_1"]);
-  expect(ids((await rows(t, "?prefix=a")).body)).toEqual(["a", "a_1", "ab"]);
+  expect(ids((await rows(t, "?q=MILK")).body)).toEqual(["a"]);
+  expect(ids((await rows(t, "?q=ab")).body)).toEqual(["ab"]);
+  expect(ids((await rows(t, "?q=work")).body)).toEqual(["a_1"]);
+  expect(ids((await rows(t, "?q=5")).body)).toEqual(["b"]);
+  expect(ids((await rows(t, "?q=a_")).body)).toEqual(["a_1"]);
+  expect(ids((await rows(t, "?q=%25")).body)).toEqual([]);
+});
+
+test("search skips booleans, so 1 does not find every done task", async () => {
+  t = await startServe(tasks);
+  expect(ids((await rows(t, "?q=1")).body)).toEqual(["a_1"]);
 });
 
 test("big integers keep every digit", async () => {

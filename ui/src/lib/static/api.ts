@@ -74,15 +74,9 @@ export function createStaticApi(opts: {
     return { columns: r.columns, rows: r.rows.map((row) => toWire(row, new Map())), truncated: r.truncated, ms };
   }
 
-  function page(
-    name: string,
-    types: Map<string, ColumnType>,
-    keyCols: string[],
-    prefixCol: string,
-    qs: URLSearchParams,
-  ): RowsPage {
+  function page(name: string, types: Map<string, ColumnType>, keyCols: string[], qs: URLSearchParams): RowsPage {
     const rq = parseRowQuery(qs);
-    const { where, params } = buildWhere(rq, types, prefixCol);
+    const { where, params } = buildWhere(rq, types);
     const total = Number(all(`SELECT count(*) AS n FROM ${q(name)} ${where}`, params).rows[0]?.n ?? 0);
     const found = all(`SELECT * FROM ${q(name)} ${where} ${orderBy(rq, types, keyCols)} LIMIT ? OFFSET ?`, [
       ...params,
@@ -105,17 +99,11 @@ export function createStaticApi(opts: {
         const view = meta.views.find((v) => v.name === table);
         if (view) {
           if (!view.inDb) return { rows: [], total: 0 };
-          return page(
-            view.name,
-            new Map(Object.entries(view.columns)),
-            view.identity,
-            view.identity[0] as string,
-            rowsQuery(p),
-          );
+          return page(view.name, new Map(Object.entries(view.columns)), view.identity, rowsQuery(p));
         }
         const t = tableOf(table);
         if (!t.inDb) return { rows: [], total: 0 };
-        return page(t.name, new Map(Object.entries(t.columns)), [t.key], t.key, rowsQuery(p));
+        return page(t.name, new Map(Object.entries(t.columns)), [t.key], rowsQuery(p));
       }),
     schema: (table) =>
       guard(() => {
