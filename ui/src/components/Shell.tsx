@@ -12,6 +12,7 @@ import { NewTableDialog } from "./NewTableDialog";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
+import { m } from "@/paraglide/messages.js";
 
 export function Shell() {
   const { configError } = useEvents();
@@ -25,7 +26,7 @@ export function Shell() {
         <SessionBanner />
         {configError && (
           <div role="alert" className="bg-warn-soft px-4 py-2 text-[12px] text-warn">
-            yamlite.yaml を読み込めません。前回の設定で同期を続けています: {configError}
+            {m.shell_config_error({ error: configError })}
           </div>
         )}
         {mobile && <MobileNav onNewTable={() => setNewTable(true)} />}

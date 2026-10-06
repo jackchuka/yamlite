@@ -24,6 +24,7 @@ import { FormField } from "./FormField";
 import { RecordHistory } from "./RecordHistory";
 import { ReflectBadge } from "./ReflectBadge";
 import { StaleDialog } from "./StaleDialog";
+import { m } from "@/paraglide/messages.js";
 
 // a field named like a prototype member ("constructor") has no declared type unless the table has that column
 const columnType = (table: TableMeta, field: string): ColumnType | undefined =>
@@ -158,7 +159,7 @@ export function RecordDrawer({
     const keep = (target: EventTarget | null) =>
       !(target instanceof Element) ||
       target.closest(
-        'aside[aria-label="record"], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]',
+        'aside[data-record-drawer], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]',
       ) !== null;
     // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away
     const onClick = (e: MouseEvent) => {
@@ -190,12 +191,13 @@ export function RecordDrawer({
 
   if (error) {
     return (
-      <aside aria-label="record" className={cn(panel, "p-4 text-err")} style={size}>
+      <aside data-record-drawer aria-label={m.record_label()} className={cn(panel, "p-4 text-err")} style={size}>
         {error.message}
       </aside>
     );
   }
-  if (!draft || !base || !data) return <aside aria-label="record" className={panel} style={size} />;
+  if (!draft || !base || !data)
+    return <aside data-record-drawer aria-label={m.record_label()} className={panel} style={size} />;
 
   const fields = Object.keys(table.columns).filter((c) => c !== table.key);
   const extra = Object.keys(draft).filter((c) => c !== table.key && !fields.includes(c));
@@ -204,8 +206,8 @@ export function RecordDrawer({
   const count = historyCount(history.data?.pages);
 
   return (
-    <aside aria-label="record" className={cn(panel, "flex flex-col")} style={size}>
-      {!mobile && <PanelResizeHandle width={width} label="Resize record panel" onResize={setWidth} />}
+    <aside data-record-drawer aria-label={m.record_label()} className={cn(panel, "flex flex-col")} style={size}>
+      {!mobile && <PanelResizeHandle width={width} label={m.record_resize()} onResize={setWidth} />}
       <Tabs
         value={tab}
         onValueChange={(next) => {
@@ -218,7 +220,12 @@ export function RecordDrawer({
       >
         <div className="flex items-center gap-2 border-b px-4 py-3 max-md:flex-wrap max-md:gap-1 max-md:px-2 max-md:pt-[calc(0.5rem+env(safe-area-inset-top))] max-md:pb-2">
           {mobile && (
-            <button type="button" aria-label="close" onClick={close} className="grid size-10 place-items-center">
+            <button
+              type="button"
+              aria-label={m.common_close_lower()}
+              onClick={close}
+              className="grid size-10 place-items-center"
+            >
               <ArrowLeft className="size-5" />
             </button>
           )}
@@ -226,23 +233,23 @@ export function RecordDrawer({
           {headerActions}
           <TabsList className="ml-auto h-7 max-md:order-last max-md:ml-0 max-md:h-9 max-md:w-full">
             <TabsTrigger value="form" className={tabTrigger}>
-              Form
+              {m.record_tab_form()}
             </TabsTrigger>
             <TabsTrigger value="json" className={tabTrigger}>
               JSON
             </TabsTrigger>
             <TabsTrigger value="yaml" className={tabTrigger}>
-              File
+              {m.record_tab_file()}
             </TabsTrigger>
             {!isReadOnly() && (
               <TabsTrigger value="history" className={tabTrigger}>
-                History
+                {m.record_tab_history()}
                 {count !== null && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{count}</span>}
               </TabsTrigger>
             )}
           </TabsList>
           {!mobile && (
-            <button type="button" aria-label="close" onClick={close} className="text-muted-foreground">
+            <button type="button" aria-label={m.common_close_lower()} onClick={close} className="text-muted-foreground">
               <X className="size-4" />
             </button>
           )}
@@ -260,7 +267,7 @@ export function RecordDrawer({
             e.target.scrollIntoView?.({ block: "center" })
           }
         >
-          {!connected && <p className="mb-2 text-[11.5px] text-err">接続が切れています</p>}
+          {!connected && <p className="mb-2 text-[11.5px] text-err">{m.record_disconnected()}</p>}
           <fieldset disabled={!editable} className="m-0 min-w-0 border-0 p-0">
             {[...fields, ...extra].map((f) => {
               const reference = table.references.find((r) => r.column === f);
@@ -272,10 +279,12 @@ export function RecordDrawer({
                   <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground max-md:text-[13px]">
                     <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
                       {f}
-                      {table.required.includes(f) && <span aria-label="required"> *</span>}
+                      {table.required.includes(f) && <span aria-label={m.record_required()}> *</span>}
                     </span>
                     <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
-                      {reference ? `→ ${reference.table}` : (columnFormat(table, f) ?? columnType(table, f) ?? "new")}
+                      {reference
+                        ? `→ ${reference.table}`
+                        : (columnFormat(table, f) ?? columnType(table, f) ?? m.record_new_column())}
                     </span>
                   </div>
                   <FormField
@@ -306,7 +315,7 @@ export function RecordDrawer({
         </TabsContent>
         <TabsContent value="json" className="min-h-0 flex-1 overflow-auto px-4 py-3">
           <CodeMirror
-            aria-label="record JSON"
+            aria-label={m.record_json()}
             value={JSON.stringify(draft, null, 2)}
             extensions={[json(), EditorView.lineWrapping]}
             theme={isDark() ? "dark" : "light"}
@@ -315,7 +324,7 @@ export function RecordDrawer({
               try {
                 const parsed: unknown = JSON.parse(text);
                 if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-                  throw new Error("a record must be a JSON object");
+                  throw new Error(m.record_json_not_object());
                 }
                 setDraft({ ...(parsed as Row), [table.key]: draft[table.key] });
                 setInvalid((p) => new Set([...p].filter((x) => x !== "$json")));
@@ -331,7 +340,7 @@ export function RecordDrawer({
         <TabsContent value="yaml" className="min-h-0 flex-1 overflow-auto px-4 py-3">
           {data.yamlError && <p className="mb-2 text-[11.5px] text-err">{data.yamlError}</p>}
           <CodeMirror
-            aria-label="record file"
+            aria-label={m.record_file()}
             value={data.yaml ?? "# not written to a file yet"}
             extensions={[yaml(), EditorView.lineWrapping]}
             editable={false}
@@ -357,9 +366,9 @@ export function RecordDrawer({
           <span className="mr-auto flex min-w-0 flex-col text-[11px] text-muted-foreground max-md:basis-full max-md:text-[12px]">
             {changes > 0 ? (
               restoredFrom ? (
-                `${restoredFrom} の値に戻しました · ${changes} 項目が未保存`
+                m.record_restored({ from: restoredFrom, count: changes })
               ) : (
-                `変更 ${changes} 件 · 保存するとファイルに反映`
+                m.record_changes({ count: changes })
               )
             ) : (
               <ReflectBadge table={table.name} recordKey={recordKey} />
@@ -371,23 +380,23 @@ export function RecordDrawer({
           <Button
             variant="ghost"
             size="icon"
-            aria-label="delete record"
+            aria-label={m.record_delete()}
             disabled={!connected}
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 className="size-4" />
           </Button>
           <Button variant="outline" size={mobile ? "lg" : "sm"} disabled={!dirty} onClick={() => reset(base)}>
-            Discard
+            {m.record_discard()}
           </Button>
           <Button
             size={mobile ? "lg" : "sm"}
             className="max-md:flex-1"
             disabled={!dirty || invalid.size > 0 || save.isPending || !connected}
-            title={connected ? undefined : "disconnected"}
+            title={connected ? undefined : m.common_disconnected_hint()}
             onClick={submit}
           >
-            {mobile ? "Save" : "Save ⌘S"}
+            {mobile ? m.common_save() : m.record_save_shortcut()}
           </Button>
         </div>
       )}
@@ -420,9 +429,9 @@ export function RecordDrawer({
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{recordKey} を削除しますか？</DialogTitle>
+              <DialogTitle>{m.record_delete_title({ key: recordKey })}</DialogTitle>
             </DialogHeader>
-            <p className="text-[12px] text-muted-foreground">{data.file} からも削除されます。</p>
+            <p className="text-[12px] text-muted-foreground">{m.record_delete_note({ file: data.file })}</p>
             {remove.error && <p className="text-[12px] text-err">{remove.error.message}</p>}
             <DialogFooter>
               <Button
@@ -432,10 +441,10 @@ export function RecordDrawer({
                   remove.reset();
                 }}
               >
-                キャンセル
+                {m.common_cancel()}
               </Button>
               <Button variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate()}>
-                削除
+                {m.common_delete()}
               </Button>
             </DialogFooter>
           </DialogContent>

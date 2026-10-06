@@ -42,8 +42,8 @@ test("references show their problems and indexes show whether they exist", async
   expect(await screen.findByText("projects.id")).toBeTruthy();
   expect(screen.getByText('project "blog" not found in projects.id (b)')).toBeTruthy();
   expect(screen.getByText("(project)")).toBeTruthy();
-  expect(screen.getAllByText("作成済み")).toHaveLength(1);
-  expect(screen.getByText("未作成")).toBeTruthy();
+  expect(screen.getAllByText("Created")).toHaveLength(1);
+  expect(screen.getByText("Not created")).toBeTruthy();
   expect(screen.getByText("by_hand")).toBeTruthy();
   expect(screen.getByText("tasks/**/*.{yaml,yml}")).toBeTruthy();
 });
@@ -128,8 +128,8 @@ test("a view's schema comes from its meta, without a request", () => {
   expect(screen.getByText("projects_id, idx")).toBeTruthy();
   const label = (column: string) => screen.getByText(column).closest("tr")?.children[2]?.textContent;
   expect(label("idx")).toBe("identity");
-  expect(label("title")).toBe("宣言済み · required");
-  expect(label("points")).toBe("推論");
+  expect(label("title")).toBe("declared · required");
+  expect(label("points")).toBe("inferred");
   expect(screen.getByText("Design, Launch")).toBeTruthy();
   expect(api.schema).not.toHaveBeenCalled();
 });
@@ -159,7 +159,7 @@ test("a column's allowed values are listed", async () => {
     </QueryClientProvider>,
   );
   expect(await screen.findByText("todo, done")).toBeTruthy();
-  expect(screen.getByText("status").closest("tr")?.children[2]?.textContent).toBe("宣言済み · required");
+  expect(screen.getByText("status").closest("tr")?.children[2]?.textContent).toBe("declared · required");
 });
 
 test("columns show their format and bounds", async () => {

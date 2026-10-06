@@ -181,17 +181,19 @@ yamlite serve notes --open
 
 The UI also works on a phone: below 768px wide the sidebar moves behind a menu button and records open full screen. To reach it from another device, start `serve` with `--host 0.0.0.0`.
 
+The UI is available in English and Japanese. It follows your browser language on the first visit; switch it from the language menu in the status bar.
+
 - It listens on `127.0.0.1:4610` and prints a URL with an access token (new for each run, reusable until the process stops); open that URL (or pass `--open`). Requests without the token, from other sites, or with an unexpected `Host` are refused.
 - `serve` and `watch` cannot run on the same folder at the same time.
 - `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
 - The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
-- A record's History tab lists the git commits that changed it, newest first, with uncommitted changes on top: each shows the fields it changed, and the YAML diff on request. Renames are followed, and in a list file only the commits that changed that record are shown. "この版に戻す" (restore this version) puts an older version's values into the form without saving them. It needs `git` and only reads the repository; the static export has no History tab.
+- A record's History tab lists the git commits that changed it, newest first, with uncommitted changes on top: each shows the fields it changed, and the YAML diff on request. Renames are followed, and in a list file only the commits that changed that record are shown. **Restore this version** puts an older version's values into the form without saving them. It needs `git` and only reads the repository; the static export has no History tab.
 
 ### Ask an AI agent
 
-If [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex) is on your PATH and logged in, `serve` adds an **AI に依頼** button. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the agent searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press 適用, and then it is saved like an edit in the form, so comments and the safety checks apply.
+If [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex) is on your PATH and logged in, `serve` adds an **Ask AI** button. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the agent searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press **Apply**, and then it is saved like an edit in the form, so comments and the safety checks apply.
 
-- Conversations stay listed under 会話 while `serve` runs. An agent left idle for 10 minutes is stopped, and your next message resumes the same conversation; stopping `serve` discards them.
+- Conversations stay listed under **Conversations** while `serve` runs. An agent left idle for 10 minutes is stopped, and your next message resumes the same conversation; stopping `serve` discards them.
 - yamlite talks to the agent over the [Agent Client Protocol](https://agentclientprotocol.com) through `claude-agent-acp` or `codex-acp`. If the adapter is not on your PATH, yamlite runs it with `npx`, which downloads it the first time.
 - The agent can read your data, read files, and search or fetch the web. It cannot run commands or write files: yamlite refuses shell commands, file edits and tools from other MCP servers. Writes happen only through proposals you apply.
 - Claude Code runs without your Claude Code settings, permission rules and hooks, and without its shell, edit and sub-agent tools. It reads files under the root without asking; when it asks to read anywhere else, yamlite refuses.
@@ -199,7 +201,7 @@ If [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https:/
 - A proposal is refused, with nothing written, if a record in it changed after it was made. It holds at most 500 rows. If applying would add rule warnings (required, allowed values, formats, bounds), the proposal shows them; they don't block applying, as with any other edit.
 - Reads can happen without asking: files under the root for both agents, and files outside it for Codex. Together with web fetching, a page the agent reads could instruct it to read your data or files and send them elsewhere through a later fetch. Keep this in mind with sensitive data, or start `serve --no-agent`.
 - With `--host 0.0.0.0`, anyone with the URL's token can use your agent and its usage limits.
-- Conversations and pending proposals are kept in memory; they are gone when `serve` stops. A conversation that no open panel is showing ends after 10 minutes without a running reply; its pending proposals stay under 未適用の提案.
+- Conversations and pending proposals are kept in memory; they are gone when `serve` stops. A conversation that no open panel is showing ends after 10 minutes without a running reply; its pending proposals stay under **Unapplied proposals**.
 
 ## Pages
 

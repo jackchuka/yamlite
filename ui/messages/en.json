@@ -1,0 +1,432 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "language_label": "Language",
+  "status_snapshot": "Read-only snapshot · {at} UTC",
+  "status_watching": "watching {root}",
+  "status_connected": "connected",
+  "status_disconnected": "disconnected",
+  "status_last_sync": "last sync {ago}",
+  "status_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "⚠ {count} warning",
+        "n=other": "⚠ {count} warnings"
+      }
+    }
+  ],
+  "status_conflicts": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "● {count} conflict",
+        "n=other": "● {count} conflicts"
+      }
+    }
+  ],
+  "status_theme": "theme: {theme}",
+  "theme_light": "light",
+  "theme_dark": "dark",
+  "theme_system": "system",
+  "common_close": "Close",
+  "common_no_tables": "No tables",
+  "common_disconnected_hint": "disconnected",
+  "shell_config_error": "Can't read yamlite.yaml. Syncing with the last good config: {error}",
+  "shell_session_expired": "Your session has expired. Reopen the URL that `yamlite serve` printed.",
+  "shell_placeholder": "{title} (coming soon)",
+  "shell_load_failed": "Couldn't load the snapshot",
+  "shell_load_file_protocol": "This page can't be opened from file://. Serve this folder over a web server instead (e.g. npx serve).",
+  "nav_sidebar": "sidebar",
+  "nav_menu": "menu",
+  "nav_search": "search",
+  "nav_search_placeholder": "Search…",
+  "nav_ask_ai": "Ask AI",
+  "nav_tables": "Tables",
+  "nav_pages": "Pages",
+  "nav_tools": "Tools",
+  "nav_new_table": "New table",
+  "nav_sql_console": "SQL console",
+  "nav_erd": "ERD",
+  "nav_sync": "Sync",
+  "nav_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} warning",
+        "n=other": "{count} warnings"
+      }
+    }
+  ],
+  "nav_footer_tables": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} table",
+        "n=other": "{count} tables"
+      }
+    }
+  ],
+  "nav_footer_db": "DB {db}",
+  "nav_new_record": "+ New record",
+  "nav_rename": "rename",
+  "nav_rename_key": "rename key",
+  "grid_resize": "Resize {column}",
+  "grid_key": "key",
+  "grid_unpin_key": "unpin key column",
+  "grid_pin_key": "pin key column",
+  "grid_unpin_key_hint": "Let the key column scroll",
+  "grid_pin_key_hint": "Keep the key column in place",
+  "filter_search": "search",
+  "filter_search_placeholder": "search all columns…",
+  "filter_add_filter": "+ filter",
+  "filter_column": "column",
+  "filter_operator": "operator",
+  "filter_value": "value",
+  "filter_add": "Add",
+  "filter_op_contains": "contains",
+  "filter_op_has": "has",
+  "filter_op_null": "is empty",
+  "filter_op_notnull": "is set",
+  "table_group": "Group",
+  "table_group_label": "group: {group}",
+  "table_group_none": "none",
+  "table_group_name": "group name",
+  "table_ungroup": "No group",
+  "common_save": "Save",
+  "table_from": "from {parent}",
+  "table_read_only_view": "read-only view",
+  "table_records": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} record",
+        "n=other": "{count} records"
+      }
+    }
+  ],
+  "table_rows": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} row",
+        "n=other": "{count} rows"
+      }
+    }
+  ],
+  "table_schema": "Schema",
+  "table_columns": "Columns",
+  "table_warnings": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} warning",
+        "n=other": "{count} warnings"
+      }
+    }
+  ],
+  "table_warning_list": "warnings",
+  "json_copy": "Copy",
+  "erd_problem": "problem",
+  "erd_key": "key",
+  "erd_reference": "reference",
+  "erd_show_views": "Show views",
+  "erd_relayout": "Re-layout",
+  "erd_hint_touch": "Tap to highlight relations · tap a title to open the table",
+  "erd_hint_pointer": "Click to highlight relations · double-click to open the table",
+  "record_label": "record",
+  "record_resize": "Resize record panel",
+  "common_close_lower": "close",
+  "record_tab_form": "Form",
+  "record_tab_file": "File",
+  "record_tab_history": "History",
+  "record_disconnected": "Connection lost",
+  "record_required": "required",
+  "record_new_column": "new",
+  "record_json": "record JSON",
+  "record_json_not_object": "a record must be a JSON object",
+  "record_file": "record file",
+  "record_restored": [
+    {
+      "declarations": ["input from", "input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "Restored the values from {from} · {count} field unsaved",
+        "n=other": "Restored the values from {from} · {count} fields unsaved"
+      }
+    }
+  ],
+  "record_changes": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} change · saving writes it to the file",
+        "n=other": "{count} changes · saving writes them to the file"
+      }
+    }
+  ],
+  "record_delete": "delete record",
+  "record_discard": "Discard",
+  "record_save_shortcut": "Save ⌘S",
+  "record_delete_title": "Delete {key}?",
+  "record_delete_note": "It is also removed from {file}.",
+  "common_cancel": "Cancel",
+  "common_delete": "Delete",
+  "record_stale_title": "Changed elsewhere",
+  "record_stale_description": "After you loaded it, these fields changed in the file or the DB.",
+  "record_stale_theirs": "Current value",
+  "record_stale_mine": "Your edit",
+  "record_reload": "Load latest",
+  "record_overwrite": "Overwrite",
+  "record_reflecting": "Reflecting…",
+  "record_reflected": "Reflected to {file}",
+  "record_reflect_failed": "⚠ Not reflected: {reason}",
+  "record_reflect_waiting": "Waiting to reflect",
+  "restore_to_db": "Restore the DB side",
+  "restore_to_file": "Restore the file side",
+  "restore_unavailable": "Can't restore",
+  "form_remove": "remove {item}",
+  "form_add_placeholder": "+ add",
+  "form_add_to": "add to {field}",
+  "form_add": "Add",
+  "form_new_key": "+ key",
+  "form_new_key_in": "new key in {field}",
+  "form_as": "{field} as {kind}",
+  "form_unset": "— (unset)",
+  "form_preview": "Preview",
+  "form_edit": "Edit",
+  "common_loading": "Loading…",
+  "history_fields": "Fields",
+  "history_yaml_diff": "YAML diff",
+  "history_unreadable": "This version can't be read",
+  "history_no_value_changes": "No value changes",
+  "history_restore_hint": "Puts this version's values into the form (does not save)",
+  "history_same_as_now": "Same as the current values",
+  "history_restore": "Restore this version",
+  "history_no_git": "No git history",
+  "history_no_git_detail": "This folder is outside a git repository.",
+  "history_no_commits": "Not committed yet",
+  "history_no_commits_detail": "Once you commit, changes show up here.",
+  "history_wip": "Uncommitted changes",
+  "history_uncommitted": "Uncommitted",
+  "history_created": "Created",
+  "history_deleted": "Deleted",
+  "history_load_older": "Load older history",
+  "history_just_now": "just now",
+  "history_none": "(none)",
+  "schema_none": "None",
+  "schema_view": "View",
+  "schema_parent": "parent",
+  "schema_identity": "identity",
+  "schema_db": "DB",
+  "schema_view_in_db": "VIEW exists",
+  "schema_not_yet": "Not yet",
+  "schema_columns": "Columns",
+  "schema_declared": "declared",
+  "schema_inferred": "inferred",
+  "schema_required": "required",
+  "schema_title": "Schema of {table}",
+  "schema_view_description": "A VIEW is a read-only table built from expand in yamlite.yaml.",
+  "schema_table_description": "What yamlite.yaml declares, and what is in the DB. To change it, edit yamlite.yaml.",
+  "schema_table": "Table",
+  "schema_path": "path",
+  "schema_key": "key",
+  "schema_table_in_db": "Table exists",
+  "schema_references": "References",
+  "schema_broken_refs": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "⚠ {count} broken reference",
+        "n=other": "⚠ {count} broken references"
+      }
+    }
+  ],
+  "schema_indexes": "Indexes",
+  "schema_created": "Created",
+  "schema_not_created": "Not created",
+  "schema_unmanaged_index": "Not managed by yamlite (created with SQL or similar)",
+  "schema_not_created_hint": "Why an index wasn't created is shown in the warnings on the Sync screen.",
+  "schema_expanded_views": "Expanded views",
+  "cmd_placeholder": "Search tables and screens…",
+  "cmd_empty": "Nothing found",
+  "cmd_views": "Views",
+  "sql_history": "History",
+  "sql_run_shortcut": "Run ⌘↵",
+  "sql_run": "Run",
+  "sql_rows": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} row",
+        "n=other": "{count} rows"
+      }
+    }
+  ],
+  "sql_truncated": " (first 1000 rows)",
+  "sql_changed": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "✓ {count} row changed",
+        "n=other": "✓ {count} rows changed"
+      }
+    }
+  ],
+  "sql_unmanaged": "{table} is not in yamlite.yaml, so it is not synced.",
+  "sql_adopt": "Add to yamlite.yaml",
+  "sql_touched_files": "Changed files",
+  "sql_confirm_title": "Run this?",
+  "sql_execute": "Run",
+  "sql_confirm_drop": "DROP can't be undone.",
+  "sql_confirm_no_where": "There is no WHERE, so every row is affected.",
+  "page_not_found": "Page not found",
+  "page_access": "access",
+  "page_blocked": "blocked: {list}",
+  "page_navigated": "The page moved to another URL, so it was disconnected.",
+  "page_reload": "Reload",
+  "agent_tool_schema": "Checking the tables",
+  "agent_tool_query": "Searching",
+  "agent_tool_get_records": "Reading records",
+  "agent_tool_propose_changes": "Proposing changes",
+  "agent_tool_propose_table": "Proposing a table",
+  "agent_tool_check": "Checking rules",
+  "agent_running": "{tool}…",
+  "agent_thinking": "Thinking…",
+  "agent_denied": "Stopped an operation that isn't allowed ({tool})",
+  "agent_status_dormant": "Dormant",
+  "agent_status_failed": "Can't resume",
+  "agent_conversations": "Conversations",
+  "agent_no_conversations": "No conversations yet",
+  "agent_untitled": "(no messages)",
+  "agent_login_required": "{agent} needs you to log in. Run the following in a terminal, then send again.",
+  "agent_spawn_failed": "Couldn't start {agent}: {error}",
+  "agent_agent": "Agent",
+  "agent_new_conversation": "New conversation",
+  "agent_pending_proposals": "Unapplied proposals",
+  "agent_pending_proposals_note": "Proposals from earlier conversations that were neither applied nor discarded.",
+  "agent_intro": "Ask it to search or edit your data. For example: \"List the tasks due next week\" or \"Mark every errand task as done\".",
+  "agent_resume_failed": "This conversation couldn't be resumed. Continue in a new conversation.",
+  "agent_closed": "The conversation has ended. Your next message starts a new one.",
+  "agent_input": "Request to the AI",
+  "agent_placeholder": "e.g. List the tasks due next week",
+  "agent_read_only_note": "Reads and proposes only. Nothing is saved until you apply it",
+  "agent_stop": "Stop",
+  "agent_send": "Send",
+  "agent_disconnected": "The connection was lost. Start a new conversation.",
+  "proposal_op_insert": "Add",
+  "proposal_op_update": "Change",
+  "proposal_op_delete": "Delete",
+  "proposal_applied": "Applied",
+  "proposal_discarded": "Discarded",
+  "proposal_stale": "Not applied because the original data changed",
+  "proposal_failed": "Couldn't apply",
+  "proposal_change_added": "added",
+  "proposal_change_removed": "removed",
+  "proposal_change_changed": "changed",
+  "proposal_collapse": "Collapse",
+  "proposal_show_all": "Show all",
+  "proposal_order_only": "No visible difference (order only)",
+  "proposal_more": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} more",
+        "n=other": "{count} more"
+      }
+    }
+  ],
+  "proposal_before": "Before",
+  "proposal_after": "After",
+  "proposal_label": "Proposal: {title}",
+  "proposal_new_table": "New table {name}",
+  "proposal_summary": [
+    {
+      "declarations": ["input tables", "input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{tables} · {count} row",
+        "n=other": "{tables} · {count} rows"
+      }
+    }
+  ],
+  "proposal_table_list": "{name} (one file for all, key {key})",
+  "proposal_table_files": "{name} (one file per record, key {key})",
+  "proposal_discard": "Discard",
+  "proposal_apply": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "Apply {count} change",
+        "n=other": "Apply {count} changes"
+      }
+    }
+  ],
+  "activity_delete_to_db": "deleted · file → DB",
+  "activity_delete_to_file": "deleted · DB → file",
+  "activity_sync_failed": "sync failed",
+  "activity_conflict": "Conflict (kept {winner})",
+  "activity_config_reloaded": "Reloaded the config",
+  "sync_kept": "Kept: {winner}",
+  "sync_backup": "Backup",
+  "sync_deleted_on_backup": "It had been deleted on the backed-up side",
+  "sync_restored": "Restored {table} / {key}",
+  "sync_dismissed": "Marked as read",
+  "sync_restore_unknown_key": "The key is unknown, so restore it by hand",
+  "sync_winner": "kept {winner}",
+  "sync_no_header": "no header (old format)",
+  "sync_dismiss": "Mark read",
+  "sync_restore_title": "Restore {table} / {key}?",
+  "sync_restore_note": "The current version is kept as a new backup, so you can restore it again later.",
+  "sync_watching": "watching",
+  "sync_last_sync": " · last sync {at}",
+  "sync_conflicts": "Conflicts",
+  "sync_no_conflicts": "No conflicts",
+  "sync_warnings": "Warnings",
+  "sync_no_warnings": "No warnings",
+  "sync_open": "Open",
+  "sync_activity": "Activity",
+  "sync_no_activity": "Nothing synced yet",
+  "conflict_title": "Conflict in {table}/{key}",
+  "conflict_file_won": "Both the file and the DB changed. Kept the file side and backed up the DB side.",
+  "conflict_db_won": "Both the file and the DB changed. Kept the DB side and backed up the file side.",
+  "conflict_view_diff": "View diff",
+  "toast_db_busy": "The database is busy. Wait a moment and try again",
+  "toast_not_reflected": "Not reflected: {record}",
+  "dialog_add_to": "Add to {table}",
+  "dialog_key_is_file": "{key} (becomes the file name)",
+  "dialog_key_is_key": "{key} (key)",
+  "dialog_new_key": "new key",
+  "form_add_record": "Add",
+  "dialog_adopt_title": "Add {table} to yamlite.yaml",
+  "dialog_new_table": "New table",
+  "dialog_name": "Name",
+  "dialog_table_name": "table name",
+  "dialog_mode_files": "Folder (one file per record: {name}/*.yaml)",
+  "dialog_mode_list": "List in one file ({name}.yaml)",
+  "dialog_key_column_label": "Key column",
+  "dialog_key_column": "key column",
+  "dialog_group_optional": "Group (optional)",
+  "dialog_columns": "Columns (more are added automatically when you write them in YAML)",
+  "dialog_column_name": "column {n} name",
+  "dialog_column_type": "column {n} type",
+  "dialog_remove_column": "remove column {n}",
+  "dialog_add_column": "+ Column",
+  "dialog_create": "Create",
+  "dialog_rename_title": "Change key",
+  "dialog_rename_files": "The file name changes. The new file is rewritten from the DB values, so comments in the original file are lost.",
+  "dialog_rename_list": "The record's key in the list changes. Comments on this record may be lost.",
+  "dialog_rename": "Change"
+}

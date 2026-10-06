@@ -12,6 +12,7 @@ import { agentPanel, useAgents } from "@/lib/agent";
 import { setCommandMenuOpen, useCommandMenuOpen } from "@/lib/commandMenu";
 import { isReadOnly } from "@/lib/mode";
 import { useMeta } from "@/lib/providers";
+import { m } from "@/paraglide/messages.js";
 
 export function CommandMenu() {
   const open = useCommandMenuOpen();
@@ -34,10 +35,10 @@ export function CommandMenu() {
   };
   return (
     <CommandDialog open={open} onOpenChange={setCommandMenuOpen}>
-      <CommandInput placeholder="テーブルや画面を検索…" className="max-md:pr-10" />
+      <CommandInput placeholder={m.cmd_placeholder()} className="max-md:pr-10" />
       <CommandList className="max-md:max-h-none">
-        <CommandEmpty>見つかりません</CommandEmpty>
-        <CommandGroup heading="Tables">
+        <CommandEmpty>{m.cmd_empty()}</CommandEmpty>
+        <CommandGroup heading={m.nav_tables()}>
           {meta?.tables.map((t) => (
             <CommandItem
               key={t.name}
@@ -48,7 +49,7 @@ export function CommandMenu() {
           ))}
         </CommandGroup>
         {meta && meta.views.length > 0 && (
-          <CommandGroup heading="Views">
+          <CommandGroup heading={m.cmd_views()}>
             {meta.views.map((v) => (
               <CommandItem
                 key={v.name}
@@ -60,7 +61,7 @@ export function CommandMenu() {
           </CommandGroup>
         )}
         {meta && meta.pages.length > 0 && (
-          <CommandGroup heading="Pages">
+          <CommandGroup heading={m.nav_pages()}>
             {meta.pages.map((p) => (
               <CommandItem
                 key={p.name}
@@ -71,11 +72,13 @@ export function CommandMenu() {
             ))}
           </CommandGroup>
         )}
-        <CommandGroup heading="Tools">
-          <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>SQL console</CommandItem>
-          <CommandItem onSelect={() => go(() => navigate({ to: "/erd" }))}>ERD</CommandItem>
-          {!isReadOnly() && <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>Sync</CommandItem>}
-          {agents.length > 0 && <CommandItem onSelect={() => go(agentPanel.open)}>AI に依頼</CommandItem>}
+        <CommandGroup heading={m.nav_tools()}>
+          <CommandItem onSelect={() => go(() => navigate({ to: "/sql" }))}>{m.nav_sql_console()}</CommandItem>
+          <CommandItem onSelect={() => go(() => navigate({ to: "/erd" }))}>{m.nav_erd()}</CommandItem>
+          {!isReadOnly() && (
+            <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>{m.nav_sync()}</CommandItem>
+          )}
+          {agents.length > 0 && <CommandItem onSelect={() => go(agentPanel.open)}>{m.nav_ask_ai()}</CommandItem>}
         </CommandGroup>
       </CommandList>
     </CommandDialog>

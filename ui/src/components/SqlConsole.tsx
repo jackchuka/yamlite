@@ -30,6 +30,7 @@ import { needsConfirm } from "@/lib/sqlguard";
 import type { ChangeOp } from "@/lib/types";
 import { Grid } from "./Grid";
 import { NewTableDialog } from "./NewTableDialog";
+import { m } from "@/paraglide/messages.js";
 
 const OP_LABEL: Record<ChangeOp, string> = { toFile: "M", deleteFile: "−", toDb: "M", deleteDb: "−" };
 const isDark = () => document.documentElement.dataset.theme === "dark";
@@ -98,12 +99,12 @@ export function SqlConsole() {
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-center gap-2.5 border-b px-[18px] py-3 max-md:px-3">
-        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">SQL console</h1>
+        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">{m.nav_sql_console()}</h1>
         <span className="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={history.length === 0}>
-              <History className="size-3.5" /> History
+              <History className="size-3.5" /> {m.sql_history()}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="max-w-[min(480px,calc(100vw-2rem))]">
@@ -116,7 +117,7 @@ export function SqlConsole() {
         </DropdownMenu>
         {!mobile && (
           <Button size="sm" onClick={() => submitRef.current()} disabled={run.isPending}>
-            <Play className="size-3.5" /> Run ⌘↵
+            <Play className="size-3.5" /> {m.sql_run_shortcut()}
           </Button>
         )}
       </div>
@@ -132,7 +133,7 @@ export function SqlConsole() {
         />
         {mobile && (
           <Button size="lg" className="w-full" onClick={() => submitRef.current()} disabled={run.isPending}>
-            <Play className="size-4" /> Run
+            <Play className="size-4" /> {m.sql_run()}
           </Button>
         )}
         {run.isError && (
@@ -143,7 +144,8 @@ export function SqlConsole() {
         {result && "columns" in result && (
           <>
             <div className="text-[11.5px] text-muted-foreground">
-              {result.rows.length} rows{result.truncated ? "（先頭 1000 行）" : ""} · {result.ms} ms
+              {m.sql_rows({ count: result.rows.length })}
+              {result.truncated ? m.sql_truncated() : ""} · {result.ms} ms
             </div>
             <Grid
               columns={result.columns.map((name) => ({ name, type: "TEXT" as const }))}
@@ -156,22 +158,20 @@ export function SqlConsole() {
         {result && !("columns" in result) && (
           <>
             <div className="flex gap-3 text-[11.5px] text-muted-foreground">
-              <span className="text-ok">
-                ✓ {result.changes} {result.changes === 1 ? "row" : "rows"} changed
-              </span>
+              <span className="text-ok">{m.sql_changed({ count: result.changes })}</span>
               <span>{result.ms} ms</span>
             </div>
             {!isReadOnly() && result.unmanaged && (
               <div className="flex flex-wrap items-center gap-3 rounded-md bg-warn-soft px-3 py-2 text-[12px] text-warn">
-                {result.unmanaged} は yamlite.yaml にないため同期されません。
+                {m.sql_unmanaged({ table: result.unmanaged })}
                 <Button size="sm" variant="outline" onClick={() => setAdopt(result.unmanaged ?? null)}>
-                  yamlite.yaml に追加
+                  {m.sql_adopt()}
                 </Button>
               </div>
             )}
             {touched.length > 0 && (
               <div className="rounded-lg border px-3 py-2 font-mono text-[12px] leading-[1.8]">
-                <div className="font-sans text-[11px] text-muted-foreground">変更されたファイル</div>
+                <div className="font-sans text-[11px] text-muted-foreground">{m.sql_touched_files()}</div>
                 {touched.map((t, i) => (
                   <div key={`${i}-${t.table}-${t.key}`}>
                     <span className="mr-1.5 font-bold text-warn">{OP_LABEL[t.op]}</span>
@@ -187,13 +187,13 @@ export function SqlConsole() {
         <Dialog open onOpenChange={(open) => !open && setConfirm(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>実行しますか？</DialogTitle>
+              <DialogTitle>{m.sql_confirm_title()}</DialogTitle>
               <DialogDescription>{confirm}</DialogDescription>
             </DialogHeader>
             <pre className="max-h-40 overflow-auto rounded bg-panel p-2 font-mono text-[12px]">{text}</pre>
             <DialogFooter>
               <Button variant="outline" onClick={() => setConfirm(null)}>
-                キャンセル
+                {m.common_cancel()}
               </Button>
               <Button
                 variant="destructive"
@@ -202,7 +202,7 @@ export function SqlConsole() {
                   run.mutate(text);
                 }}
               >
-                実行
+                {m.sql_execute()}
               </Button>
             </DialogFooter>
           </DialogContent>

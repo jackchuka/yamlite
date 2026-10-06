@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useEventStore } from "@/lib/providers";
+import { m } from "@/paraglide/messages.js";
 
 export function ConflictToasts() {
   const store = useEventStore();
@@ -10,10 +11,9 @@ export function ConflictToasts() {
     () =>
       store.listen((e) => {
         if (e.type !== "conflict") return;
-        const [won, lost] = e.winner === "file" ? ["ファイル", "DB"] : ["DB", "ファイル"];
-        toast.warning(`Conflict in ${e.table}/${e.key}`, {
-          description: `ファイルと DB の両方が変更されました。${won}側を採用し、${lost}側の内容をバックアップしました。`,
-          action: { label: "差分を見る", onClick: () => void navigate({ to: "/sync" }) },
+        toast.warning(m.conflict_title({ table: e.table, key: e.key }), {
+          description: e.winner === "file" ? m.conflict_file_won() : m.conflict_db_won(),
+          action: { label: m.conflict_view_diff(), onClick: () => void navigate({ to: "/sync" }) },
           duration: 15_000,
         });
       }),

@@ -21,6 +21,8 @@ YAMLITE_TOKEN=<token> pnpm dev:ui         # Vite with hot reload, proxying /api 
 pnpm test:e2e                             # Playwright against dist/ (run pnpm build first)
 ```
 
+UI text lives in `ui/messages/en.json` and `ui/messages/ja.json`; components call `m.<key>()` from `@/paraglide/messages.js`. Add every new key to both files: a test fails when their keys differ, and `pnpm lint` rejects hard-coded text in JSX. Run `pnpm i18n` after editing the messages if your editor's type checker does not pick them up.
+
 ## Scope
 
 yamlite never loses data silently. A change that could overwrite a file, delete a row, or drop a column must be guarded the same way the existing paths are: unreadable files are skipped, mass deletions are refused without `--force`, and the losing side of a conflict is saved to `.yamlite/conflicts/`. Tests cover each of these; add one for any new path that writes.

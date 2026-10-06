@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import { fieldError } from "@/lib/fielderror";
 import { useReflectDispatch } from "@/lib/providers";
 import type { TableMeta } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 
 export function RenameKeyDialog({
   table,
@@ -44,21 +45,24 @@ export function RenameKeyDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>キーを変更</DialogTitle>
+          <DialogTitle>{m.dialog_rename_title()}</DialogTitle>
           <DialogDescription>
-            {table.mode === "files"
-              ? "ファイル名が変わります。新しいファイルは DB の値から書き直されるので、元のファイルのコメントは失われます。"
-              : "リスト内のレコードのキーが変わります。このレコードのコメントは失われることがあります。"}
+            {table.mode === "files" ? m.dialog_rename_files() : m.dialog_rename_list()}
           </DialogDescription>
         </DialogHeader>
-        <Input aria-label="new key" value={to} onChange={(e) => setTo(e.target.value)} className="font-mono" />
+        <Input
+          aria-label={m.dialog_new_key()}
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          className="font-mono"
+        />
         {err && <p className="text-[11px] text-err">{err.message}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {m.common_cancel()}
           </Button>
           <Button disabled={to === "" || to === recordKey || rename.isPending} onClick={() => rename.mutate()}>
-            変更
+            {m.dialog_rename()}
           </Button>
         </DialogFooter>
       </DialogContent>

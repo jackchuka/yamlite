@@ -124,12 +124,12 @@ test("a conflict is restored with taps", async ({ page }) => {
   await page.goto(`${running.url}#/sync`);
   await page.getByRole("button", { name: /tasks \/ fix-ci/ }).tap();
   await page
-    .getByRole("button", { name: /側に戻す/ })
+    .getByRole("button", { name: /^Restore the/ })
     .first()
     .tap();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: /側に戻す/ })
+    .getByRole("button", { name: /^Restore the/ })
     .tap();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).not.toBe(winner);
 });
@@ -149,12 +149,12 @@ test("the AI panel opens full screen and applies a proposal", async ({ page }) =
     ]),
   );
   await page.goto(app.url);
-  await page.getByRole("button", { name: "AI に依頼" }).tap();
-  const panel = page.getByRole("complementary", { name: "AI に依頼" });
+  await page.getByRole("button", { name: "Ask AI" }).tap();
+  const panel = page.getByRole("complementary", { name: "Ask AI" });
   await expect(panel).toBeVisible();
   expect((await panel.boundingBox())?.width).toBe(page.viewportSize()?.width);
-  await panel.getByRole("textbox", { name: "AI への依頼" }).fill("A を完了に");
-  await panel.getByRole("button", { name: "送信" }).tap();
-  await panel.getByRole("button", { name: "1 件を適用" }).tap();
-  await expect(panel.getByText("適用しました")).toBeVisible();
+  await panel.getByRole("textbox", { name: "Request to the AI" }).fill("A を完了に");
+  await panel.getByRole("button", { name: "Send" }).tap();
+  await panel.getByRole("button", { name: "Apply 1 change" }).tap();
+  await expect(panel.getByText("Applied")).toBeVisible();
 });

@@ -6,18 +6,23 @@ import { agentApi, invalidateProposals, type Proposal, type ProposalRow } from "
 import { diffJson, isStructured, type JsonChange } from "@/lib/jsondiff";
 import { cn } from "@/lib/utils";
 import { FieldDiff } from "./FieldDiff";
+import { m } from "@/paraglide/messages.js";
 
 const show = (v: unknown) => (v === null || v === undefined ? "—" : typeof v === "string" ? v : JSON.stringify(v));
-const OP = { insert: "追加", update: "変更", delete: "削除" } as const;
+const OP = { insert: m.proposal_op_insert, update: m.proposal_op_update, delete: m.proposal_op_delete } as const;
 
-const OUTCOME: Record<Exclude<Proposal["status"], "pending">, string> = {
-  applied: "適用しました",
-  discarded: "破棄しました",
-  stale: "元のデータが変更されたため適用しませんでした",
-  failed: "適用できませんでした",
+const OUTCOME: Record<Exclude<Proposal["status"], "pending">, () => string> = {
+  applied: m.proposal_applied,
+  discarded: m.proposal_discarded,
+  stale: m.proposal_stale,
+  failed: m.proposal_failed,
 };
 
-const CHANGE_LABEL = { added: "追加", removed: "削除", changed: "変更" } as const;
+const CHANGE_LABEL = {
+  added: m.proposal_change_added,
+  removed: m.proposal_change_removed,
+  changed: m.proposal_change_changed,
+} as const;
 const COLLAPSE_AFTER = 200;
 const MAX_ROWS = 50;
 
@@ -30,7 +35,7 @@ function JsonValue({ value }: { value: unknown }) {
       <p className={cn("font-mono text-[14px] [overflow-wrap:anywhere]", long && !open && "line-clamp-6")}>{text}</p>
       {long && (
         <button type="button" className="text-[14px] text-muted-foreground underline" onClick={() => setOpen(!open)}>
-          {open ? "折りたたむ" : "すべて表示"}
+          {open ? m.proposal_collapse() : m.proposal_show_all()}
         </button>
       )}
     </div>
@@ -43,7 +48,7 @@ function JsonChanges({ field, before, after }: { field: string; before: unknown;
   if (all.length === 0)
     return (
       <p className="text-[14px] text-muted-foreground">
-        <span className="font-mono">{field}</span> <span>表示上の差分なし（並び順のみ）</span>
+        <span className="font-mono">{field}</span> <span>{m.proposal_order_only()}</span>
       </p>
     );
   return (
@@ -61,7 +66,7 @@ function JsonChanges({ field, before, after }: { field: string; before: unknown;
                     : "text-muted-foreground",
               )}
             >
-              {CHANGE_LABEL[c.kind]}
+              {CHANGE_LABEL[c.kind]()}
             </span>
             <span className="font-mono [overflow-wrap:anywhere]">{c.path}</span>
           </div>
@@ -70,7 +75,9 @@ function JsonChanges({ field, before, after }: { field: string; before: unknown;
           {c.kind !== "removed" && <JsonValue value={c.after} />}
         </li>
       ))}
-      {all.length > MAX_ROWS && <li className="text-[14px] text-muted-foreground">ほか {all.length - MAX_ROWS} 件</li>}
+      {all.length > MAX_ROWS && (
+        <li className="text-[14px] text-muted-foreground">{m.proposal_more({ count: all.length - MAX_ROWS })}</li>
+      )}
     </ul>
   );
 }
@@ -90,12 +97,12 @@ function RowDiff({ row }: { row: ProposalRow }) {
             row.op === "delete" ? "border-err text-err" : "border-ok text-ok",
           )}
         >
-          {OP[row.op]}
+          {OP[row.op]()}
         </span>
       </div>
       {row.op !== "delete" && scalars.length > 0 && (
         <FieldDiff
-          labels={["変更前", "変更後"]}
+          labels={[m.proposal_before(), m.proposal_after()]}
           rows={scalars.map((f) => ({ field: f, a: show(row.before?.[f]), b: show(row.after?.[f]) }))}
         />
       )}
@@ -116,18 +123,22 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
   const tables = [...new Set(p.rows.map((r) => r.table))];
   const count = p.table ? 1 : p.rows.length;
   return (
-    <section aria-label={`提案: ${p.title}`} className="overflow-hidden rounded-lg border">
+    <section aria-label={m.proposal_label({ title: p.title })} className="overflow-hidden rounded-lg border">
       <header className="flex items-baseline justify-between gap-2 border-b bg-panel px-3 py-2.5">
         <h3 className="text-[16px] font-semibold">{p.title}</h3>
         <span className="text-[14px] text-muted-foreground">
-          {p.table ? `新しいテーブル ${p.table.name}` : `${tables.join(", ")} · ${count} 件`}
+          {p.table
+            ? m.proposal_new_table({ name: p.table.name })
+            : m.proposal_summary({ tables: tables.join(", "), count })}
         </span>
       </header>
       <div className="max-h-[360px] overflow-auto px-3">
         {p.table ? (
           <p className="py-2.5 text-[14px]">
-            {p.table.name}（{p.table.mode === "list" ? "1 ファイルにまとめる" : "1 件ごとにファイル"}、キー{" "}
-            {p.table.key}）
+            {(p.table.mode === "list" ? m.proposal_table_list : m.proposal_table_files)({
+              name: p.table.name,
+              key: p.table.key,
+            })}
           </p>
         ) : (
           p.rows.map((r) => <RowDiff key={`${r.table}/${r.key}`} row={r} />)
@@ -152,10 +163,10 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
         {p.status === "pending" ? (
           <>
             <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate("discard")}>
-              破棄
+              {m.proposal_discard()}
             </Button>
             <Button disabled={act.isPending} onClick={() => act.mutate("apply")}>
-              {count} 件を適用
+              {m.proposal_apply({ count })}
             </Button>
           </>
         ) : (
@@ -165,7 +176,7 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
               p.status === "applied" ? "text-ok" : p.status === "discarded" ? "text-muted-foreground" : "text-err",
             )}
           >
-            {OUTCOME[p.status]}
+            {OUTCOME[p.status]()}
             {p.stale && `: ${p.stale.join(", ")}`}
             {p.error && `: ${p.error}`}
           </p>

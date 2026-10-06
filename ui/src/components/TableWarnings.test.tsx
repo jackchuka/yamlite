@@ -16,7 +16,7 @@ test("nothing is shown without warnings", () => {
 test("the button counts the warnings and opens their messages with links", () => {
   const open = vi.fn();
   render(<TableWarnings items={items} onOpenRecord={open} />);
-  fireEvent.click(screen.getByRole("button", { name: /3 件の警告/ }));
+  fireEvent.click(screen.getByRole("button", { name: /3 warnings/ }));
   expect(screen.getByText('assignee "9" not found in people.id (b, c)')).toBeTruthy();
   expect(screen.getByRole("link", { name: "tasks__checklist" }).getAttribute("href")).toBe("#/t/tasks__checklist");
   fireEvent.click(screen.getByRole("button", { name: "a" }));

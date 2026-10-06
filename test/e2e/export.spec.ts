@@ -74,6 +74,14 @@ function exportFixture(): string {
   return out;
 }
 
+test("an export opens in the language the viewer chose", async ({ page }) => {
+  const url = await host(exportFixture());
+  await page.addInitScript(() => localStorage.setItem("yamlite-locale", "ja"));
+  await page.goto(url);
+  await expect(page.locator("html")).toHaveAttribute("lang", "ja");
+  await expect(page.getByText(/読み取り専用スナップショット/)).toBeVisible();
+});
+
 test("an export browses, queries and refuses writes from a subdirectory", async ({ page }) => {
   const url = await host(exportFixture());
   await page.goto(url);

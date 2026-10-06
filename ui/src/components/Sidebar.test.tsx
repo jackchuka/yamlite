@@ -122,16 +122,16 @@ test("the AI button shows only when an agent exists and toggles the panel", asyn
   agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
   await renderSidebar();
   const { result } = renderHook(() => useAgentPanelOpen());
-  fireEvent.click(await screen.findByRole("button", { name: "AI に依頼" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Ask AI" }));
   expect(result.current).toBe(true);
-  fireEvent.click(screen.getByRole("button", { name: "AI に依頼" }));
+  fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
   expect(result.current).toBe(false);
 });
 
 test("no AI button without agents", async () => {
   await renderSidebar();
   await screen.findByText("deals");
-  expect(screen.queryByRole("button", { name: "AI に依頼" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Ask AI" })).toBeNull();
 });
 
 test("in the phone menu the AI button closes the menu and keeps the panel open", async () => {
@@ -139,7 +139,7 @@ test("in the phone menu the AI button closes the menu and keeps the panel open",
   const onSearch = vi.fn();
   await renderSidebar({ onSearch });
   const { result } = renderHook(() => useAgentPanelOpen());
-  const button = await screen.findByRole("button", { name: "AI に依頼" });
+  const button = await screen.findByRole("button", { name: "Ask AI" });
   fireEvent.click(button);
   fireEvent.click(button);
   expect(onSearch).toHaveBeenCalledTimes(2);

@@ -1,0 +1,49 @@
+{
+  "$schema": "../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "style": "off",
+    "restriction": "off",
+    "nursery": "off"
+  },
+  "ignorePatterns": ["src/paraglide/**", "**/*.test.tsx", "src/test/**"],
+  "overrides": [
+    {
+      "files": ["src/**/*.tsx"],
+      "rules": {
+        "react/jsx-no-literals": [
+          "error",
+          {
+            "restrictedAttributes": ["aria-label", "title", "placeholder", "alt"],
+            "allowedStrings": [
+              "·",
+              "—",
+              "⚠",
+              "●",
+              "×",
+              "…",
+              "/",
+              ":",
+              "(",
+              ")",
+              "yamlite",
+              "⌘K",
+              "",
+              "→",
+              "+",
+              "JSON",
+              "*",
+              "HEAD",
+              "ms",
+              "SQL"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

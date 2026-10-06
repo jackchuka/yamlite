@@ -51,15 +51,15 @@ test("a group is typed or picked from the existing ones and saved", async () => 
     "Sales",
   ]);
   fireEvent.change(input, { target: { value: " CRM " } });
-  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await waitFor(() => expect(api.setGroup).toHaveBeenCalledWith("tasks", "CRM"));
 });
 
 test("a table's group is shown and can be removed", async () => {
   show(tables[1]!);
-  expect(screen.getByRole("button", { name: /group/i }).textContent).toContain("CRM");
+  expect(screen.getByRole("button", { name: /^group:/ }).textContent).toContain("CRM");
   expect((await screen.findByRole("combobox", { name: "group name" })).getAttribute("value")).toBe("CRM");
-  fireEvent.click(screen.getByRole("button", { name: "グループなし" }));
+  fireEvent.click(screen.getByRole("button", { name: "No group" }));
   await waitFor(() => expect(api.setGroup).toHaveBeenCalledWith("people", null));
 });
 
@@ -67,6 +67,6 @@ test("a refused change is shown", async () => {
   vi.mocked(api.setGroup).mockRejectedValueOnce(new Error("invalid yamlite.yaml"));
   show(tables[0]!);
   fireEvent.change(await screen.findByRole("combobox", { name: "group name" }), { target: { value: "X" } });
-  fireEvent.click(screen.getByRole("button", { name: "保存" }));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(await screen.findByText("invalid yamlite.yaml")).toBeTruthy();
 });

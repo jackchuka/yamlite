@@ -1,16 +1,17 @@
 import { useReflect } from "@/lib/providers";
+import { m } from "@/paraglide/messages.js";
 
 export function ReflectBadge({ table, recordKey }: { table: string; recordKey: string }) {
   const r = useReflect(table, recordKey);
   if (!r) return null;
   const text =
     r.state === "pending"
-      ? "反映中…"
+      ? m.record_reflecting()
       : r.state === "applied"
-        ? `${r.file} に反映済み`
+        ? m.record_reflected({ file: r.file })
         : r.state === "failed"
-          ? `⚠ 反映されませんでした: ${r.reason}`
-          : "反映待ち";
+          ? m.record_reflect_failed({ reason: r.reason })
+          : m.record_reflect_waiting();
   const tone = r.state === "applied" ? "text-ok" : r.state === "failed" ? "text-err" : "text-muted-foreground";
   return (
     <span role="status" className={`text-[11px] ${tone}`}>

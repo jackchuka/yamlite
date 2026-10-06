@@ -4,21 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { ColumnType, Filter, FilterOp } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 
-const OPS: Array<[FilterOp, string]> = [
-  ["eq", "="],
-  ["ne", "≠"],
-  ["lt", "<"],
-  ["lte", "≤"],
-  ["gt", ">"],
-  ["gte", "≥"],
-  ["contains", "contains"],
-  ["has", "has"],
-  ["null", "is empty"],
-  ["notnull", "is set"],
+const symbol = (s: string) => () => s;
+const OPS: Array<[FilterOp, () => string]> = [
+  ["eq", symbol("=")],
+  ["ne", symbol("≠")],
+  ["lt", symbol("<")],
+  ["lte", symbol("≤")],
+  ["gt", symbol(">")],
+  ["gte", symbol("≥")],
+  ["contains", m.filter_op_contains],
+  ["has", m.filter_op_has],
+  ["null", m.filter_op_null],
+  ["notnull", m.filter_op_notnull],
 ];
 const label = (f: Filter) =>
-  `${f.col} ${OPS.find(([op]) => op === f.op)?.[1] ?? f.op}${f.value === undefined ? "" : ` ${JSON.stringify(f.value)}`}`;
+  `${f.col} ${OPS.find(([op]) => op === f.op)?.[1]() ?? f.op}${f.value === undefined ? "" : ` ${JSON.stringify(f.value)}`}`;
 
 export function parseFilterValue(text: string, type: ColumnType): unknown {
   if (type === "BOOLEAN") return text === "true";
@@ -71,8 +73,8 @@ export function FilterBar({
         />
         <Input
           type="search"
-          aria-label="search"
-          placeholder="search all columns…"
+          aria-label={m.filter_search()}
+          placeholder={m.filter_search_placeholder()}
           className="h-7 pl-7 text-[12px] max-md:h-9"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
@@ -95,12 +97,12 @@ export function FilterBar({
             type="button"
             className="rounded-full border border-dashed px-2 py-0.5 text-[11.5px] text-muted-foreground max-md:min-h-8 max-md:px-3 max-md:text-[13px]"
           >
-            + filter
+            {m.filter_add_filter()}
           </button>
         </PopoverTrigger>
         <PopoverContent className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2">
           <select
-            aria-label="column"
+            aria-label={m.filter_column()}
             className="rounded border bg-background px-2 py-1 max-md:py-2"
             value={draft.col}
             onChange={(e) => setDraft({ ...draft, col: e.target.value })}
@@ -110,27 +112,27 @@ export function FilterBar({
             ))}
           </select>
           <select
-            aria-label="operator"
+            aria-label={m.filter_operator()}
             className="rounded border bg-background px-2 py-1 max-md:py-2"
             value={draft.op}
             onChange={(e) => setDraft({ ...draft, op: e.target.value as FilterOp })}
           >
             {OPS.map(([op, text]) => (
               <option key={op} value={op}>
-                {text}
+                {text()}
               </option>
             ))}
           </select>
           {draft.op !== "null" && draft.op !== "notnull" && (
             <Input
-              aria-label="value"
+              aria-label={m.filter_value()}
               value={draft.text}
               onChange={(e) => setDraft({ ...draft, text: e.target.value })}
               onKeyDown={(e) => e.key === "Enter" && add()}
             />
           )}
           <Button size="sm" onClick={add}>
-            Add
+            {m.filter_add()}
           </Button>
         </PopoverContent>
       </Popover>

@@ -1,5 +1,6 @@
 import { changedFields } from "./form";
 import type { Row } from "./types";
+import { m } from "@/paraglide/messages.js";
 
 export interface DiffRow {
   field: string;
@@ -17,7 +18,7 @@ export function diffRows(winner: Row | null, saved: Row | null, keyCol?: string)
 }
 
 export function restoreLabel(winner: "file" | "db" | null): string {
-  if (winner === "file") return "DB 側に戻す";
-  if (winner === "db") return "ファイル側に戻す";
-  return "復元できません";
+  if (winner === "file") return m.restore_to_db();
+  if (winner === "db") return m.restore_to_file();
+  return m.restore_unavailable();
 }

@@ -70,7 +70,7 @@ test("a page that navigates its frame away is cut off", async ({ page }) => {
   });
   await page.goto(`${app.url}#/p/board`);
   await page.frameLocator('iframe[title="Board"]').getByRole("button", { name: "leave" }).click();
-  await expect(page.getByRole("alert")).toContainText("別の URL に移動したため");
+  await expect(page.getByRole("alert")).toContainText("moved to another URL");
   await expect(page.locator('iframe[title="Board"]')).toHaveCount(0);
 });
 

@@ -19,7 +19,7 @@ vi.mock("./NewTableDialog", () => ({ NewTableDialog: () => null }));
 vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
 vi.mock("./Sidebar", () => ({ Sidebar: () => null }));
 vi.mock("./StatusBar", () => ({ StatusBar: () => null }));
-vi.mock("./AgentPanel", () => ({ AgentPanel: () => <aside aria-label="AI に依頼" /> }));
+vi.mock("./AgentPanel", () => ({ AgentPanel: () => <aside aria-label="Ask AI" /> }));
 
 afterEach(() => {
   agents = [];
@@ -31,11 +31,11 @@ test("the panel docks beside the screen when open and an agent exists", () => {
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.getByText("outlet")).toBeTruthy();
-  expect(screen.getByRole("complementary", { name: "AI に依頼" })).toBeTruthy();
+  expect(screen.getByRole("complementary", { name: "Ask AI" })).toBeTruthy();
 });
 
 test("no panel without agents, even when open", () => {
   act(() => agentPanel.open());
   render(<Shell />);
-  expect(screen.queryByRole("complementary", { name: "AI に依頼" })).toBeNull();
+  expect(screen.queryByRole("complementary", { name: "Ask AI" })).toBeNull();
 });

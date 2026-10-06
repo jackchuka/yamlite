@@ -26,7 +26,7 @@ test("an edit in the drawer reaches the file and keeps its comments", async ({ p
   await drawer.getByLabel("title.ja", { exact: true }).fill("牛乳を買った");
   await drawer.getByLabel("done", { exact: true }).click();
   await drawer.getByRole("button", { name: /Save/ }).click();
-  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  await expect(drawer.getByRole("status")).toContainText("Reflected to");
   const text = file(app, "tasks/buy-milk.yaml");
   expect(text).toContain("# errand");
   expect(text).toContain("ja: 牛乳を買った");
@@ -59,18 +59,18 @@ test("a conflict is announced and its losing side can be restored", async ({ pag
   await page.getByRole("link", { name: /^Sync/ }).click();
   const entry = page.getByRole("button", { name: /tasks \/ fix-ci/ });
   await expect(entry).toHaveCount(1);
-  const original = (await entry.textContent())?.includes("db を採用") ? "db" : "file";
+  const original = (await entry.textContent())?.includes("kept db") ? "db" : "file";
   await entry.click();
-  await page.getByRole("button", { name: /側に戻す/ }).click();
+  await page.getByRole("button", { name: /^Restore the/ }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByText("現在の版は新しい退避として残る")).toBeVisible();
-  await dialog.getByRole("button", { name: /側に戻す/ }).click();
+  await expect(dialog.getByText(/The current version is kept as a new backup/)).toBeVisible();
+  await dialog.getByRole("button", { name: /^Restore the/ }).click();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe(loser);
   // the replaced winner is kept as a new backup: the original entry is gone, and the only one left
   // names the other side as the winner
   const swapped = original === "db" ? "file" : "db";
   await expect(entry).toHaveCount(1);
-  await expect(entry).toContainText(`${swapped} を採用`);
+  await expect(entry).toContainText(`kept ${swapped}`);
 });
 
 test("an UPDATE in the SQL console lists the files it changed", async ({ page }) => {
@@ -129,10 +129,10 @@ test("warnings sit next to the table's name and their messages open from the tab
   await page.goto(app.url);
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
   const tasks = sidebar.getByRole("link", { name: /tasks/ });
-  await expect(tasks.getByRole("img", { name: "1 warnings" })).toBeVisible();
+  await expect(tasks.getByRole("img", { name: "1 warning" })).toBeVisible();
   await expect(tasks).toContainText("2");
   await tasks.click();
-  await page.getByRole("button", { name: /1 件の警告/ }).click();
+  await page.getByRole("button", { name: /1 warning/ }).click();
   await expect(page.getByRole("list", { name: "warnings" })).toContainText('assignee "zed" not found in people.id (b)');
 });
 
@@ -213,7 +213,7 @@ test("editing a Markdown note's body in the drawer changes only the body in the 
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.type("new body");
   await drawer.getByRole("button", { name: /Save/ }).click();
-  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  await expect(drawer.getByRole("status")).toContainText("Reflected to");
   expect(file(app, "idea.md")).toBe("---\ntitle: Idea   # keep this comment\n---\nnew body");
   await drawer.getByRole("tab", { name: "File" }).click();
   await expect(drawer.getByText("# keep this comment")).toBeVisible();
@@ -225,7 +225,7 @@ test("a table's group is set in the header, written to yamlite.yaml and shown in
   await page.goto(`${running.url}#/t/tasks`);
   await page.getByRole("button", { name: /^group:/ }).click();
   await page.getByRole("combobox", { name: "group name" }).fill("Work");
-  await page.getByRole("button", { name: "保存" }).click();
+  await page.getByRole("button", { name: "Save" }).click();
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
   const work = sidebar.getByRole("group", { name: "Work" });
   await expect(work.getByRole("link", { name: /tasks/ })).toBeVisible();
@@ -247,7 +247,7 @@ test("a column with values is edited with a select and saved to the file", async
   const drawer = page.getByRole("complementary", { name: "record" });
   await drawer.getByLabel("status", { exact: true }).selectOption("done");
   await drawer.getByRole("button", { name: /Save/ }).click();
-  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  await expect(drawer.getByRole("status")).toContainText("Reflected to");
   const text = file(app, "tasks/buy-milk.yaml");
   expect(text).toContain("# errand");
   expect(text).toContain("status: done");
@@ -266,7 +266,7 @@ test("dates are edited with pickers, keep their offset, and values out of bounds
   await drawer.getByLabel("due", { exact: true }).fill("2026-10-31");
   await drawer.getByLabel("at", { exact: true }).fill("2026-10-06T12:30");
   await drawer.getByRole("button", { name: /Save/ }).click();
-  await expect(drawer.getByRole("status")).toContainText("に反映済み");
+  await expect(drawer.getByRole("status")).toContainText("Reflected to");
   const text = file(app, "tasks/release.yaml");
   expect(text).toContain("# release");
   expect(text).toMatch(/due: "?2026-10-31"?\n/);
@@ -297,6 +297,6 @@ test("an edit from the form shows up in History as an uncommitted change", async
   await drawer.getByRole("button", { name: /Save/ }).click();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix flaky CI\n");
   await drawer.getByRole("tab", { name: /History/ }).click();
-  await expect(drawer.getByText("未コミットの変更")).toBeVisible();
+  await expect(drawer.getByText("Uncommitted changes")).toBeVisible();
   await expect(drawer.getByText("add fix-ci")).toBeVisible();
 });

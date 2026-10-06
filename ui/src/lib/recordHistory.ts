@@ -1,20 +1,23 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { getLocale } from "@/paraglide/runtime.js";
 import { api } from "./api";
 import type { HistoryPage, Row } from "./types";
+import { m } from "@/paraglide/messages.js";
 
 export function since(iso: string, now: number): string {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
-  if (s < 60) return "たった今";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} 分前`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h} 時間前`;
+  if (s < 60) return m.history_just_now();
+  const rtf = new Intl.RelativeTimeFormat(getLocale(), { numeric: "always" });
+  const min = Math.round(s / 60);
+  if (min < 60) return rtf.format(-min, "minute");
+  const h = Math.round(min / 60);
+  if (h < 24) return rtf.format(-h, "hour");
   const d = Math.round(h / 24);
-  return d < 30 ? `${d} 日前` : iso.slice(0, 10);
+  return d < 30 ? rtf.format(-d, "day") : iso.slice(0, 10);
 }
 
 export const valueText = (v: unknown): string =>
-  v === null || v === undefined ? "（なし）" : typeof v === "string" ? v : JSON.stringify(v);
+  v === null || v === undefined ? m.history_none() : typeof v === "string" ? v : JSON.stringify(v);
 
 // defineProperty, so a field named __proto__ stays a field instead of replacing the prototype
 const put = (row: Row, field: string, value: unknown) =>

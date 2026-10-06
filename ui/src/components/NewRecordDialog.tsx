@@ -9,6 +9,7 @@ import { fieldError } from "@/lib/fielderror";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
 import type { Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
+import { m } from "@/paraglide/messages.js";
 
 export function NewRecordDialog({
   table,
@@ -45,11 +46,16 @@ export function NewRecordDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="overflow-auto md:max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>{table.name} に追加</DialogTitle>
+          <DialogTitle>{m.dialog_add_to({ table: table.name })}</DialogTitle>
         </DialogHeader>
         <label className="text-[11.5px] font-semibold text-muted-foreground">
-          {table.key}（{table.mode === "files" ? "ファイル名になります" : "キー"}）
-          <Input aria-label="new key" value={key} onChange={(e) => setKey(e.target.value)} className="mt-1 font-mono" />
+          {(table.mode === "files" ? m.dialog_key_is_file : m.dialog_key_is_key)({ key: table.key })}
+          <Input
+            aria-label={m.dialog_new_key()}
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            className="mt-1 font-mono"
+          />
         </label>
         {err?.field === "key" && <p className="text-[11px] text-err">{err.message}</p>}
         {Object.entries(table.columns)
@@ -60,7 +66,7 @@ export function NewRecordDialog({
                 className={`mb-1 text-[11.5px] font-semibold ${table.required.includes(c) && values[c] == null ? "text-warn" : "text-muted-foreground"}`}
               >
                 {c}
-                {table.required.includes(c) && <span aria-label="required"> *</span>}
+                {table.required.includes(c) && <span aria-label={m.record_required()}> *</span>}
               </div>
               <FormField
                 path={[c]}
@@ -78,14 +84,14 @@ export function NewRecordDialog({
         {err && err.field !== "key" && <p className="text-[11px] text-err">{err.message}</p>}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            キャンセル
+            {m.common_cancel()}
           </Button>
           <Button
             disabled={key === "" || create.isPending || !connected}
-            title={connected ? undefined : "disconnected"}
+            title={connected ? undefined : m.common_disconnected_hint()}
             onClick={() => create.mutate()}
           >
-            追加
+            {m.form_add_record()}
           </Button>
         </DialogFooter>
       </DialogContent>

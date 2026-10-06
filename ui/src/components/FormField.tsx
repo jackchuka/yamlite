@@ -14,6 +14,7 @@ import { emptyValueFor, fieldKind, fieldProblem } from "@/lib/form";
 import { useTheme } from "@/lib/theme";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, Reference } from "@/lib/types";
 import { RefLink } from "./RefLink";
+import { m } from "@/paraglide/messages.js";
 
 export interface FieldProps {
   path: Array<string | number>;
@@ -64,7 +65,7 @@ function ChipsInput({
           {chip}
           <button
             type="button"
-            aria-label={`remove ${chip}`}
+            aria-label={m.form_remove({ item: chip })}
             className="ml-1 opacity-60 max-md:grid max-md:size-7 max-md:place-items-center"
             onClick={() => onChange(value.filter((_, j) => j !== i))}
           >
@@ -75,7 +76,7 @@ function ChipsInput({
       <input
         aria-label={label(path)}
         className="min-w-16 flex-1 bg-transparent px-1 outline-none"
-        placeholder="+ add"
+        placeholder={m.form_add_placeholder()}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -88,13 +89,13 @@ function ChipsInput({
       />
       <button
         type="button"
-        aria-label={`add to ${label(path)}`}
+        aria-label={m.form_add_to({ field: label(path) })}
         className="rounded-md px-2 text-[13px] text-muted-foreground md:hidden"
         // keeps focus in the input, so its blur does not add the chip first
         onMouseDown={(e) => e.preventDefault()}
         onClick={add}
       >
-        追加
+        {m.form_add()}
       </button>
     </div>
   );
@@ -239,7 +240,7 @@ function MapField(props: FieldProps) {
           />
           <button
             type="button"
-            aria-label={`remove ${label([...path, k])}`}
+            aria-label={m.form_remove({ item: label([...path, k]) })}
             className="pt-1.5 text-muted-foreground max-md:grid max-md:size-8 max-md:place-items-center max-md:pt-0"
             onClick={() => {
               const { [k]: _gone, ...rest } = value as Record<string, unknown>;
@@ -256,12 +257,12 @@ function MapField(props: FieldProps) {
           className="pb-2 text-[11.5px] text-muted-foreground max-md:py-2 max-md:text-[13px]"
           onClick={() => setNewKey("")}
         >
-          + key
+          {m.form_new_key()}
         </button>
       ) : (
         <Input
           autoFocus
-          aria-label={`new key in ${label(path)}`}
+          aria-label={m.form_new_key_in({ field: label(path) })}
           className="mb-2 h-7"
           value={newKey}
           onChange={(e) => setNewKey(e.target.value)}
@@ -345,7 +346,7 @@ function Widget(props: FieldProps) {
   const toggle = (to: "text" | "picker") => (
     <button
       type="button"
-      aria-label={`${label(path)} as ${to}`}
+      aria-label={m.form_as({ field: label(path), kind: to })}
       className="shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground max-md:grid max-md:min-h-8 max-md:min-w-8 max-md:place-items-center"
       onClick={() => setKind(to === "text" ? "text" : fieldKind(value, type, false, format))}
     >
@@ -448,7 +449,7 @@ function Widget(props: FieldProps) {
               <button
                 key={c.name}
                 type="button"
-                aria-label={`${label(path)} as ${c.name}`}
+                aria-label={m.form_as({ field: label(path), kind: c.name })}
                 className="rounded border px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground"
                 onClick={() => change(c.next, c.chosen)}
               >
@@ -465,7 +466,7 @@ function Widget(props: FieldProps) {
           className="text-[12px] text-muted-foreground hover:text-foreground"
           onClick={() => change(emptyValueFor(type ?? "TEXT"))}
         >
-          — (未設定)
+          {m.form_unset()}
         </button>
       );
   }

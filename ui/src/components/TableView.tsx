@@ -21,6 +21,7 @@ import { FilterBar } from "./FilterBar";
 import { Grid, type GridColumn } from "./Grid";
 import { SchemaDialog } from "./SchemaDialog";
 import { TableWarnings } from "./TableWarnings";
+import { m } from "@/paraglide/messages.js";
 
 const PAGE = 100;
 
@@ -143,25 +144,25 @@ export function TableView({
           ) : (
             <>
               <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground max-md:hidden">
-                from {view?.parent}
+                {m.table_from({ parent: view?.parent ?? "" })}
               </span>
               <span className="shrink-0 rounded border px-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
-                read-only view
+                {m.table_read_only_view()}
               </span>
             </>
           )}
           <span className="shrink-0 text-[12px] whitespace-nowrap text-muted-foreground">
-            {total} {t ? "records" : "rows"}
+            {t ? m.table_records({ count: total }) : m.table_rows({ count: total })}
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-2.5 max-md:ml-0 max-md:w-full max-md:shrink max-md:overflow-x-auto max-md:pb-0.5">
             <TableWarnings items={ownWarnings} onOpenRecord={onOpenRecord} />
             <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
-              <Database className="size-3.5" /> Schema
+              <Database className="size-3.5" /> {m.table_schema()}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">
-                  <Columns3 className="size-3.5" /> Columns
+                  <Columns3 className="size-3.5" /> {m.table_columns()}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>

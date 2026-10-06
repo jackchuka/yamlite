@@ -6,6 +6,7 @@ docs/superpowers/
 *.tgz
 *.log
 coverage/
+ui/src/paraglide/
 .DS_Store
 .idea/
 test-results/

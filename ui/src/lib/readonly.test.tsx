@@ -65,7 +65,7 @@ test("the sidebar has no New table or Sync, and keeps warning marks", async () =
   expect(await screen.findByText("tasks")).toBeTruthy();
   expect(screen.queryByText(/New table/)).toBeNull();
   expect(screen.queryByText("Sync")).toBeNull();
-  expect(screen.getByRole("img", { name: "1 warnings" })).toBeTruthy();
+  expect(screen.getByRole("img", { name: "1 warning" })).toBeTruthy();
 });
 
 test("the status bar shows the snapshot instead of a watcher", async () => {
@@ -87,7 +87,7 @@ test("the record drawer is view-only and shows a YAML that failed to load as an 
   expect(title.closest("fieldset")?.disabled).toBe(true);
   expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "delete record" })).toBeNull();
-  expect(screen.queryByText("接続が切れています")).toBeNull();
+  expect(screen.queryByText("Connection lost")).toBeNull();
   fireEvent.mouseDown(screen.getByRole("tab", { name: "File" }));
   await waitFor(() => expect(screen.getByText("data/yaml/tasks.json: 404")).toBeTruthy());
 });

@@ -6,6 +6,7 @@ import { changedFields } from "@/lib/form";
 import { restoreDraft, since, type useRecordHistory, valueText } from "@/lib/recordHistory";
 import type { HistoryEntry, Row } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { m } from "@/paraglide/messages.js";
 
 const short = (sha: string) => sha.slice(0, 7);
 const entryId = (e: HistoryEntry) => e.sha ?? "wip";
@@ -29,7 +30,7 @@ function YamlDiff({ table, recordKey, rev }: { table: string; recordKey: string;
     queryFn: () => api.historyDiff(table, recordKey, rev),
   });
   if (error) return <p className="text-[12px] text-err">{error.message}</p>;
-  if (!data) return <p className="text-[12px] text-muted-foreground">読み込み中…</p>;
+  if (!data) return <p className="text-[12px] text-muted-foreground">{m.common_loading()}</p>;
   return (
     <pre className="overflow-x-auto rounded-md bg-panel py-2 font-mono text-[12px] leading-relaxed">
       {data.text.split("\n").map((line, i) => (
@@ -77,13 +78,13 @@ function Detail({ entry, ...props }: Props & { entry: HistoryEntry }) {
                 onClick={() => setView(v)}
                 className={cn("px-2.5 py-0.5", view === v && "bg-foreground text-background")}
               >
-                {v === "fields" ? "Fields" : "YAML diff"}
+                {v === "fields" ? m.history_fields() : m.history_yaml_diff()}
               </button>
             ))}
           </div>
         ) : (
           <span className="text-[12px] text-muted-foreground">
-            {entry.unreadable ? "読めない版です" : "値の変更はありません"}
+            {entry.unreadable ? m.history_unreadable() : m.history_no_value_changes()}
           </span>
         )}
         {entry.kind === "commit" && entry.sha && record !== null && props.canRestore && (
@@ -92,10 +93,10 @@ function Detail({ entry, ...props }: Props & { entry: HistoryEntry }) {
             size="sm"
             className="ml-auto"
             disabled={!restorable}
-            title={restorable ? "この時点の値をフォームに入れます（保存はしません）" : "今の値と同じです"}
+            title={restorable ? m.history_restore_hint() : m.history_same_as_now()}
             onClick={() => props.onRestore(record, entry.sha as string)}
           >
-            この版に戻す
+            {m.history_restore()}
           </Button>
         )}
       </div>
@@ -125,12 +126,12 @@ export function RecordHistory(props: Props) {
   const [open, setOpen] = useState<string | null>(null);
   if (query.error) return <p className="text-[13px] text-err">{query.error.message}</p>;
   const first = query.data?.pages[0];
-  if (!query.data || !first) return <p className="text-[13px] text-muted-foreground">読み込み中…</p>;
+  if (!query.data || !first) return <p className="text-[13px] text-muted-foreground">{m.common_loading()}</p>;
   if (first.state === "nogit") {
-    return <Empty title="git の履歴はありません">このフォルダは git リポジトリの外にあります。</Empty>;
+    return <Empty title={m.history_no_git()}>{m.history_no_git_detail()}</Empty>;
   }
   if (first.state === "untracked") {
-    return <Empty title="まだコミットされていません">コミットすると、ここに変更が並びます。</Empty>;
+    return <Empty title={m.history_no_commits()}>{m.history_no_commits_detail()}</Empty>;
   }
   if (first.state === "error") return <p className="text-[13px] text-err">{first.message}</p>;
   const entries = query.data.pages.flatMap((p) => (p.state === "ok" ? p.entries : []));
@@ -161,9 +162,9 @@ export function RecordHistory(props: Props) {
                 )}
               >
                 <span className="flex items-baseline gap-2 text-[14px] font-semibold">
-                  {e.kind === "wip" ? "未コミットの変更" : e.subject}
+                  {e.kind === "wip" ? m.history_wip() : e.subject}
                   {e.kind === "wip" && (
-                    <span className="rounded bg-warn-soft px-1.5 text-[11px] text-warn">未コミット</span>
+                    <span className="rounded bg-warn-soft px-1.5 text-[11px] text-warn">{m.history_uncommitted()}</span>
                   )}
                   {e.head && <span className="rounded bg-chip px-1.5 text-[11px] text-chip-foreground">HEAD</span>}
                 </span>
@@ -178,8 +179,8 @@ export function RecordHistory(props: Props) {
                   </span>
                 ) : (
                   <span className="mt-1.5 flex flex-wrap gap-1">
-                    {e.event === "created" && <Chip>作成</Chip>}
-                    {e.event === "deleted" && <Chip>削除</Chip>}
+                    {e.event === "created" && <Chip>{m.history_created()}</Chip>}
+                    {e.event === "deleted" && <Chip>{m.history_deleted()}</Chip>}
                     {e.changes.map((c) => (
                       <Chip key={c.path}>{c.path}</Chip>
                     ))}
@@ -198,7 +199,7 @@ export function RecordHistory(props: Props) {
           onClick={() => void query.fetchNextPage()}
           className="mt-2 ml-8 text-[12px] text-muted-foreground"
         >
-          さらに古い履歴を読み込む
+          {m.history_load_older()}
         </button>
       )}
     </div>

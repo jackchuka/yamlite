@@ -300,11 +300,11 @@ test("after saving a restored version, a new edit is no longer labelled as resto
   );
   fireEvent.mouseDown(await screen.findByRole("tab", { name: /History/ }));
   fireEvent.click(await screen.findByRole("button", { name: /old title/ }));
-  fireEvent.click(screen.getByRole("button", { name: "この版に戻す" }));
+  fireEvent.click(screen.getByRole("button", { name: "Restore this version" }));
   fireEvent.click(await screen.findByRole("button", { name: /Save/ }));
   await waitFor(() => expect(screen.getByRole("button", { name: /Save/ }).hasAttribute("disabled")).toBe(true));
   fireEvent.change(screen.getByLabelText("title"), { target: { value: "typed" } });
-  expect(screen.getByText("変更 1 件 · 保存するとファイルに反映")).toBeTruthy();
+  expect(screen.getByText("1 change · saving writes it to the file")).toBeTruthy();
 });
 
 test("restoring a version fills the form, marks it unsaved, and Discard undoes it", async () => {
@@ -333,9 +333,9 @@ test("restoring a version fills the form, marks it unsaved, and Discard undoes i
   );
   fireEvent.mouseDown(await screen.findByRole("tab", { name: /History/ }));
   fireEvent.click(await screen.findByRole("button", { name: /old title/ }));
-  fireEvent.click(screen.getByRole("button", { name: "この版に戻す" }));
+  fireEvent.click(screen.getByRole("button", { name: "Restore this version" }));
   expect(((await screen.findByLabelText("title")) as HTMLInputElement).value).toBe("old");
-  expect(screen.getByText("7be0d44 の値に戻しました · 2 項目が未保存")).toBeTruthy();
+  expect(screen.getByText("Restored the values from 7be0d44 · 2 fields unsaved")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Discard" }));
   expect(((await screen.findByLabelText("title")) as HTMLInputElement).value).toBe("new");
 });

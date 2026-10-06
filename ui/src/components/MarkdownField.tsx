@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTheme } from "@/lib/theme";
 import type { FieldProps } from "./FormField";
+import { m } from "@/paraglide/messages.js";
 
 const MARKDOWN_EXTENSIONS = [markdown(), EditorView.lineWrapping];
 
@@ -27,10 +28,10 @@ export default function MarkdownField({ path, value, onChange, readOnly }: Field
     <Tabs defaultValue={text === "" ? "edit" : "preview"} className="gap-1">
       <TabsList className="h-6 max-md:h-8">
         <TabsTrigger value="preview" className="text-[11px] max-md:text-[13px]">
-          Preview
+          {m.form_preview()}
         </TabsTrigger>
         <TabsTrigger value="edit" className="text-[11px] max-md:text-[13px]">
-          Edit
+          {m.form_edit()}
         </TabsTrigger>
       </TabsList>
       <TabsContent value="edit">
