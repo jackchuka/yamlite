@@ -1,16 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
-import { encode, recordToRow } from "../../codec.ts";
+import { encode } from "../../codec.ts";
 import { canonical } from "../../hash.ts";
-import { invalidKey } from "../../source/files.ts";
 import { markdownExt } from "../../source/markdown.ts";
 import { q } from "../../store.ts";
-import { type DbRow, own, type TableSpec } from "../../types.ts";
+import { own, type TableSpec } from "../../types.ts";
 import { type ApiContext, displayPath, findView, tableSpec, type ViewTarget } from "../context.ts";
 import { HttpError, Reply } from "../http.ts";
 import { buildWhere, orderBy, parseRowQuery, type RowQuery } from "../query.ts";
+import { checkKey, deleteRecord, insertRecord, noKeyIn, readRecord, updateRecord } from "../records.ts";
 import { fromWire, toWire } from "../wire.ts";
-import { ensureColumns, fromWireRecord, objectBody, writeTx } from "../write.ts";
+import { objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
 
 export function recordFile(spec: TableSpec, key: string): string {
@@ -28,19 +28,6 @@ export function insideTable(spec: TableSpec, file: string): boolean {
   if (spec.mode === "list") return true;
   const rel = relative(spec.path, file);
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-}
-
-function checkKey(spec: TableSpec, key: unknown): string {
-  if (typeof key !== "string" || key === "") throw new HttpError(400, "key is required", { field: "key" });
-  if (spec.mode === "files") {
-    const reason = invalidKey(key);
-    if (reason) throw new HttpError(400, reason, { field: "key" });
-  }
-  return key;
-}
-
-function noKeyIn(spec: TableSpec, values: Record<string, unknown>, hint: string): void {
-  if (spec.key in values) throw new HttpError(400, `"${spec.key}" is the key; ${hint}`, { field: spec.key });
 }
 
 function viewRows(ctx: ApiContext, view: ViewTarget, rq: RowQuery) {
@@ -96,18 +83,7 @@ export const rowRoutes: Routes = (router, ctx) => {
     const key = checkKey(spec, b.key);
     const values = objectBody(b.values, "values");
     noKeyIn(spec, values, 'send it as "key"');
-    const { store } = ctx;
-    writeTx(store, () => {
-      const before = store.tableExists(spec.name) ? store.columns(spec.name) : new Map();
-      const record = fromWireRecord(values, before);
-      const types = ensureColumns(store, spec, record);
-      const keyValue = encode(fromWire(key, types.get(spec.key)));
-      if (store.readRow(spec.name, spec.key, keyValue)) {
-        throw new HttpError(409, `"${key}" already exists in ${spec.name}`, { field: "key" });
-      }
-      const row: DbRow = { ...recordToRow(record), [spec.key]: keyValue };
-      store.upsert(spec.name, spec.key, row, Object.keys(row));
-    });
+    writeTx(ctx.store, () => insertRecord(ctx.store, spec, key, values));
     return new Reply(201, { key });
   });
 
@@ -120,10 +96,8 @@ export const rowRoutes: Routes = (router, ctx) => {
     noKeyIn(spec, values, "rename the record instead");
     const { store } = ctx;
     writeTx(store, () => {
-      const row = store.tableExists(spec.name) ? store.readRow(spec.name, spec.key, key) : undefined;
-      if (!row) throw new HttpError(404, `no record "${key}" in ${spec.name}`);
-      const types = store.columns(spec.name);
-      const current = toWire(row, types);
+      const current = readRecord(store, spec, key);
+      if (!current) throw new HttpError(404, `no record "${key}" in ${spec.name}`);
       // only the fields being saved must be unchanged; edits to other fields are kept
       const stale = Object.keys(values).filter(
         (f) => canonical(own(current, f) ?? null) !== canonical(own(base, f) ?? null),
@@ -131,10 +105,7 @@ export const rowRoutes: Routes = (router, ctx) => {
       if (stale.length > 0) {
         throw new HttpError(409, `changed since it was loaded: ${stale.join(", ")}`, { current, stale });
       }
-      const record = fromWireRecord(values, types);
-      ensureColumns(store, spec, record);
-      const update: DbRow = { ...recordToRow(record), [spec.key]: row[spec.key] ?? null };
-      store.upsert(spec.name, spec.key, update, Object.keys(update));
+      updateRecord(store, spec, key, values);
     });
     return { ok: true };
   });
@@ -163,13 +134,7 @@ export const rowRoutes: Routes = (router, ctx) => {
 
   router.add("DELETE", "/api/tables/:table/rows/:key", ({ params }) => {
     const spec = tableSpec(ctx, params.table as string);
-    const key = params.key as string;
-    const { store } = ctx;
-    writeTx(store, () => {
-      const row = store.tableExists(spec.name) ? store.readRow(spec.name, spec.key, key) : undefined;
-      if (!row) throw new HttpError(404, `no record "${key}" in ${spec.name}`);
-      store.delete(spec.name, spec.key, row[spec.key] ?? null);
-    });
+    writeTx(ctx.store, () => deleteRecord(ctx.store, spec, params.key as string));
     return { ok: true };
   });
 };
