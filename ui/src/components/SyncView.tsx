@@ -10,6 +10,8 @@ import { ApiError, api } from "@/lib/api";
 import { diffRows, restoreLabel } from "@/lib/diff";
 import { useEvents, useEventStore, useMeta } from "@/lib/providers";
 import type { ConflictDetail, ConflictEntry } from "@/lib/types";
+import { useIsMobile } from "@/lib/useIsMobile";
+import { FieldDiff } from "./FieldDiff";
 
 const TONE = { ok: "text-ok", warn: "text-warn", err: "text-err", muted: "text-muted-foreground" } as const;
 const time = (at: string) => new Date(at).toLocaleTimeString();
@@ -17,19 +19,17 @@ const show = (v: unknown) => (v === undefined ? "—" : JSON.stringify(v));
 
 function Diff({ entry, detail, keyCol }: { entry: ConflictEntry; detail: ConflictDetail; keyCol?: string }) {
   return (
-    <div className="grid grid-cols-[auto_1fr_1fr] gap-x-3 gap-y-1 font-mono text-[11.5px]">
-      <span />
-      <span className="font-sans text-[10.5px] text-ok">採用: {entry.winner}</span>
-      <span className="font-sans text-[10.5px] text-muted-foreground">退避</span>
-      {detail.deleted && <span className="col-span-3 text-muted-foreground">退避された側では削除されていました</span>}
-      {diffRows(detail.current, detail.saved, keyCol).map((d) => (
-        <div key={d.field} className={`contents ${d.same ? "opacity-50" : ""}`}>
-          <span className="text-syn-key">{d.field}</span>
-          <span>{show(d.winner)}</span>
-          <span>{show(d.saved)}</span>
-        </div>
-      ))}
-    </div>
+    <FieldDiff
+      className="md:text-[11.5px]"
+      labels={[<span className="text-ok">採用: {entry.winner}</span>, "退避"]}
+      note={detail.deleted ? "退避された側では削除されていました" : undefined}
+      rows={diffRows(detail.current, detail.saved, keyCol).map((d) => ({
+        field: d.field,
+        a: show(d.winner),
+        b: show(d.saved),
+        dim: d.same,
+      }))}
+    />
   );
 }
 
@@ -38,6 +38,7 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
   const [confirming, setConfirming] = useState(false);
   const client = useQueryClient();
   const { connected } = useEvents();
+  const mobile = useIsMobile();
   const { data: meta } = useMeta();
   const keyCol = meta?.tables.find((t) => t.name === entry.table)?.key;
   const detail = useQuery({
@@ -73,22 +74,22 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
       : "キーが分からないため、手で戻してください";
   return (
     <div className="border-b px-3.5 py-2.5 text-[12px] last:border-b-0">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-left max-md:basis-full max-md:flex-wrap"
           onClick={() => setOpen(!open)}
         >
           {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
           <span className="font-semibold">
             {entry.table} / {entry.key ?? entry.file}
           </span>
-          <span className="truncate text-[11.5px] text-muted-foreground">
+          <span className="truncate text-[11.5px] text-muted-foreground max-md:basis-full max-md:pl-5 max-md:text-[12.5px] max-md:whitespace-normal">
             {time(entry.at)} · {entry.winner ? `${entry.winner} を採用` : "ヘッダーなし（古い形式）"}
           </span>
         </button>
         <Button
-          size="sm"
+          size={mobile ? "default" : "sm"}
           variant="outline"
           disabled={!connected || !entry.restorable || restore.isPending}
           title={restoreTitle}
@@ -97,7 +98,7 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
           {restoreLabel(entry.restorable ? entry.winner : null)}
         </Button>
         <Button
-          size="sm"
+          size={mobile ? "default" : "sm"}
           variant="ghost"
           disabled={!connected || dismiss.isPending}
           title={connected ? undefined : "disconnected"}
@@ -106,6 +107,7 @@ function ConflictItem({ entry }: { entry: ConflictEntry }) {
           既読
         </Button>
       </div>
+      {mobile && restoreTitle && <p className="mt-1 text-[12px] text-muted-foreground">{restoreTitle}</p>}
       {open && detail.data && (
         <div className="mt-2">
           <Diff entry={entry} detail={detail.data} keyCol={keyCol} />
@@ -184,14 +186,14 @@ export function SyncView() {
   const lines = activityLines(activity);
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <div className="flex items-center gap-2.5 border-b px-[18px] py-3">
-        <h1 className="text-lg font-semibold tracking-tight">Sync</h1>
+      <div className="flex flex-wrap items-center gap-2.5 border-b px-[18px] py-3 max-md:px-3">
+        <h1 className="max-md:sr-only text-lg font-semibold tracking-tight">Sync</h1>
         <span className="text-[12px] text-muted-foreground">
           {connected ? "watching" : "disconnected"}
           {lastSyncAt && ` · last sync ${time(lastSyncAt)}`}
         </span>
       </div>
-      <div className="overflow-auto px-[18px] py-3.5">
+      <div className="overflow-auto px-[18px] py-3.5 max-md:px-3">
         <Card title="Conflicts" count={conflicts.length} tone="err">
           {conflicts.length === 0 ? (
             <p className="px-3.5 py-2.5 text-[12px] text-muted-foreground">コンフリクトはありません</p>
@@ -206,21 +208,26 @@ export function SyncView() {
             warningList.map((w, i) => (
               <div
                 key={`${i}-${w.text}`}
-                className="flex items-center gap-3 border-b px-3.5 py-2 text-[12px] last:border-b-0"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-3.5 py-2 text-[12px] last:border-b-0 max-md:text-[13px]"
               >
                 <span className="font-semibold">
                   {w.table}
                   {w.key && ` / ${w.key}`}
                   {w.view && ` / ${w.view}`}
                 </span>
-                <span className="flex-1 text-muted-foreground">{w.text}</span>
+                <span className="flex-1 text-muted-foreground max-md:order-last max-md:basis-full">{w.text}</span>
                 {w.key && (
-                  <Link to="/t/$table" params={{ table: w.table }} search={{ key: w.key }} className="text-tomato">
+                  <Link
+                    to="/t/$table"
+                    params={{ table: w.table }}
+                    search={{ key: w.key }}
+                    className="text-tomato max-md:py-1.5"
+                  >
                     開く
                   </Link>
                 )}
                 {w.view && (
-                  <Link to="/t/$table" params={{ table: w.view }} className="text-tomato">
+                  <Link to="/t/$table" params={{ table: w.view }} className="text-tomato max-md:py-1.5">
                     開く
                   </Link>
                 )}
@@ -235,7 +242,7 @@ export function SyncView() {
             lines.map((l, i) => (
               <div
                 key={`${i}-${l.at}-${l.text}`}
-                className="flex gap-3 border-b px-3.5 py-2 text-[12px] last:border-b-0"
+                className="flex flex-wrap gap-x-3 border-b px-3.5 py-2 text-[12px] last:border-b-0 max-md:text-[13px]"
               >
                 <span className={`w-3 font-mono font-bold ${TONE[l.tone]}`}>{l.symbol}</span>
                 <span className="font-semibold">{l.text}</span>

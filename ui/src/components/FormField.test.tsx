@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { expect, test, vi } from "vitest";
+import { setMobile } from "@/test/media";
 import { FormField } from "./FormField";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -360,4 +361,13 @@ test("emptying a date field's text emits null and brings the picker toggle back"
   fireEvent.change(screen.getByLabelText("due"), { target: { value: "" } });
   expect(latest).toBe(null);
   expect(screen.getByRole("button", { name: "due as picker" })).toBeTruthy();
+});
+
+test("a chip can be added with a button on a phone", () => {
+  act(() => setMobile(true));
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={["a"]} type="JSON" onChange={onChange} />));
+  fireEvent.change(screen.getByLabelText("tags"), { target: { value: "b" } });
+  fireEvent.click(screen.getByRole("button", { name: "add to tags" }));
+  expect(onChange).toHaveBeenCalledWith(["a", "b"]);
 });

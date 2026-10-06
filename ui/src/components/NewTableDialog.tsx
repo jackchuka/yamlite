@@ -109,16 +109,16 @@ export function NewTableDialog({
               列（あとで YAML に書いても自動で増えます）
             </span>
             {columns.map((c, i) => (
-              <div key={i} className="flex gap-1.5">
+              <div key={i} className="flex flex-wrap gap-1.5">
                 <Input
                   aria-label={`column ${i + 1} name`}
                   value={c.name}
                   onChange={(e) => setColumns(columns.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                  className="font-mono"
+                  className="font-mono max-md:basis-full"
                 />
                 <select
                   aria-label={`column ${i + 1} type`}
-                  className="rounded border bg-background px-2"
+                  className="rounded border bg-background px-2 max-md:h-9 max-md:flex-1"
                   value={c.type}
                   onChange={(e) =>
                     setColumns(columns.map((x, j) => (j === i ? { ...x, type: e.target.value as ColumnType } : x)))

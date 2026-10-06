@@ -28,17 +28,24 @@ export function StatusBar() {
   const conflictCount = conflicts?.conflicts.length ?? 0;
   const ThemeIcon = theme === "system" ? Monitor : theme === "light" ? Sun : Moon;
   return (
-    <footer className="flex items-center gap-4 border-t bg-panel px-3 text-[11px] text-muted-foreground">
+    <footer className="flex h-[30px] items-center gap-4 border-t bg-panel px-3 text-[11px] text-muted-foreground max-md:h-[calc(40px+env(safe-area-inset-bottom))] max-md:gap-3 max-md:pb-[env(safe-area-inset-bottom)] max-md:text-[12px]">
       {snapshot ? (
         <span>Read-only snapshot · {snapshot.generatedAt.slice(0, 16).replace("T", " ")} UTC</span>
       ) : (
         <>
           <span className="flex items-center gap-1.5" aria-live="polite">
             <span className={`size-[7px] rounded-full ${connected ? "bg-ok" : "bg-err"}`} />
-            {connected ? `watching ${meta?.root ?? ""}` : "disconnected"}
+            {connected ? (
+              <>
+                <span className="max-md:hidden">watching {meta?.root ?? ""}</span>
+                <span className="md:hidden">connected</span>
+              </>
+            ) : (
+              "disconnected"
+            )}
           </span>
-          <span>last sync {ago(lastSyncAt, now)}</span>
-          <span>{location.host}</span>
+          <span className="max-md:hidden">last sync {ago(lastSyncAt, now)}</span>
+          <span className="max-md:hidden">{location.host}</span>
         </>
       )}
       <span className="ml-auto flex items-center gap-3.5">
@@ -54,14 +61,14 @@ export function StatusBar() {
         <button
           type="button"
           aria-label={`theme: ${theme}`}
-          className="rounded p-1 hover:bg-panel-2"
+          className="rounded p-1 hover:bg-panel-2 max-md:grid max-md:size-10 max-md:place-items-center"
           onClick={() => {
             const next = nextChoice(theme);
             applyTheme(next);
             setTheme(next);
           }}
         >
-          <ThemeIcon className="size-3.5" />
+          <ThemeIcon className="size-3.5 max-md:size-4.5" />
         </button>
       </span>
     </footer>

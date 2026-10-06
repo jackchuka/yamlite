@@ -91,6 +91,8 @@ export function TableView({
   const pinned = t ? [t.key] : (view?.identity ?? []);
   const columns: GridColumn[] = Object.entries(all)
     .filter(([name]) => pinned.includes(name) || !hidden.has(name))
+    // the key column comes first, where it can stay in place while the rest scrolls
+    .sort(([a], [b]) => Number(b === keyCol) - Number(a === keyCol))
     .map(([name, type]) => {
       const reference = (t ?? (view as ViewMeta)).references.find((r) => r.column === name);
       return { name, type, note: reference ? `→ ${reference.table}` : undefined, reference };
@@ -112,21 +114,23 @@ export function TableView({
     setSearch({ sort: next });
   };
 
+  const path = t ? (t.mode === "files" ? t.files : t.path) : `from ${view?.parent}`;
+
   return (
     <div className="relative flex min-w-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-w-0 items-center gap-2.5 border-b px-[18px] py-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2.5 border-b px-[18px] py-3 max-md:gap-2 max-md:px-3 max-md:py-2">
           {/* a long name or path gives way, so the buttons stay in view */}
-          <h1 title={table} className="min-w-0 truncate text-lg font-semibold tracking-tight">
+          <h1 title={table} className="min-w-0 truncate text-lg font-semibold tracking-tight max-md:sr-only">
             {table}
           </h1>
           {t ? (
-            <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+            <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground max-md:hidden">
               {t.mode === "files" ? t.files : t.path}
             </span>
           ) : (
             <>
-              <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground">
+              <span className="min-w-0 shrink-[100] truncate rounded bg-panel px-1.5 font-mono text-[11px] text-muted-foreground max-md:hidden">
                 from {view?.parent}
               </span>
               <span className="shrink-0 rounded border px-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
@@ -137,7 +141,7 @@ export function TableView({
           <span className="shrink-0 text-[12px] whitespace-nowrap text-muted-foreground">
             {total} {t ? "records" : "rows"}
           </span>
-          <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          <div className="ml-auto flex shrink-0 items-center gap-2.5 max-md:ml-0 max-md:w-full max-md:shrink max-md:overflow-x-auto max-md:pb-0.5">
             <TableWarnings items={ownWarnings} onOpenRecord={onOpenRecord} />
             <Button variant="outline" size="sm" onClick={() => setSchemaOpen(true)}>
               <Database className="size-3.5" /> Schema
@@ -193,7 +197,7 @@ export function TableView({
         )}
       </section>
       {t && search.key !== undefined && drawer?.(t, search.key)}
-      {schemaOpen && <SchemaDialog table={table} view={view} open onOpenChange={setSchemaOpen} />}
+      {schemaOpen && <SchemaDialog table={table} view={view} path={path} open onOpenChange={setSchemaOpen} />}
     </div>
   );
 }

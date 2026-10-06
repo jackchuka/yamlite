@@ -220,3 +220,25 @@
 [data-resizing] iframe {
   pointer-events: none;
 }
+
+/* iOS zooms into any focused field under 16px */
+@media (width < 48rem) {
+  input,
+  textarea,
+  select,
+  .cm-editor {
+    font-size: 16px;
+  }
+}
+
+@keyframes y-slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+@keyframes y-slide-right {
+  from {
+    transform: translateX(-100%);
+  }
+}

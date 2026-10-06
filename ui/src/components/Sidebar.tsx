@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 import { warningLinks } from "@/lib/activity";
+import { openCommandMenu } from "@/lib/commandMenu";
 import { groupTables, useCollapsedGroups } from "@/lib/groups";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
@@ -20,7 +21,8 @@ import { useEvents, useMeta } from "@/lib/providers";
 import type { TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const item = "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2";
+const item =
+  "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2 max-md:py-2.5 max-md:text-[15px]";
 const active = { className: cn(item, "bg-tomato text-[var(--y-on-accent)] font-semibold hover:bg-tomato") };
 
 // a table or view with warnings shows how many in place of its icon, so its row count stays on the right
@@ -39,7 +41,7 @@ function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
   );
 }
 
-export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
+export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onSearch?: () => void }) {
   const { data: meta } = useMeta();
   const { warnings, connected } = useEvents();
   const readOnly = isReadOnly();
@@ -55,7 +57,7 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
         <Link to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
           <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
           {t.name}
-          <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{t.count}</span>
+          <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">{t.count}</span>
         </Link>
         {meta?.views
           .filter((v) => v.table === t.name)
@@ -70,14 +72,16 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
             >
               <WarnMark count={warnOf(v.name)} fallback={<Layers className="size-3.5 shrink-0 opacity-70" />} />
               <span className="truncate">{v.name}</span>
-              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums">{v.count}</span>
+              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+                {v.count}
+              </span>
             </Link>
           ))}
       </Fragment>
     );
   };
   return (
-    <aside className="flex min-h-0 flex-col border-r bg-panel" aria-label="sidebar">
+    <aside className="flex h-full min-h-0 flex-col border-r bg-panel" aria-label="sidebar">
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
         <img src="./favicon.svg" alt="" className="size-6" />
         yamlite
@@ -85,13 +89,16 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
       </div>
       <button
         type="button"
-        className="mx-2.5 mb-2 flex justify-between rounded-md border bg-background px-2 py-1.5 text-[12px] text-muted-foreground"
-        onClick={() => document.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }))}
+        className="mx-2.5 mb-2 flex justify-between rounded-md border bg-background px-2 py-1.5 text-[12px] text-muted-foreground max-md:py-2.5 max-md:text-[14px]"
+        onClick={() => {
+          onSearch?.();
+          openCommandMenu();
+        }}
       >
         <span>Search…</span>
-        <kbd className="rounded border px-1 font-mono text-[10px]">⌘K</kbd>
+        <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
       </button>
-      <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
         Tables
       </div>
       <nav className="flex flex-col gap-px overflow-auto">
@@ -104,7 +111,7 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
                 <button
                   type="button"
                   aria-expanded={open}
-                  className="mx-1.5 mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] font-semibold text-muted-foreground hover:bg-panel-2"
+                  className="mx-1.5 mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-[11.5px] font-semibold text-muted-foreground hover:bg-panel-2 max-md:py-2 max-md:text-[13px]"
                   onClick={() => toggleGroup(group)}
                 >
                   <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
@@ -128,7 +135,7 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
       </nav>
       {meta && meta.pages.length > 0 && (
         <>
-          <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+          <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
             Pages
           </div>
           <nav className="flex flex-col gap-px">
@@ -141,7 +148,7 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
           </nav>
         </>
       )}
-      <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+      <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
         Tools
       </div>
       <nav className="flex flex-col gap-px">
@@ -162,10 +169,14 @@ export function Sidebar({ onNewTable }: { onNewTable?: () => void }) {
           </Link>
         )}
       </nav>
-      <div className="mt-auto border-t px-3.5 py-2.5 text-[11px] text-muted-foreground">
+      <div className="mt-auto border-t px-3.5 py-2.5 text-[11px] text-muted-foreground max-md:pb-[calc(0.625rem+env(safe-area-inset-bottom))] max-md:text-[12px]">
         {meta?.configFile} · {meta?.tables.length ?? 0} tables
         <br />
         DB {meta?.db}
+        <span className="md:hidden">
+          <br />
+          {location.host}
+        </span>
       </div>
     </aside>
   );

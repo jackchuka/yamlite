@@ -6,7 +6,7 @@ export function JsonPopover({ title, value, children }: { title: string; value: 
   return (
     <Popover>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent className="w-80" align="start" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-[min(20rem,calc(100vw-2rem))]" align="start" onClick={(e) => e.stopPropagation()}>
         <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
           <span>{title}</span>
           <button

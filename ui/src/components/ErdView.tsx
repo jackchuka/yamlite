@@ -22,6 +22,7 @@ import { buildErd, type Erd } from "@/lib/erd";
 import { layoutErd } from "@/lib/erdLayout";
 import { useEvents, useMeta } from "@/lib/providers";
 import { useTheme } from "@/lib/theme";
+import { useIsMobile } from "@/lib/useIsMobile";
 import type { Meta, TableSchema } from "@/lib/types";
 import { columnHandle, type ErdFlowNode, ErdNodeView, headerHandle, HighlightContext } from "./ErdNode";
 import { ErdSelfLoop } from "./ErdSelfLoop";
@@ -103,6 +104,7 @@ interface DiagramProps {
 
 function Diagram({ meta, schemas, warnings }: DiagramProps) {
   const navigate = useNavigate();
+  const mobile = useIsMobile();
   const { fitView } = useReactFlow();
   const theme = useTheme();
   const [showViews, setShowViews] = useState(true);
@@ -146,8 +148,8 @@ function Diagram({ meta, schemas, warnings }: DiagramProps) {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="flex items-center gap-4 border-b px-4 py-2.5">
-        <h1 className="text-[15px] font-bold">ERD</h1>
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2.5 max-md:px-3">
+        <h1 className="max-md:sr-only text-[15px] font-bold">ERD</h1>
         <label className="flex items-center gap-2 text-[12px]">
           <Switch checked={showViews} onCheckedChange={setShowViews} />
           ビューを表示
@@ -155,8 +157,10 @@ function Diagram({ meta, schemas, warnings }: DiagramProps) {
         <Button size="sm" variant="outline" onClick={() => setRound((r) => r + 1)}>
           <RotateCcw className="size-3.5" /> 再レイアウト
         </Button>
-        <span className="ml-auto text-[12px] text-muted-foreground">
-          クリックで関連をハイライト · ダブルクリックでテーブルを開く
+        <span className="text-[12px] text-muted-foreground max-md:basis-full max-md:text-[12.5px] md:ml-auto">
+          {mobile
+            ? "タップで関連をハイライト · タイトルをタップでテーブルを開く"
+            : "クリックで関連をハイライト · ダブルクリックでテーブルを開く"}
         </span>
       </header>
       <div className="min-h-0 flex-1">
@@ -178,8 +182,8 @@ function Diagram({ meta, schemas, warnings }: DiagramProps) {
             style={palette}
           >
             <Background gap={18} />
-            <Controls showInteractive={false} />
-            <MiniMap pannable zoomable />
+            <Controls showInteractive={false} className="max-md:[&_button]:size-9" />
+            {!mobile && <MiniMap pannable zoomable />}
           </ReactFlow>
         </HighlightContext.Provider>
       </div>

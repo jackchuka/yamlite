@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/theme";
 import type { Meta, PageMeta } from "@/lib/types";
 import { accessBrief, accessSummary } from "../../../src/pages/access.ts";
 import { RecordDrawer } from "./RecordDrawer";
+import { HintPopover } from "./HintPopover";
 
 export function PageView({ name }: { name: string }) {
   const theme = useTheme();
@@ -93,14 +94,15 @@ export function PageView({ name }: { name: string }) {
   };
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <header className="flex min-w-0 items-center gap-3 border-b px-[18px] py-2.5">
-        <h1 className="shrink-0 whitespace-nowrap text-[15px] font-semibold">{page.title}</h1>
-        <span
-          className="min-w-0 truncate font-mono text-[11px] text-muted-foreground"
-          title={`${page.path}\n${accessSummary(page)}`}
+      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-[18px] py-2.5 max-md:px-3">
+        <h1 className="shrink-0 whitespace-nowrap text-[15px] font-semibold max-md:sr-only">{page.title}</h1>
+        <HintPopover
+          label="access"
+          hint={`${page.path}\n${accessSummary(page)}`}
+          className="min-w-0 truncate text-left font-mono text-[11px] text-muted-foreground max-md:text-[12px]"
         >
           {accessBrief(page)}
-        </span>
+        </HintPopover>
       </header>
       {blocked.length > 0 && (
         <div role="alert" className="border-b bg-warn-soft px-[18px] py-1.5 text-[12px] text-warn">
@@ -113,7 +115,7 @@ export function PageView({ name }: { name: string }) {
         </div>
       )}
       {navigated ? (
-        <div role="alert" className="flex items-center gap-3 px-[18px] py-3 text-err">
+        <div role="alert" className="flex flex-wrap items-center gap-3 px-[18px] py-3 text-err max-md:px-3">
           ページが別の URL に移動したため、接続を切りました。
           <Button size="sm" onClick={() => setGeneration((g) => g + 1)}>
             再読み込み

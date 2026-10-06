@@ -62,11 +62,11 @@ export function FilterBar({
     setOpen(false);
   };
   return (
-    <div className="flex items-center gap-2 border-b px-[18px] py-2">
+    <div className="flex flex-wrap items-center gap-2 border-b px-[18px] py-2 max-md:px-3">
       <Input
         aria-label="key prefix"
         placeholder="key prefix…"
-        className="h-7 max-w-[220px] text-[12px]"
+        className="h-7 max-w-[220px] text-[12px] max-md:h-9 max-md:max-w-none max-md:basis-full"
         value={prefixText}
         onChange={(e) => setPrefixText(e.target.value)}
       />
@@ -74,7 +74,7 @@ export function FilterBar({
         <button
           key={`${i}-${label(f)}`}
           type="button"
-          className="rounded-full border border-tomato bg-tomato-soft px-2 py-0.5 text-[11.5px] text-tomato"
+          className="rounded-full border border-tomato bg-tomato-soft px-2 py-0.5 text-[11.5px] text-tomato max-md:min-h-8 max-md:px-3 max-md:text-[13px]"
           onClick={() => onChange({ filters: filters.filter((_, j) => j !== i), prefix })}
         >
           {label(f)} ×
@@ -84,15 +84,15 @@ export function FilterBar({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="rounded-full border border-dashed px-2 py-0.5 text-[11.5px] text-muted-foreground"
+            className="rounded-full border border-dashed px-2 py-0.5 text-[11.5px] text-muted-foreground max-md:min-h-8 max-md:px-3 max-md:text-[13px]"
           >
             + filter
           </button>
         </PopoverTrigger>
-        <PopoverContent className="flex w-80 flex-col gap-2">
+        <PopoverContent className="flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-2">
           <select
             aria-label="column"
-            className="rounded border bg-background px-2 py-1"
+            className="rounded border bg-background px-2 py-1 max-md:py-2"
             value={draft.col}
             onChange={(e) => setDraft({ ...draft, col: e.target.value })}
           >
@@ -102,7 +102,7 @@ export function FilterBar({
           </select>
           <select
             aria-label="operator"
-            className="rounded border bg-background px-2 py-1"
+            className="rounded border bg-background px-2 py-1 max-md:py-2"
             value={draft.op}
             onChange={(e) => setDraft({ ...draft, op: e.target.value as FilterOp })}
           >

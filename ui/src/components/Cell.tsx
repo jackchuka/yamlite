@@ -48,7 +48,7 @@ export function Cell({
     case "map":
       return (
         <JsonPopover title={`${column} · ${rowKey}`} value={value}>
-          <button type="button" className="text-left" onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="text-left max-md:min-h-8" onClick={(e) => e.stopPropagation()}>
             {v.entries.map(([k, text]) => (
               <span key={k} className="mr-1.5">
                 <span className="mr-0.5 text-[11px] text-muted-foreground">{k}</span>
@@ -62,7 +62,7 @@ export function Cell({
     case "nested":
       return (
         <JsonPopover title={`${column} · ${rowKey}`} value={value}>
-          <button type="button" className="text-left" onClick={(e) => e.stopPropagation()}>
+          <button type="button" className="text-left max-md:min-h-8" onClick={(e) => e.stopPropagation()}>
             <span className="mr-1.5 rounded border px-1 font-mono text-[10px] text-muted-foreground">{v.label}</span>
             <span className="border-b border-dotted border-muted-foreground">{v.preview}</span>
           </button>

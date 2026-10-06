@@ -12,6 +12,7 @@ import { SyncView } from "./components/SyncView";
 import { TableView } from "./components/TableView";
 import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
+import { useIsMobile } from "./lib/useIsMobile";
 import type { TableMeta } from "./lib/types";
 import { erdRoute, pageRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
 
@@ -26,12 +27,18 @@ function Home() {
 function NewRecordButton({ table }: { table: TableMeta }) {
   const [open, setOpen] = useState(false);
   const { connected } = useEvents();
+  const mobile = useIsMobile();
   return (
     <>
       <Button
-        size="sm"
+        size={mobile ? "lg" : "sm"}
         disabled={!connected}
         title={connected ? undefined : "disconnected"}
+        className={
+          mobile
+            ? "fixed right-4 bottom-[calc(56px+env(safe-area-inset-bottom))] z-30 rounded-full shadow-lg"
+            : undefined
+        }
         onClick={() => setOpen(true)}
       >
         + New record
@@ -50,7 +57,7 @@ function RenameButton({ table, recordKey }: { table: TableMeta; recordKey: strin
         type="button"
         aria-label="rename key"
         disabled={!connected}
-        className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+        className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 max-md:px-2 max-md:py-2 max-md:text-[13px]"
         onClick={() => setOpen(true)}
       >
         rename

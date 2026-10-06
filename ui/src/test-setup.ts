@@ -1,4 +1,9 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach } from "vitest";
+import { installMatchMedia, setMobile } from "./test/media";
 
-afterEach(cleanup);
+installMatchMedia();
+afterEach(() => {
+  cleanup();
+  setMobile(false);
+});

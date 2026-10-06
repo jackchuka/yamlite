@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 import type { ErdColumn, ErdNode } from "@/lib/erd";
 import { HEADER_HEIGHT, NODE_WIDTH, ROW_HEIGHT } from "@/lib/erdLayout";
 import { cn } from "@/lib/utils";
+import { HintPopover } from "./HintPopover";
 
 export type ErdFlowNode = Node<{ node: ErdNode }, "erd">;
 
@@ -57,7 +58,11 @@ export function ErdNodeView({ data: { node } }: NodeProps<ErdFlowNode>) {
         ) : (
           <Table2 className="size-3.5 shrink-0 opacity-70" />
         )}
-        <Link to="/t/$table" params={{ table: node.name }} className="nodrag truncate hover:underline">
+        <Link
+          to="/t/$table"
+          params={{ table: node.name }}
+          className="nodrag truncate hover:underline max-md:py-1.5 max-md:underline max-md:underline-offset-2"
+        >
           {node.name}
         </Link>
         {node.warnings > 0 && (
@@ -81,7 +86,6 @@ export function ErdNodeView({ data: { node } }: NodeProps<ErdFlowNode>) {
       {node.columns.map((c) => (
         <div
           key={c.name}
-          title={c.problems.length > 0 ? c.problems.join("\n") : undefined}
           className={cn("relative flex items-center gap-1.5 px-2.5", c.problems.length > 0 && "bg-warn-soft")}
           style={{ height: ROW_HEIGHT }}
         >
@@ -92,9 +96,19 @@ export function ErdNodeView({ data: { node } }: NodeProps<ErdFlowNode>) {
             isConnectable={false}
             className={handle}
           />
-          <span className="flex w-3.5 shrink-0 justify-center">
-            <Mark column={c} />
-          </span>
+          {c.problems.length > 0 ? (
+            <HintPopover
+              label={`${c.name} problems`}
+              hint={c.problems.join("\n")}
+              className="nodrag flex w-3.5 justify-center max-md:-m-1.5 max-md:size-6.5 max-md:items-center"
+            >
+              <Mark column={c} />
+            </HintPopover>
+          ) : (
+            <span className="flex w-3.5 shrink-0 justify-center">
+              <Mark column={c} />
+            </span>
+          )}
           <span className={cn("truncate font-mono", c.key && "font-semibold")}>{c.name}</span>
           <span className="ml-auto font-mono text-[10.5px] text-muted-foreground">{c.type}</span>
           <Handle

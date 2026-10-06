@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeAll, expect, test, vi } from "vitest";
+import { setMobile } from "@/test/media";
 import { Grid } from "./Grid";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -109,4 +110,42 @@ test("an empty reference cell is not a link", () => {
     />,
   );
   expect(screen.queryByRole("link")).toBeNull();
+});
+
+test("the key column stays in place when scrolled sideways", () => {
+  render(
+    <Grid
+      columns={[
+        { name: "id", type: "TEXT" },
+        { name: "title", type: "TEXT" },
+      ]}
+      rows={[{ id: "a", title: "A" }]}
+      keyCol="id"
+    />,
+  );
+  const [keyHeader, other] = screen.getAllByRole("columnheader");
+  expect(keyHeader?.className).toContain("sticky");
+  expect(other?.className).not.toContain("sticky");
+  const [keyCell] = screen.getAllByRole("gridcell");
+  expect(keyCell?.className).toContain("sticky");
+});
+
+test("rows are taller on a phone", () => {
+  act(() => setMobile(true));
+  const { container } = render(<Grid columns={[{ name: "id", type: "TEXT" }]} rows={[{ id: "a" }]} keyCol="id" />);
+  expect(container.querySelector<HTMLElement>('[data-key="a"]')?.style.height).toBe("44px");
+});
+
+test("a row's warning mark is big enough to tap on a phone", () => {
+  const { container } = render(
+    <Grid
+      columns={[{ name: "id", type: "TEXT" }]}
+      rows={[{ id: "b" }]}
+      keyCol="id"
+      flagged={new Map([["b", ["w"]]])}
+    />,
+  );
+  const mark = container.querySelector('[aria-label="has warnings"]');
+  expect(mark?.className).toContain("max-md:min-w-8");
+  expect(mark?.className).toContain("max-md:min-h-8");
 });
