@@ -22,6 +22,8 @@ const table: TableMeta = {
   formats: {},
   values: {},
   required: ["title"],
+  min: {},
+  max: {},
   references: [],
   count: 0,
   inDb: true,

@@ -233,3 +233,131 @@ test("a JSON column ignores values", () => {
   render(wrap(<FormField path={["tags"]} value={["a"]} type="JSON" allowed={["a"]} onChange={() => {}} />));
   expect(screen.queryByRole("combobox")).toBeNull();
 });
+
+test("a date field edits with a date input and emits the date as text; clearing it emits null", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["due"]} value="2026-10-06" type="TEXT" format="date" onChange={onChange} />));
+  const input = screen.getByLabelText("due") as HTMLInputElement;
+  expect(input.type).toBe("date");
+  fireEvent.change(input, { target: { value: "2026-10-31" } });
+  expect(onChange).toHaveBeenLastCalledWith("2026-10-31");
+  fireEvent.change(input, { target: { value: "" } });
+  expect(onChange).toHaveBeenLastCalledWith(null);
+});
+
+test("a datetime field keeps the value's offset and shows it next to the picker", () => {
+  const onChange = vi.fn();
+  render(
+    wrap(
+      <FormField path={["at"]} value="2026-10-06T09:00:30+09:00" type="TEXT" format="datetime" onChange={onChange} />,
+    ),
+  );
+  const input = screen.getByLabelText("at") as HTMLInputElement;
+  expect(input.type).toBe("datetime-local");
+  // seconds that are not :00, since an input normalizes 09:00:00 to 09:00
+  expect(input.value).toBe("2026-10-06T09:00:30");
+  expect(screen.getByText("+09:00")).toBeTruthy();
+  fireEvent.change(input, { target: { value: "2026-10-06T12:30:15" } });
+  expect(onChange).toHaveBeenLastCalledWith("2026-10-06T12:30:15+09:00");
+});
+
+test("a datetime the picker cannot show is edited as text, and the toggle switches back when it can", () => {
+  function Harness() {
+    const [value, setValue] = useState<unknown>("tomorrow");
+    return <FormField path={["at"]} value={value} type="TEXT" format="datetime" onChange={setValue} />;
+  }
+  render(wrap(<Harness />));
+  const text = screen.getByLabelText("at") as HTMLInputElement;
+  expect(text.type).toBe("text");
+  expect(screen.getByText("not a datetime")).toBeTruthy();
+  fireEvent.change(text, { target: { value: "2026-10-06T09:00Z" } });
+  fireEvent.click(screen.getByRole("button", { name: "at as picker" }));
+  expect((screen.getByLabelText("at") as HTMLInputElement).type).toBe("datetime-local");
+  fireEvent.click(screen.getByRole("button", { name: "at as text" }));
+  expect((screen.getByLabelText("at") as HTMLInputElement).value).toBe("2026-10-06T09:00Z");
+});
+
+test("a number out of bounds is marked and explained, and still emitted", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["priority"]} value={7} type="INTEGER" max={5} onChange={onChange} />));
+  expect(screen.getByText("above max 5")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("priority"), { target: { value: "9" } });
+  expect(onChange).toHaveBeenLastCalledWith(9);
+});
+
+test("the date picker gets the bounds as min and max", () => {
+  render(
+    wrap(
+      <FormField
+        path={["due"]}
+        value={null}
+        type="TEXT"
+        format="date"
+        min="2026-01-01"
+        max="2026-12-31"
+        onChange={() => {}}
+      />,
+    ),
+  );
+  const input = screen.getByLabelText("due") as HTMLInputElement;
+  expect(input.min).toBe("2026-01-01");
+  expect(input.max).toBe("2026-12-31");
+});
+
+test("a datetime keeps its spelling when the picker is emptied before the new value is typed", () => {
+  let latest: unknown;
+  function Harness() {
+    const [value, setValue] = useState<unknown>("2026-10-06 09:00:30Z");
+    latest = value;
+    return <FormField path={["at"]} value={value} type="TEXT" format="datetime" onChange={setValue} />;
+  }
+  render(wrap(<Harness />));
+  const picker = screen.getByLabelText("at") as HTMLInputElement;
+  fireEvent.change(picker, { target: { value: "" } });
+  expect(latest).toBe(null);
+  fireEvent.change(screen.getByLabelText("at"), { target: { value: "2026-10-06T12:30:15" } });
+  expect(latest).toBe("2026-10-06 12:30:15Z");
+});
+
+test("a value outside its bounds gets the warning border", () => {
+  render(wrap(<FormField path={["priority"]} value={7} type="INTEGER" max={5} onChange={() => {}} />));
+  expect(screen.getByLabelText("priority").className).toContain("border-warn");
+});
+
+test("a value inside its bounds keeps the normal border", () => {
+  render(wrap(<FormField path={["priority"]} value={3} type="INTEGER" max={5} onChange={() => {}} />));
+  expect(screen.getByLabelText("priority").className).not.toContain("border-warn");
+});
+
+test("a datetime picker gets the bounds in the value's offset", () => {
+  render(
+    wrap(
+      <FormField
+        path={["at"]}
+        value="2026-10-06T09:00:00+09:00"
+        type="TEXT"
+        format="datetime"
+        min="2026-01-01"
+        max="2026-12-31T23:59:59Z"
+        onChange={() => {}}
+      />,
+    ),
+  );
+  const input = screen.getByLabelText("at") as HTMLInputElement;
+  expect(input.min).toBe("2026-01-01T09:00");
+  expect(input.max).toBe("2027-01-01T08:59:59");
+});
+
+test("emptying a date field's text emits null and brings the picker toggle back", () => {
+  let latest: unknown;
+  function Harness() {
+    const [value, setValue] = useState<unknown>("soon");
+    latest = value;
+    return <FormField path={["due"]} value={value} type="TEXT" format="date" onChange={setValue} />;
+  }
+  render(wrap(<Harness />));
+  expect(screen.queryByRole("button", { name: "due as picker" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("due"), { target: { value: "" } });
+  expect(latest).toBe(null);
+  expect(screen.getByRole("button", { name: "due as picker" })).toBeTruthy();
+});

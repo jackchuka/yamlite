@@ -26,6 +26,8 @@ export const metaRoutes: Routes = (router, ctx) => {
         formats: t.formats,
         values: t.values,
         required: t.required,
+        min: t.min,
+        max: t.max,
         references: t.references,
         count,
         inDb,
@@ -60,6 +62,9 @@ export const metaRoutes: Routes = (router, ctx) => {
           references: spec.references,
           values: spec.values,
           required: spec.required,
+          formats: spec.formats,
+          min: spec.min,
+          max: spec.max,
           count,
           inDb: record !== undefined,
         };

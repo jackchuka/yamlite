@@ -26,6 +26,8 @@ test("the modules the static UI shares with the server import nothing from node"
     "src/serve/sqltext.ts",
     "src/serve/errors.ts",
     "src/pages/access.ts",
+    "src/datetime.ts",
+    "src/rules.ts",
   ]) {
     expect(nodeImports(resolve(repo, entry)), entry).toEqual([]);
   }

@@ -15,6 +15,8 @@ const expand = (field: string, extra: Partial<ExpandSpec> = {}): ExpandSpec => (
   references: [],
   values: {},
   required: [],
+  min: {},
+  max: {},
   expand: [],
   ...extra,
 });
@@ -142,6 +144,8 @@ describe("buildView", () => {
         references: [],
         values: {},
         required: [],
+        min: {},
+        max: {},
         expand: [],
       },
       milestones.next,
@@ -161,6 +165,8 @@ describe("buildView", () => {
       references: [],
       values: {},
       required: [],
+      min: {},
+      max: {},
       expand: [],
     });
     const one = buildView(child("projects__children"), root, [[{ children: [{ children: [{ name: "x" }] }] }]]);
@@ -200,6 +206,8 @@ function setup(list: ExpandSpec[]) {
     references: [],
     values: {},
     required: [],
+    min: {},
+    max: {},
     persisted: false,
     exclude: [],
     expand: list,
@@ -221,6 +229,8 @@ const tasks: ExpandSpec = {
   references: [],
   values: {},
   required: [],
+  min: {},
+  max: {},
   expand: [],
 };
 const views = (db: string) =>
@@ -377,6 +387,8 @@ describe("reconcileViews", () => {
       references: [],
       values: {},
       required: [],
+      min: {},
+      max: {},
       persisted: false,
       exclude: [],
       expand: [
@@ -388,6 +400,8 @@ describe("reconcileViews", () => {
           references: [],
           values: {},
           required: [],
+          min: {},
+          max: {},
           expand: [],
         },
       ],
@@ -410,6 +424,8 @@ describe("reconcileViews", () => {
       references: [],
       values: {},
       required: [],
+      min: {},
+      max: {},
       expand,
     });
     const t = setup([

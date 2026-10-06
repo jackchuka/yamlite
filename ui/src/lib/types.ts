@@ -1,6 +1,7 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
-export type ColumnFormat = "markdown";
+export type ColumnFormat = "markdown" | "date" | "datetime";
 export type AllowedValue = string | number | boolean;
+export type Bound = number | string;
 
 export interface Reference {
   column: string;
@@ -20,6 +21,8 @@ export interface TableMeta {
   references: Reference[];
   values: Record<string, AllowedValue[]>;
   required: string[];
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
   count: number;
   inDb: boolean;
   group: string | null;
@@ -36,6 +39,9 @@ export interface ViewMeta {
   references: Reference[];
   values: Record<string, AllowedValue[]>;
   required: string[];
+  formats: Record<string, ColumnFormat>;
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
   count: number;
   inDb: boolean;
 }
@@ -72,6 +78,9 @@ export interface TableSchema {
   references: Array<{ column: string; table: string; target: string; problems: string[] }>;
   values: Record<string, AllowedValue[]>;
   required: string[];
+  formats: Record<string, ColumnFormat>;
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
   indexes: Array<{
     name: string;
     definition: string;

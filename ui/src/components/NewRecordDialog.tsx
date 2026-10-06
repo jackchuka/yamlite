@@ -68,6 +68,8 @@ export function NewRecordDialog({
                 type={type}
                 format={Object.hasOwn(table.formats, c) ? table.formats[c] : undefined}
                 allowed={Object.hasOwn(table.values, c) ? table.values[c] : undefined}
+                min={Object.hasOwn(table.min, c) ? table.min[c] : undefined}
+                max={Object.hasOwn(table.max, c) ? table.max[c] : undefined}
                 reference={table.references.find((r) => r.column === c)}
                 onChange={(next) => setValues({ ...values, [c]: next })}
               />

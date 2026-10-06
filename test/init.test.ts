@@ -11,6 +11,48 @@ const HEADER = [
 ];
 
 describe("generateConfig", () => {
+  test("infers date and datetime formats for TEXT columns that only hold them", () => {
+    const root = tmpRoot();
+    write(join(root, "tasks/a.yaml"), "due: 2026-10-06\nat: 2026-10-06T09:00+09:00\nmixed: 2026-10-06\nnote: hi\n");
+    write(join(root, "tasks/b.yaml"), "due: 2026-11-01\nat: 2026-10-07\nmixed: soon\nnote: 2026-10-06\n");
+    write(join(root, "tasks/c.yaml"), "due: null\n");
+    const out = generateConfig({ root });
+    expect(out).toContain(["    formats:", "      due: date", "      at: datetime", ""].join("\n"));
+    expect(out).not.toContain("mixed: date");
+    expect(out).not.toContain("note: date");
+  });
+
+  test("infers no format for a column that mixes dates and numbers", () => {
+    const root = tmpRoot();
+    write(join(root, "tasks/a.yaml"), "when: 2026-10-06\n");
+    write(join(root, "tasks/b.yaml"), "when: 5\n");
+    expect(generateConfig({ root })).not.toContain("when: date");
+  });
+
+  test("leaves declared formats and columns with values alone", () => {
+    const root = tmpRoot();
+    write(join(root, "tasks/a.yaml"), "due: 2026-10-06\nday: 2026-10-06\n");
+    write(
+      join(root, "yamlite.yaml"),
+      "tables:\n  tasks:\n    formats: { due: markdown }\n    values: { day: [2026-10-06] }\n",
+    );
+    const out = generateConfig({ root, force: true });
+    expect(out).toContain(["    formats:", "      due: markdown", ""].join("\n"));
+    expect(out).not.toContain("day: date");
+  });
+
+  test("keeps min and max when it rewrites yamlite.yaml", () => {
+    const root = tmpRoot();
+    write(join(root, "tasks/a.yaml"), "priority: 2\nmilestones:\n  - points: 3\n");
+    write(
+      join(root, "yamlite.yaml"),
+      "tables:\n  tasks:\n    columns: { priority: INTEGER }\n    min: { priority: 1 }\n    max: { priority: 5 }\n    expand: { milestones: { columns: { points: INTEGER }, max: { points: 13 } } }\n",
+    );
+    const out = generateConfig({ root, force: true });
+    expect(out).toContain(["    min:", "      priority: 1", "    max:", "      priority: 5", ""].join("\n"));
+    expect(out).toContain(["        max:", "          points: 13", ""].join("\n"));
+  });
+
   test("keeps expand declarations when it rewrites yamlite.yaml", () => {
     const root = tmpRoot();
     write(join(root, "projects/website.yaml"), "title: Website\nmilestones:\n  - title: Design\n");

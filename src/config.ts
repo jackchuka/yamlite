@@ -2,10 +2,12 @@ import { type Dirent, existsSync, readdirSync, readFileSync, statSync } from "no
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parse } from "yaml";
+import { instant, isDate, isDatetime } from "./datetime.ts";
 import { claims } from "./source/files.ts";
 import { YAML_EXT, YAML_GLOB } from "./source/yamldoc.ts";
 import {
   type AllowedValue,
+  type Bound,
   COLUMN_FORMATS,
   COLUMN_TYPES,
   type ColumnFormat,
@@ -35,6 +37,8 @@ export interface TableInput {
   references?: Record<string, unknown>;
   values?: unknown;
   required?: unknown;
+  min?: unknown;
+  max?: unknown;
   expand?: Record<string, unknown>;
   group?: string;
 }
@@ -186,6 +190,8 @@ interface RawTable {
   references?: Record<string, unknown>;
   values?: unknown;
   required?: unknown;
+  min?: unknown;
+  max?: unknown;
   expand?: Record<string, unknown>;
   group?: unknown;
 }
@@ -258,6 +264,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     ),
     values: toValues(where, t.values, formats),
     required: toRequired(where, t.required),
+    ...toBounds(where, t, columns, formats),
     persisted,
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
@@ -330,10 +337,52 @@ function toValues(where: string, raw: unknown, formats: Record<string, ColumnFor
       throw new Error(`${where}values.${column} must be a non-empty list of strings, numbers or booleans`);
     }
     if (Object.hasOwn(formats, column))
-      throw new Error(`${where}values.${column}: a markdown column cannot have values`);
+      throw new Error(`${where}values.${column}: a ${formats[column]} column cannot have values`);
     values[column] = [...new Set(list)];
   }
   return values;
+}
+
+// bounds are checked against the data, never enforced; what a bound may be follows the column's type or format
+function toBounds(
+  where: string,
+  raw: { min?: unknown; max?: unknown },
+  columns: Record<string, ColumnType>,
+  formats: Record<string, ColumnFormat>,
+): { min: Record<string, Bound>; max: Record<string, Bound> } {
+  const read = (which: "min" | "max") => {
+    const bounds: Record<string, Bound> = Object.create(null);
+    const value = raw[which];
+    if (value === undefined || value === null) return bounds;
+    if (typeof value !== "object" || Array.isArray(value))
+      throw new Error(`${where}${which} must be a map of columns to numbers or dates`);
+    for (const [column, b] of Object.entries(value)) {
+      const format = Object.hasOwn(formats, column) ? formats[column] : undefined;
+      const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
+      if (format === "date" || format === "datetime") {
+        const ok = typeof b === "string" && (isDate(b) || (format === "datetime" && isDatetime(b)));
+        if (!ok) throw new Error(`${where}${which}.${column}: ${JSON.stringify(b)} is not a ${format}`);
+      } else if (type === "INTEGER" || type === "REAL") {
+        if (typeof b !== "number" || !Number.isFinite(b))
+          throw new Error(`${where}${which}.${column}: ${JSON.stringify(b)} is not a number`);
+      } else {
+        throw new Error(`${where}${which}.${column} needs an INTEGER or REAL column, or a date or datetime format`);
+      }
+      bounds[column] = b as Bound;
+    }
+    return bounds;
+  };
+  const min = read("min");
+  const max = read("max");
+  const at = (b: Bound) => (typeof b === "number" ? b : (instant(b) as number));
+  for (const column of Object.keys(min)) {
+    const low = min[column] as Bound;
+    const high = Object.hasOwn(max, column) ? max[column] : undefined;
+    if (high !== undefined && at(low) > at(high)) {
+      throw new Error(`${where}min.${column} (${low}) is above max.${column} (${high})`);
+    }
+  }
+  return { min, max };
 }
 
 function toRequired(where: string, raw: unknown): string[] {
@@ -353,9 +402,9 @@ function toReference(where: string, column: string, raw: unknown): Reference {
 
 export const referenceToRaw = (r: Reference): string => (r.target ? `${r.table}.${r.target}` : r.table);
 
-const EXPAND_KEYS = ["columns", "formats", "references", "values", "required", "expand"];
+const EXPAND_KEYS = ["columns", "formats", "references", "values", "required", "min", "max", "expand"];
 
-// `expand: { <field>: { columns?, references?, expand? } | null }`: one view per field, named <parent>__<field>
+// `expand: { <field>: { columns?, formats?, references?, values?, required?, min?, max?, expand? } | null }`: one view per field, named <parent>__<field>
 function toExpand(table: string, parent: string, raw: unknown, path: string): ExpandSpec[] {
   if (raw === undefined || raw === null) return [];
   if (typeof raw !== "object" || Array.isArray(raw))
@@ -373,6 +422,8 @@ function toExpand(table: string, parent: string, raw: unknown, path: string): Ex
       references?: Record<string, unknown>;
       values?: unknown;
       required?: unknown;
+      min?: unknown;
+      max?: unknown;
       expand?: unknown;
     };
     const unknown = Object.keys(v).find((k) => !EXPAND_KEYS.includes(k));
@@ -390,6 +441,7 @@ function toExpand(table: string, parent: string, raw: unknown, path: string): Ex
       ),
       values: toValues(`table "${table}": ${where}.`, v.values, formats),
       required: toRequired(`table "${table}": ${where}.`, v.required),
+      ...toBounds(`table "${table}": ${where}.`, v, columns, formats),
       expand: toExpand(table, name, v.expand, `${where}.expand`),
     };
   });
@@ -407,6 +459,8 @@ export function expandToRaw(list: ExpandSpec[]): Record<string, unknown> {
           : {}),
         ...(Object.keys(e.values).length > 0 ? { values: { ...e.values } } : {}),
         ...(e.required.length > 0 ? { required: [...e.required] } : {}),
+        ...(Object.keys(e.min).length > 0 ? { min: { ...e.min } } : {}),
+        ...(Object.keys(e.max).length > 0 ? { max: { ...e.max } } : {}),
         ...(e.expand.length > 0 ? { expand: expandToRaw(e.expand) } : {}),
       },
     ]),
@@ -550,6 +604,8 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         references: o.references,
         values: o.values,
         required: o.required,
+        min: o.min,
+        max: o.max,
         expand: o.expand,
         group: o.group as string | undefined,
       });

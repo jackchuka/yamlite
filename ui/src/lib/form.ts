@@ -1,5 +1,8 @@
+import { isDate } from "../../../src/datetime.ts";
+import { boundProblem, formatProblem } from "../../../src/rules.ts";
 import { isScalar } from "./cell";
-import type { ColumnFormat, ColumnType, Row } from "./types";
+import { toPicker } from "./datetime";
+import type { Bound, ColumnFormat, ColumnType, Row } from "./types";
 
 export type FieldKind =
   | "switch"
@@ -9,6 +12,8 @@ export type FieldKind =
   | "textarea"
   | "markdown"
   | "ref"
+  | "date"
+  | "datetime"
   | "map"
   | "chips"
   | "json"
@@ -31,6 +36,9 @@ export function fieldKind(
   format?: ColumnFormat,
 ): FieldKind {
   if (isRef) return "ref";
+  if (format === "date" && (value == null || isDate(value))) return "date";
+  if (format === "datetime" && (value == null || (typeof value === "string" && toPicker(value) !== null)))
+    return "datetime";
   if (value === null || value === undefined) return "unset";
   if (typeof value === "boolean") return "switch";
   if (typeof value === "number") return "number";
@@ -110,4 +118,15 @@ export function removeIn(value: unknown, path: Array<string | number>): unknown 
     return others;
   }
   return value;
+}
+
+// what the form says under a field; an empty value is left to required
+export function fieldProblem(
+  value: unknown,
+  format: ColumnFormat | undefined,
+  min: Bound | undefined,
+  max: Bound | undefined,
+): string | null {
+  if (value === null || value === undefined) return null;
+  return formatProblem(value, format) ?? boundProblem(value, format, min, max);
 }

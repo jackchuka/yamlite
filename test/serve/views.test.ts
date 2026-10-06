@@ -50,6 +50,9 @@ test("meta lists the views under their table", async () => {
       references: [{ column: "owner", table: "people" }],
       values: { title: ["Design", "Launch", "Draft"] },
       required: ["title"],
+      formats: {},
+      min: {},
+      max: {},
       count: 3,
       inDb: true,
     },
@@ -64,6 +67,9 @@ test("meta lists the views under their table", async () => {
       references: [],
       values: {},
       required: [],
+      formats: {},
+      min: {},
+      max: {},
       count: 1,
       inDb: true,
     },
@@ -143,4 +149,36 @@ test("a view that cannot be created is listed as not in the DB, with the reason"
     }),
   ]);
   expect((await t.api("/api/tables/projects__nope/rows")).body).toEqual({ rows: [], total: 0 });
+});
+
+test("meta and schema carry formats, min and max", async () => {
+  t = await startServe(
+    { "tasks/a.yaml": "priority: 2\ndue: 2026-10-06\nmilestones:\n  - at: 2026-10-06T09:00\n" },
+    [
+      "tables:",
+      "  tasks:",
+      "    columns: { priority: INTEGER }",
+      "    formats: { due: date }",
+      "    min: { priority: 1, due: 2026-01-01 }",
+      "    max: { priority: 5 }",
+      "    expand: { milestones: { formats: { at: datetime }, min: { at: 2026-01-01 } } }",
+      "",
+    ].join("\n"),
+  );
+  await ready(t);
+  const { body } = await t.api("/api/meta");
+  expect(body.tables.find((x: { name: string }) => x.name === "tasks")).toMatchObject({
+    min: { priority: 1, due: "2026-01-01" },
+    max: { priority: 5 },
+  });
+  expect(body.views.find((v: { name: string }) => v.name === "tasks__milestones")).toMatchObject({
+    formats: { at: "datetime" },
+    min: { at: "2026-01-01" },
+    max: {},
+  });
+  expect((await t.api("/api/tables/tasks/schema")).body).toMatchObject({
+    formats: { due: "date" },
+    min: { priority: 1, due: "2026-01-01" },
+    max: { priority: 5 },
+  });
 });

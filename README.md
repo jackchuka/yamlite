@@ -246,7 +246,7 @@ The variable and class names are part of the page API: renaming one is a breakin
 yamlite check notes
 ```
 
-`check` syncs your YAML into a temporary database, the way `export` does, and reports every problem it finds: a table that fails, any warning (values, references, types, indexes), and a table or column that `yamlite.yaml` does not list yet. It exits 1 if there is one. Nothing under the root is written and no lock is taken, so it runs in CI, in a pre-commit hook, and next to a running `watch` or `serve`.
+`check` syncs your YAML into a temporary database, the way `export` does, and reports every problem it finds: a table that fails, any warning (values, required, formats, min and max, references, types, indexes), and a table or column that `yamlite.yaml` does not list yet. It exits 1 if there is one. Nothing under the root is written and no lock is taken, so it runs in CI, in a pre-commit hook, and next to a running `watch` or `serve`.
 
 - `--table` (repeatable) checks only those tables.
 - `--json` prints `{ ok, tables: [{ table, ok, error?, warnings, unregistered }], unregisteredTables }`.
@@ -452,7 +452,23 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 
 ### Formats
 
-`formats` tells the web UI how to edit a `TEXT` column; it never changes the database. `markdown` shows the field as rendered Markdown, with an Edit tab for the source. The editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A format on a column declared with another type is an error. `expand` entries take `formats` too.
+`formats` tells the web UI how to edit a `TEXT` column, and for dates also what to check:
+
+| Format     | Edited with                                   | Checked                                                                   |
+| ---------- | --------------------------------------------- | ------------------------------------------------------------------------- |
+| `markdown` | rendered Markdown, with an Edit tab           | —                                                                         |
+| `date`     | a date picker                                 | `YYYY-MM-DD`, a real date                                                 |
+| `datetime` | a date and time picker, with the offset shown | `YYYY-MM-DD`, `T` or a space, `HH:MM[:SS[.fff]]`, optional `Z` / `±HH:MM` |
+
+The Markdown editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A `datetime` keeps how it is written: picking a new time leaves its offset, separator and seconds as they were, and a new value gets your browser's offset. A value the picker can't show is edited as text, and a button switches between the two.
+
+A value that doesn't match its format is a warning, not a failed sync:
+
+```
+! due "2026-02-31" not a date (buy-milk)
+```
+
+`init` writes `date` or `datetime` for a `TEXT` column whose values all have that shape. A format on a column declared with another type is an error. `expand` entries take `formats` too.
 
 ### Values
 
@@ -495,6 +511,29 @@ tables:
 ```
 
 The web UI marks required fields with `*` and highlights the empty ones. `yamlite check` fails on any of these warnings.
+
+### Min and max
+
+Bound a column, and yamlite checks it on every sync. Bounds are included, and a value outside them is a warning, not a failed sync.
+
+```yaml
+tables:
+  tasks:
+    columns: { priority: INTEGER }
+    formats: { due: date }
+    min: { priority: 1, due: 2026-01-01 }
+    max: { priority: 5 }
+```
+
+```
+! priority 7 above max 5 (buy-milk)
+! due "2025-12-31" below min 2026-01-01 (call-mom)
+```
+
+- A bound takes a number on an `INTEGER` or `REAL` column, and a date (or, for `datetime`, a datetime) on a `date` or `datetime` column; anything else is an error. In `expand`, declare the column's type there too (`columns: { points: INTEGER }`).
+- Datetimes compare as points in time: one without an offset is UTC, and a date bound is its midnight UTC.
+- A value of the wrong kind (text in an `INTEGER` column, a broken date) is not compared; the format check reports a broken date.
+- The web UI marks a value out of bounds under its field.
 
 ### References
 
