@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>yamlite clients demo</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --tomato: #e5484d;
+        --cream: #fff7ed;
+        --ink: #1c1b29;
+        --mute: #8a8796;
+        --line: #eadfd0;
+        --soft: #fde3d6;
+        --ok: #2f9e6e;
+        --jp: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+      html,
+      body {
+        width: 960px;
+        height: 500px;
+        overflow: hidden;
+      }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "JetBrains Mono", var(--jp), monospace;
+        font-size: 15px;
+        position: relative;
+      }
+      .top {
+        position: absolute;
+        left: 40px;
+        top: 22px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-family: Outfit, sans-serif;
+        font-weight: 700;
+        font-size: 24px;
+      }
+      .chip {
+        position: absolute;
+        right: 40px;
+        top: 26px;
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--ok);
+        background: #e3f4ea;
+        border-radius: 99px;
+        padding: 6px 14px;
+        opacity: 0;
+      }
+      .card {
+        position: absolute;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 10px 30px -18px rgba(60, 30, 10, 0.35);
+        overflow: hidden;
+      }
+      .file {
+        left: 40px;
+        top: 80px;
+        width: 340px;
+        height: 300px;
+      }
+      .client {
+        left: 560px;
+        width: 360px;
+        height: 92px;
+      }
+      #admin {
+        top: 80px;
+      }
+      #ai {
+        top: 184px;
+      }
+      #site {
+        top: 288px;
+      }
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 34px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--mute);
+      }
+      .bar b {
+        color: var(--ink);
+        font-weight: 700;
+        font-family: "JetBrains Mono", var(--jp), monospace;
+      }
+      .code {
+        padding: 18px 0;
+      }
+      .ln {
+        display: flex;
+        align-items: center;
+        height: 34px;
+        padding-right: 16px;
+        position: relative;
+        white-space: nowrap;
+      }
+      .ln .no {
+        width: 44px;
+        text-align: right;
+        padding-right: 14px;
+        color: #c9c1b6;
+        font-size: 13px;
+      }
+      .ln .gut {
+        position: absolute;
+        left: 0;
+        top: 4px;
+        bottom: 4px;
+        width: 4px;
+        border-radius: 0 3px 3px 0;
+        background: var(--tomato);
+        opacity: 0;
+      }
+      .ln.hl {
+        background: var(--soft);
+      }
+      .k {
+        color: var(--tomato);
+        font-weight: 700;
+      }
+      .caret {
+        display: inline-block;
+        width: 2px;
+        height: 18px;
+        background: var(--ink);
+        vertical-align: -3px;
+        margin-left: 1px;
+        opacity: 0;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0 14px;
+        white-space: nowrap;
+      }
+      th {
+        font-size: 11px;
+        color: var(--mute);
+        font-weight: 400;
+        height: 22px;
+        padding-top: 4px;
+      }
+      td {
+        height: 32px;
+        font-size: 14px;
+      }
+      td.hl,
+      .pill.hl {
+        background: var(--soft);
+        color: var(--tomato);
+        font-weight: 700;
+      }
+      td.edit {
+        box-shadow: inset 0 0 0 2px var(--tomato);
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 29px;
+        padding: 0 14px;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .ask {
+        justify-content: flex-end;
+      }
+      .ai-row {
+        position: relative;
+      }
+      .hint {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        top: 3px;
+        bottom: 3px;
+        display: flex;
+        align-items: center;
+        padding: 0 10px;
+        font-family: var(--jp);
+        font-size: 12px;
+        color: var(--mute);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .note {
+        position: absolute;
+        left: 14px;
+        right: 14px;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        align-items: center;
+        font-family: var(--jp);
+        font-size: 11px;
+        color: var(--mute);
+      }
+      .bubble {
+        background: var(--ink);
+        color: #f4efe6;
+        border-radius: 10px 10px 2px 10px;
+        padding: 3px 10px;
+        font-family: var(--jp);
+        font-size: 12px;
+        min-height: 22px;
+        opacity: 0;
+      }
+      .bubble .caret {
+        background: #f4efe6;
+        height: 13px;
+      }
+      .proposal {
+        opacity: 0;
+      }
+      .proposal .diff {
+        color: var(--mute);
+      }
+      .proposal .diff b {
+        color: var(--ok);
+      }
+      .btn {
+        margin-left: auto;
+        font-family: var(--jp);
+        font-size: 11px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--tomato);
+        border-radius: 6px;
+        padding: 3px 10px;
+      }
+      .btn.press {
+        transform: scale(0.92);
+        filter: brightness(0.85);
+      }
+      .post {
+        height: 58px;
+        font-family: var(--jp);
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .pill {
+        margin-left: auto;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        border: 1px solid var(--line);
+        border-radius: 99px;
+        padding: 2px 10px;
+        color: var(--ink);
+        font-weight: 400;
+      }
+      svg.wires {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 960px;
+        height: 500px;
+        pointer-events: none;
+      }
+      .wire {
+        fill: none;
+        stroke: #e7c9b8;
+        stroke-width: 2;
+        stroke-dasharray: 6 6;
+      }
+      .wire.on {
+        stroke: var(--tomato);
+        stroke-dasharray: none;
+      }
+      .hub {
+        position: absolute;
+        left: 442px;
+        top: 202px;
+        width: 56px;
+        height: 56px;
+        border-radius: 14px;
+        box-shadow: 0 0 0 6px var(--cream);
+      }
+      .hublabel {
+        position: absolute;
+        left: 400px;
+        width: 140px;
+        top: 270px;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--mute);
+      }
+      .dot {
+        position: absolute;
+        width: 14px;
+        height: 14px;
+        margin: -7px 0 0 -7px;
+        border-radius: 50%;
+        background: var(--tomato);
+        box-shadow: 0 0 0 5px rgba(229, 72, 77, 0.18);
+        opacity: 0;
+        z-index: 2;
+      }
+      .cap {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 420px;
+        height: 40px;
+        text-align: center;
+        font-family: Outfit, var(--jp), sans-serif;
+        font-weight: 600;
+        font-size: 24px;
+      }
+      .cap span {
+        position: absolute;
+        left: 0;
+        right: 0;
+        opacity: 0;
+      }
+      .cap em {
+        font-style: normal;
+        color: var(--tomato);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="top">
+      <svg width="34" height="34" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="15" fill="#e5484d" />
+        <path d="M15 19L27 38M39 19L22 50" stroke="#fff7ed" stroke-width="7" stroke-linecap="round" fill="none" />
+        <circle cx="48" cy="29" r="4.5" fill="#1c1b29" />
+        <circle cx="48" cy="44" r="4.5" fill="#fff7ed" />
+      </svg>
+      yamlite
+    </div>
+    <div class="chip" id="chip"></div>
+
+    <svg class="wires">
+      <path class="wire" id="wFile" d="M380 230 L442 230" />
+      <path class="wire" id="wAdmin" d="M498 230 C530 230 530 126 560 126" />
+      <path class="wire" id="wAi" d="M498 230 L560 230" />
+      <path class="wire" id="wSite" d="M498 230 C530 230 530 334 560 334" />
+    </svg>
+
+    <div class="card file">
+      <div class="bar">📄 <b>tasks/buy-milk.yaml</b> <span id="editor"></span></div>
+      <div class="code">
+        <div class="ln" id="l1">
+          <span class="gut"></span><span class="no">1</span><span class="k">title</span>:&nbsp;<span id="title"></span>
+        </div>
+        <div class="ln" id="l2">
+          <span class="gut"></span><span class="no">2</span><span class="k">status</span>:&nbsp;<span id="fStatus"
+            >todo</span
+          ><span class="caret" id="caret1"></span>
+        </div>
+        <div class="ln" id="l3">
+          <span class="gut"></span><span class="no">3</span><span class="k">priority</span>:&nbsp;<span id="fPrio"
+            >2</span
+          >
+        </div>
+        <div class="ln" id="l4">
+          <span class="gut"></span><span class="no">4</span><span class="k">tags</span>: [errand]
+        </div>
+      </div>
+    </div>
+
+    <svg class="hub" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="15" fill="#e5484d" />
+      <path d="M15 19L27 38M39 19L22 50" stroke="#fff7ed" stroke-width="7" stroke-linecap="round" fill="none" />
+      <circle cx="48" cy="29" r="4.5" fill="#1c1b29" />
+      <circle cx="48" cy="44" r="4.5" fill="#fff7ed" />
+    </svg>
+    <div class="hublabel">SQLite</div>
+    <div class="dot" id="dFile"></div>
+    <div class="dot" id="dAdmin"></div>
+    <div class="dot" id="dAi"></div>
+    <div class="dot" id="dSite"></div>
+
+    <div class="card client" id="admin">
+      <div class="bar">🖥️ <b id="adminName"></b></div>
+      <table>
+        <tr>
+          <th>id</th>
+          <th>status</th>
+          <th>priority</th>
+        </tr>
+        <tr>
+          <td>buy-milk</td>
+          <td id="aStatus">todo</td>
+          <td id="aPrio">2</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card client" id="ai">
+      <div class="bar">🤖 <b id="aiName"></b></div>
+      <div class="row ask ai-row">
+        <span class="hint" id="hint"></span>
+        <span class="bubble" id="bubble"><span id="askText"></span><span class="caret" id="caret2"></span></span>
+      </div>
+      <div class="row ai-row">
+        <span class="note" id="note"></span>
+      </div>
+      <div class="row proposal" id="proposal" style="margin-top: -29px">
+        buy-milk <span class="diff">status doing → <b>done</b></span
+        ><span class="btn" id="apply"></span>
+      </div>
+    </div>
+
+    <div class="card client" id="site">
+      <div class="bar">🌐 <b id="siteName"></b></div>
+      <div class="row post"><span id="postTitle"></span><span class="pill" id="sStatus">todo</span></div>
+    </div>
+
+    <div class="cap">
+      <span id="cap1"></span>
+      <span id="cap2"></span>
+      <span id="cap3"></span>
+      <span id="cap4"></span>
+    </div>
+
+    <script>
+      const STRINGS = {
+        en: {
+          title: "Buy milk",
+          editor: "· your editor",
+          admin: "Admin UI",
+          ai: "AI",
+          site: "Published site · read-only",
+          ask: "mark the errands done",
+          hint: "e.g. List the tasks due next week",
+          note: "Reads and proposes only. Nothing is saved until you apply it",
+          apply: "Apply 1",
+          chip: "✓ in sync",
+          caps: [
+            "Edit the file <em>→</em> the UI and the site update",
+            "Edit in the UI <em>→</em> the file updates",
+            "Ask the AI <em>→</em> the file updates",
+            "Every client, <em>the same files</em>",
+          ],
+        },
+        ja: {
+          title: "牛乳を買う",
+          editor: "· エディタ",
+          admin: "管理画面",
+          ai: "AI",
+          site: "公開サイト · 読み取り専用",
+          ask: "errand を全部 done にして",
+          hint: "例: 来週締め切りのタスクを一覧して",
+          note: "読み取りと提案のみ。適用するまで保存されません",
+          apply: "1 件を適用",
+          chip: "✓ 同期済み",
+          caps: [
+            "エディタで直すと <em>→</em> 管理画面もサイトも変わる",
+            "管理画面で直すと <em>→</em> ファイルが変わる",
+            "AI に頼んでも <em>→</em> ファイルが変わる",
+            "どこから触っても、<em>同じファイル</em>",
+          ],
+        },
+      };
+      const params = new URLSearchParams(location.search);
+      const S = STRINGS[params.get("lang")] ?? STRINGS.en;
+      document.documentElement.lang = params.get("lang") ?? "en";
+
+      const T = {
+        caret1: [300, 1300],
+        del: 700,
+        typed: 950,
+        hlFile1: [950, 1900],
+        file1: [1100, 1600],
+        fan1: [1600, 2100],
+        cell1: 2100,
+        hl1: [2100, 3200],
+        cap1: [-1000, 4200],
+        edit2: [4500, 5200],
+        cell2: 5000,
+        admin2: [5200, 5700],
+        file2: [5700, 6200],
+        fPrio: 6200,
+        hlFile2: [6200, 7300],
+        cap2: [4200, 8600],
+        bubble: 8700,
+        ask: 8900,
+        askSpeed: 45,
+        proposal: 10200,
+        press: [11000, 11250],
+        ai3: [11100, 11600],
+        fan3: [11600, 12100],
+        done3: 12100,
+        hl3: [12100, 13200],
+        cap3: [8600, 13400],
+        final: 13400,
+        end: 16400,
+      };
+      const $ = (id) => document.getElementById(id);
+      const within = (t, [a, b]) => t >= a && t < b;
+      const fade = (t, a, b, d = 250) => Math.max(0, Math.min(1, (t - a) / d, (b - t) / d));
+      const ease = (p) => (p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2);
+
+      $("title").textContent = S.title;
+      $("postTitle").textContent = S.title;
+      $("editor").textContent = S.editor;
+      $("adminName").textContent = S.admin;
+      $("aiName").textContent = S.ai;
+      $("siteName").textContent = S.site;
+      $("apply").textContent = S.apply;
+      $("hint").textContent = S.hint;
+      $("note").textContent = S.note;
+      $("chip").textContent = S.chip;
+      S.caps.forEach((c, i) => ($(`cap${i + 1}`).innerHTML = c));
+
+      function move(dot, wire, t, [a, b], reverse = false) {
+        const p = (t - a) / (b - a);
+        if (p < 0 || p > 1) return false;
+        const len = wire.getTotalLength();
+        const pt = wire.getPointAtLength(len * ease(reverse ? 1 - p : p));
+        dot.style.left = pt.x + "px";
+        dot.style.top = pt.y + "px";
+        dot.style.opacity = fade(t, a, b, 120);
+        return true;
+      }
+
+      window.render = (t) => {
+        const status = t < T.del ? "todo" : t < T.typed ? "" : t < T.done3 ? "doing" : "done";
+        $("fStatus").textContent = status;
+        $("caret1").style.opacity = within(t, T.caret1) && Math.floor(t / 400) % 2 === 0 ? 1 : 0;
+        $("l2").classList.toggle("hl", within(t, T.hlFile1) || within(t, T.hl3));
+        $("fPrio").textContent = t < T.fPrio ? "2" : "1";
+        $("l3").classList.toggle("hl", within(t, T.hlFile2));
+
+        const remote = t < T.cell1 ? "todo" : t < T.done3 ? "doing" : "done";
+        $("aStatus").textContent = remote;
+        $("sStatus").textContent = remote;
+        $("aStatus").classList.toggle("hl", within(t, T.hl1) || within(t, T.hl3));
+        $("sStatus").classList.toggle("hl", within(t, T.hl1) || within(t, T.hl3));
+        $("aPrio").textContent = t < T.cell2 ? "2" : "1";
+        $("aPrio").classList.toggle("edit", within(t, T.edit2));
+        $("aPrio").classList.toggle("hl", within(t, [T.cell2, T.cell2 + 1000]));
+
+        $("bubble").style.opacity = fade(t, T.bubble, T.end + 1000, 200);
+        $("hint").style.opacity = t < T.bubble ? 1 : Math.max(0, 1 - (t - T.bubble) / 200);
+        $("note").style.opacity = t < T.proposal ? 1 : Math.max(0, 1 - (t - T.proposal) / 200);
+        const n = Math.max(0, Math.min(S.ask.length, Math.floor((t - T.ask) / T.askSpeed)));
+        $("askText").textContent = S.ask.slice(0, n);
+        $("caret2").style.opacity =
+          t >= T.ask - 200 && t < T.ask + S.ask.length * T.askSpeed + 300 && Math.floor(t / 400) % 2 === 0 ? 1 : 0;
+        $("proposal").style.opacity = fade(t, T.proposal, T.end + 1000, 250);
+        $("apply").classList.toggle("press", within(t, T.press));
+
+        const dots = { dFile: false, dAdmin: false, dAi: false, dSite: false };
+        dots.dFile =
+          move($("dFile"), $("wFile"), t, T.file1) ||
+          move($("dFile"), $("wFile"), t, T.file2, true) ||
+          move($("dFile"), $("wFile"), t, T.fan3, true);
+        dots.dAdmin =
+          move($("dAdmin"), $("wAdmin"), t, T.fan1) ||
+          move($("dAdmin"), $("wAdmin"), t, T.admin2, true) ||
+          move($("dAdmin"), $("wAdmin"), t, T.fan3);
+        dots.dSite = move($("dSite"), $("wSite"), t, T.fan1) || move($("dSite"), $("wSite"), t, T.fan3);
+        dots.dAi = move($("dAi"), $("wAi"), t, T.ai3, true);
+        for (const [id, on] of Object.entries(dots)) if (!on) $(id).style.opacity = 0;
+
+        const final = t >= T.final;
+        for (const id of ["wFile", "wAdmin", "wAi", "wSite"]) $(id).classList.toggle("on", final);
+        for (const id of ["l2", "l3"]) $(id).querySelector(".gut").style.opacity = final ? 1 : 0;
+        $("chip").style.opacity = fade(t, T.final, T.end + 1000, 300);
+
+        $("cap1").style.opacity = fade(t, ...T.cap1, 300);
+        $("cap2").style.opacity = fade(t, ...T.cap2, 300);
+        $("cap3").style.opacity = fade(t, ...T.cap3, 300);
+        $("cap4").style.opacity = fade(t, T.final, T.end + 1000, 300);
+      };
+      window.DURATION = T.end;
+      render(Number(params.get("t") ?? 0));
+    </script>
+  </body>
+</html>
