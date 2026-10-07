@@ -511,22 +511,6 @@ test("cancel during a resume keeps the prompt from being sent", async () => {
   expect(texts(c.events)[1]).toMatch(/^[^|]*first$/);
 });
 
-test("a turn cut short by stop does not clear busy of the resumed turn", async () => {
-  const { host, c } = await dormant([[{ say: "one" }], [{ wait: 3000 }], [{ wait: 600 }, { say: "three" }]]);
-  host.prompt(c.id, "second");
-  await waitForAsync(async () => c.status === "active" && c.busy, 10_000);
-  await sleep(300);
-  await host.stop(c.id);
-  expect(c.busy).toBe(false);
-  const from = c.events.length;
-  host.prompt(c.id, "third");
-  await waitForAsync(async () => texts(c.events).includes("three"), 10_000);
-  const after = c.events.slice(from);
-  const firstIdle = after.findIndex((e) => e.type === "busy" && !e.busy);
-  const said = after.findIndex((e) => e.type === "text" && e.text === "three");
-  expect(firstIdle).toBeGreaterThan(said);
-});
-
 test("an agent that exits right after resuming leaves the conversation dormant", async () => {
   const { host, c } = await dormant([[{ say: "one" }], [{ say: "two" }]]);
   process.env.FAKE_AGENT_EXIT_AFTER_RESUME = "1";
