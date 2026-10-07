@@ -157,14 +157,14 @@ export function RecordDrawer({
   useEffect(() => {
     if (dirty) return;
     // dialogs, menus and toasts render in portals outside the drawer, and a row opens its own record
-    const keep = (target: EventTarget | null) =>
-      !(target instanceof Element) ||
-      target.closest(
-        'aside[data-record-drawer], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]',
-      ) !== null;
-    // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away
+    const keepers =
+      'aside[data-record-drawer], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]';
+    // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away;
+    // the path is fixed at dispatch, so a clicked element that removed itself still counts as inside
     const onClick = (e: MouseEvent) => {
-      if (!keep(e.target)) close();
+      const path = e.composedPath();
+      if (path.length === 0 || !(path[0] instanceof Element)) return;
+      if (!path.some((node) => node instanceof Element && node.matches(keepers))) close();
     };
     const onKey = (e: KeyboardEvent) => {
       // Escape belongs to an open dialog, menu or popover first
