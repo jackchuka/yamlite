@@ -5,13 +5,16 @@ function fake(theme?: "light" | "dark") {
   const sent: Array<Record<string, unknown>> = [];
   let onMessage: (e: { source: unknown; data: unknown }) => void = () => {};
   let onViolation: (e: { blockedURI: string }) => void = () => {};
+  let onKey: (e: { key: string; defaultPrevented: boolean; isComposing: boolean }) => void = () => {};
+  let onClick: () => void = () => {};
   const parent = { postMessage: (m: Record<string, unknown>) => sent.push(m) };
   const root = { dataset: {} as Record<string, string> };
   const win = {
     parent,
     setInterval: (fn: () => void, ms: number) => setInterval(fn, ms),
     clearInterval: (h: ReturnType<typeof setInterval>) => clearInterval(h),
-    addEventListener: (_t: string, fn: typeof onMessage) => (onMessage = fn),
+    addEventListener: (t: string, fn: any) =>
+      t === "keydown" ? (onKey = fn) : t === "click" ? (onClick = fn) : (onMessage = fn),
     document: { addEventListener: (_t: string, fn: typeof onViolation) => (onViolation = fn), documentElement: root },
   } as Record<string, any>;
   pageSdk(win as never, theme);
@@ -22,6 +25,8 @@ function fake(theme?: "light" | "dark") {
     reply: (data: unknown) => onMessage({ source: parent, data }),
     fromOther: (data: unknown) => onMessage({ source: {}, data }),
     violate: (url: string) => onViolation({ blockedURI: url }),
+    click: () => onClick(),
+    key: (key: string, defaultPrevented = false, isComposing = false) => onKey({ key, defaultPrevented, isComposing }),
   };
 }
 
@@ -141,4 +146,21 @@ test("a theme event that changes nothing is a no-op, and an invalid one is ignor
 
 test("only change and theme can be subscribed to", () => {
   expect(() => fake().yamlite.on("other", () => {})).toThrow('only "change" and "theme" can be subscribed to');
+});
+
+test("an Escape the page left alone is passed to the parent", () => {
+  const f = fake();
+  const escapes = () => f.sent.filter((m) => m.method === "escape");
+  f.key("Enter");
+  f.key("Escape", true);
+  f.key("Escape", false, true);
+  expect(escapes()).toHaveLength(0);
+  f.key("Escape");
+  expect(escapes()).toEqual([{ yamlite: 1, method: "escape", args: [] }]);
+});
+
+test("a click in the page is passed to the parent", () => {
+  const f = fake();
+  f.click();
+  expect(f.sent.filter((m) => m.method === "click")).toEqual([{ yamlite: 1, method: "click", args: [] }]);
 });

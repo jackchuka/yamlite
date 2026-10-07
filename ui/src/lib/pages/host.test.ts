@@ -31,6 +31,8 @@ function setup(page: PageMeta = board, readOnly = false) {
     readOnly,
     open: vi.fn(),
     blocked: vi.fn(),
+    escape: vi.fn(),
+    click: vi.fn(),
     theme: () => "dark",
   };
   const host = new PageHost(
@@ -188,4 +190,15 @@ test("answering hello is followed by the current theme", async () => {
   const answer = await ask("hello");
   const at = posted.indexOf(answer);
   expect(posted[at + 1]).toEqual({ yamlite: 1, event: "theme", data: { theme: "dark" } });
+});
+
+test("escape and click from the frame are passed on without an answer", () => {
+  const { host, frame, posted, deps } = setup();
+  for (const method of ["escape", "click"]) {
+    host.handle({ source: frame, data: { yamlite: 1, method, args: [] } } as MessageEvent);
+    host.handle({ source: {}, data: { yamlite: 1, method, args: [] } } as MessageEvent);
+  }
+  expect(deps.escape).toHaveBeenCalledTimes(1);
+  expect(deps.click).toHaveBeenCalledTimes(1);
+  expect(posted).toHaveLength(0);
 });

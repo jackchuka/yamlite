@@ -44,6 +44,7 @@ export function PageView({ name }: { name: string }) {
   const current = useRef({ page, meta });
   current.current = { page, meta };
   const ready = page !== undefined && meta !== undefined;
+  const focused = () => frame.current !== null && document.activeElement === frame.current;
 
   useEffect(() => {
     setNavigated(false);
@@ -61,6 +62,13 @@ export function PageView({ name }: { name: string }) {
         readOnly: isReadOnly(),
         open: (table, key) => setOpened({ table, key }),
         theme: () => themeRef.current,
+        // the page may post these at any time; only while the user is in it do they stand for the user's input
+        escape: () => {
+          if (focused()) document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        },
+        click: () => {
+          if (focused()) frame.current?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+        },
         blocked: (url) => setBlocked((list) => (list.includes(url) ? list : [...list, url])),
       },
     );
