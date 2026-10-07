@@ -138,6 +138,15 @@ test("a click outside closes the drawer; inside it or on another row does not", 
   expect(closedKey()).toEqual({ key: undefined, sort: "title:asc" });
 });
 
+test("a click on something in the drawer that removes itself does not close it", async () => {
+  const title = await openDrawer();
+  const add = document.createElement("button");
+  add.addEventListener("click", () => add.remove());
+  title.closest("fieldset")?.append(add);
+  fireEvent.click(add);
+  expect(navigate).not.toHaveBeenCalled();
+});
+
 test("unsaved edits keep the drawer open on Escape or a click outside", async () => {
   const title = await openDrawer();
   fireEvent.change(title, { target: { value: "new" } });
