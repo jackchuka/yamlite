@@ -108,4 +108,24 @@ test("a page follows the UI's theme and the record panel resizes over it", async
   await page.mouse.up();
   const after = (await drawer.boundingBox())?.width ?? 0;
   expect(after).toBeGreaterThan(before + 200);
+
+  await frame.getByRole("button", { name: "open" }).focus();
+  await page.keyboard.press("Escape");
+  await expect(drawer).toBeHidden();
+
+  // the page's own button reopens the record rather than leaving it closed
+  await frame.getByRole("button", { name: "open" }).click();
+  await expect(drawer).toBeVisible();
+  await frame.locator("html").click({ position: { x: 5, y: 200 } });
+  await expect(drawer).toBeHidden();
+
+  // a page cannot close the host's layers on its own while the user is elsewhere
+  await frame.getByRole("button", { name: "open" }).click();
+  await drawer.click();
+  await frame.locator("body").evaluate(() => {
+    parent.postMessage({ yamlite: 1, method: "escape", args: [] }, "*");
+    parent.postMessage({ yamlite: 1, method: "click", args: [] }, "*");
+  });
+  await page.waitForTimeout(300);
+  await expect(drawer).toBeVisible();
 });

@@ -1,6 +1,11 @@
 interface SdkWindow {
   parent: { postMessage(message: unknown, target: string): void };
   addEventListener(type: "message", listener: (e: { source: unknown; data: any }) => void): void;
+  addEventListener(type: "click", listener: () => void): void;
+  addEventListener(
+    type: "keydown",
+    listener: (e: { key: string; defaultPrevented: boolean; isComposing: boolean }) => void,
+  ): void;
   setInterval(fn: () => void, ms: number): unknown;
   clearInterval(handle: unknown): void;
   document: {
@@ -67,6 +72,13 @@ export function pageSdk(
   win.document.addEventListener("securitypolicyviolation", (e) => {
     parent.postMessage({ yamlite: 1, method: "blocked", args: [e.blockedURI] }, "*");
   });
+  // keys and clicks in the frame never reach the host, so the ones that close its layers are passed up
+  win.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !e.defaultPrevented && !e.isComposing) {
+      parent.postMessage({ yamlite: 1, method: "escape", args: [] }, "*");
+    }
+  });
+  win.addEventListener("click", () => parent.postMessage({ yamlite: 1, method: "click", args: [] }, "*"));
   // the host may not be listening yet when the frame first speaks, so ask again until it answers
   const ready = call("hello");
   const hello = win.setInterval(() => parent.postMessage({ yamlite: 1, id: 1, method: "hello", args: [] }, "*"), 100);

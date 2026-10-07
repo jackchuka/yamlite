@@ -9,6 +9,8 @@ export interface HostDeps {
   readOnly: boolean;
   open(table: string, key: string): void;
   blocked(url: string): void;
+  escape(): void;
+  click(): void;
   theme(): "light" | "dark";
 }
 
@@ -64,6 +66,10 @@ export class PageHost {
     const { id, method, args } = e.data;
     if (method === "blocked") {
       if (typeof args[0] === "string") this.deps.blocked(args[0]);
+      return;
+    }
+    if (method === "escape" || method === "click") {
+      this.deps[method]();
       return;
     }
     void this.answer(method, args).then(
