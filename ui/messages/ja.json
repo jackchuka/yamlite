@@ -337,6 +337,15 @@
       }
     }
   ],
+  "proposal_unchanged_lines": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "⋯ 変更のない {count} 行"
+      }
+    }
+  ],
   "proposal_before": "変更前",
   "proposal_after": "変更後",
   "proposal_label": "提案: {title}",

@@ -121,3 +121,25 @@ test("more than 50 changes are capped with a remainder note", () => {
   expect(screen.getByRole("list", { name: "m" }).querySelectorAll("li")).toHaveLength(51);
   expect(screen.getByText("5 more")).toBeTruthy();
 });
+
+test("a long text field shows a line diff instead of side-by-side values", () => {
+  const body = (s: string) => `## Purpose\nintro\n- ${s}\n- other\n`;
+  renderCard({
+    ...proposal,
+    rows: [
+      {
+        table: "docs",
+        key: "health",
+        op: "update",
+        before: { body: body("Influenza vaccination.") },
+        after: { body: body("Flu vaccination.") },
+        changed: ["body"],
+      },
+    ],
+  });
+  expect(screen.queryByTestId("field-diff")).toBeNull();
+  const diff = screen.getByRole("group", { name: "body" });
+  expect(diff.querySelectorAll("mark")).toHaveLength(2);
+  expect(diff.textContent).toContain("Influenza");
+  expect(diff.textContent).toContain("Flu");
+});
