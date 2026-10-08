@@ -23,6 +23,21 @@ export interface ProposalRow {
   changed: string[];
 }
 
+export type GitStep =
+  | { kind: "create_branch"; name: string; from?: string }
+  | { kind: "switch"; branch: string }
+  | { kind: "commit"; message: string; paths: string[] }
+  | { kind: "push"; branch: string }
+  | { kind: "pull"; branch: string }
+  | { kind: "open_pr"; title: string; body: string; base?: string };
+
+export interface StepResult {
+  status: "done" | "failed" | "skipped";
+  message?: string;
+  url?: string;
+  created?: boolean;
+}
+
 export interface Proposal {
   id: string;
   conversationId: string;
@@ -32,6 +47,7 @@ export interface Proposal {
   rows: ProposalRow[];
   warnings: string[];
   table?: { name: string; mode: string; key: string; columns: Record<string, string> };
+  git?: { steps: GitStep[]; startBranch: string | null; results: StepResult[] };
   sql?: string;
   stale?: string[];
   error?: string;

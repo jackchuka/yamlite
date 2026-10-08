@@ -78,6 +78,7 @@ export const rowRoutes: Routes = (router, ctx) => {
   });
 
   router.add("POST", "/api/tables/:table/rows", ({ params, body }) => {
+    ctx.proposals.assertIdle();
     const spec = tableSpec(ctx, params.table as string);
     const b = objectBody(body, "body");
     const key = checkKey(spec, b.key);
@@ -88,6 +89,7 @@ export const rowRoutes: Routes = (router, ctx) => {
   });
 
   router.add("PATCH", "/api/tables/:table/rows/:key", ({ params, body }) => {
+    ctx.proposals.assertIdle();
     const spec = tableSpec(ctx, params.table as string);
     const key = params.key as string;
     const b = objectBody(body, "body");
@@ -111,6 +113,7 @@ export const rowRoutes: Routes = (router, ctx) => {
   });
 
   router.add("POST", "/api/tables/:table/rows/:key/rename", ({ params, body }) => {
+    ctx.proposals.assertIdle();
     const spec = tableSpec(ctx, params.table as string);
     const from = params.key as string;
     const to = checkKey(spec, objectBody(body, "body").to);
@@ -133,6 +136,7 @@ export const rowRoutes: Routes = (router, ctx) => {
   });
 
   router.add("DELETE", "/api/tables/:table/rows/:key", ({ params }) => {
+    ctx.proposals.assertIdle();
     const spec = tableSpec(ctx, params.table as string);
     writeTx(ctx.store, () => deleteRecord(ctx.store, spec, params.key as string));
     return { ok: true };

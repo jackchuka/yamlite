@@ -33,6 +33,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
   // the backup becomes the database row; the watcher then writes it to the file like any other edit.
   // The row it replaces is backed up first, so a restore is a swap that can itself be restored.
   router.add("POST", "/api/conflicts/:id/restore", ({ params, body }) => {
+    ctx.proposals.assertIdle();
     const id = params.id as string;
     const backup = readConflict(ctx.stateDir, id);
     const { entry } = backup;
@@ -82,6 +83,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
   });
 
   router.add("POST", "/api/conflicts/:id/dismiss", ({ params }) => {
+    ctx.proposals.assertIdle();
     dismissConflict(ctx.stateDir, params.id as string);
     return { ok: true };
   });

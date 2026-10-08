@@ -143,3 +143,89 @@ test("a long text field shows a line diff instead of side-by-side values", () =>
   expect(diff.textContent).toContain("Influenza");
   expect(diff.textContent).toContain("Flu");
 });
+
+const gitProposal: Proposal = {
+  id: "g1",
+  conversationId: "c1",
+  title: "Send for review",
+  status: "pending",
+  createdAt: "",
+  rows: [],
+  warnings: [],
+  git: {
+    startBranch: "main",
+    steps: [
+      { kind: "create_branch", name: "edit-a" },
+      { kind: "commit", message: "edit a", paths: ["tasks/a.yaml"] },
+      { kind: "push", branch: "edit-a" },
+      { kind: "open_pr", title: "Edit A", body: "why" },
+    ],
+    results: [{ status: "skipped" }, { status: "skipped" }, { status: "skipped" }, { status: "skipped" }],
+  },
+};
+
+test("a git card lists its steps and files and runs them", async () => {
+  apply.mockResolvedValue({ ...gitProposal, status: "applied" });
+  renderCard(gitProposal);
+  expect(screen.getByText("Create branch edit-a and switch to it")).toBeTruthy();
+  expect(screen.getByText("tasks/a.yaml")).toBeTruthy();
+  expect(screen.getByText("Open a draft pull request: Edit A")).toBeTruthy();
+  expect(screen.queryByText("Not run")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Run 4 steps" }));
+  await waitFor(() => expect(apply).toHaveBeenCalledWith("g1"));
+});
+
+test("a git card says it is running until the steps finish", async () => {
+  let finish!: (p: Proposal) => void;
+  apply.mockReturnValue(new Promise<Proposal>((r) => (finish = r)));
+  renderCard(gitProposal);
+  fireEvent.click(screen.getByRole("button", { name: "Run 4 steps" }));
+  await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Running the steps…"));
+  finish({ ...gitProposal, status: "applied" });
+  await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+});
+
+test("a running git card shows progress while pending", () => {
+  renderCard({
+    ...gitProposal,
+    git: {
+      ...gitProposal.git!,
+      results: [{ status: "done" }, { status: "skipped" }, { status: "skipped" }, { status: "skipped" }],
+    },
+  });
+  expect(screen.getAllByText("Done")).toHaveLength(1);
+});
+
+test("a run git card shows each step's result and the PR link", () => {
+  renderCard({
+    ...gitProposal,
+    status: "failed",
+    error: "step 4 (open_pr) failed: boom",
+    git: {
+      ...gitProposal.git!,
+      results: [{ status: "done" }, { status: "done" }, { status: "done" }, { status: "failed", message: "boom" }],
+    },
+  });
+  expect(screen.getAllByText("Done")).toHaveLength(3);
+  expect(screen.getByText(/boom/, { selector: "li *" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Run/ })).toBeNull();
+});
+
+test("a compare link asks the user to create the PR on GitHub", () => {
+  renderCard({
+    ...gitProposal,
+    status: "applied",
+    git: {
+      ...gitProposal.git!,
+      results: [
+        { status: "done" },
+        { status: "done" },
+        { status: "done" },
+        { status: "done", url: "https://github.com/o/r/compare/main...edit-a?quick_pull=1", created: false },
+      ],
+    },
+  });
+  const link = screen.getByRole("link", { name: "Create the pull request on GitHub" });
+  expect(link.getAttribute("href")).toContain("/compare/main...edit-a");
+  expect(link.getAttribute("target")).toBe("_blank");
+});

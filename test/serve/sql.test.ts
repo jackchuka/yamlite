@@ -66,3 +66,10 @@ test("a table created in SQL that yamlite.yaml does not list is flagged", async 
     unmanaged: "scratch",
   });
 });
+
+test("a write is refused while git steps run, a read is not", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  Object.defineProperty(t.s.context.proposals, "running", { get: () => true });
+  expect((await run(t, "update tasks set title = 'B'")).status).toBe(409);
+  expect((await run(t, "select id from tasks")).status).toBe(200);
+});
