@@ -123,7 +123,7 @@ function ruleWarnings(store: Store, spec: TableSpec): string[] {
 export class ProposalStore {
   private readonly proposals = new Map<string, Proposal>();
   private readonly feedback = new Map<string, string[]>();
-  private runningId: string | null = null;
+  private busy = false;
 
   constructor(
     private readonly deps: ProposalDeps,
@@ -199,11 +199,22 @@ export class ProposalStore {
   }
 
   get running(): boolean {
-    return this.runningId !== null;
+    return this.busy;
   }
 
   assertIdle(): void {
     if (this.running) throw new HttpError(409, "git steps are running; try again when they finish");
+  }
+
+  // git work that must not overlap other git work or writes: proposals' steps and the review button
+  async exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    this.assertIdle();
+    this.busy = true;
+    try {
+      return await fn();
+    } finally {
+      this.busy = false;
+    }
   }
 
   get(id: string): Proposal | undefined {
@@ -219,17 +230,17 @@ export class ProposalStore {
     const p = this.mustBePending(id);
     if (!p.git) throw new HttpError(400, `proposal ${id} has no git steps`);
     const git = p.git;
-    if (!this.deps.runGit) return this.settle(p, "failed", { error: "git is not available" });
-    this.runningId = id;
+    const runGit = this.deps.runGit;
+    if (!runGit) return this.settle(p, "failed", { error: "git is not available" });
     try {
-      git.results = await this.deps.runGit(git.steps, git.startBranch, (r) => {
-        git.results = r;
-        this.onChange(p);
-      });
+      git.results = await this.exclusive(() =>
+        runGit(git.steps, git.startBranch, (r) => {
+          git.results = r;
+          this.onChange(p);
+        }),
+      );
     } catch (e) {
       return this.settle(p, "failed", { error: message(e) });
-    } finally {
-      this.runningId = null;
     }
     const failed = git.results.findIndex((r) => r.status === "failed");
     if (failed < 0) return this.settle(p, "applied");

@@ -9,7 +9,7 @@ import { ProposalStore } from "../agent/proposals.ts";
 import { configPath, resolveConfig } from "../config.ts";
 import { findRepo, ghReady } from "../git/repo.ts";
 import { runSteps } from "../git/steps.ts";
-import type { TableResult } from "../engine.ts";
+
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
@@ -21,6 +21,7 @@ import { createHandler, Router } from "./http.ts";
 import { mcpEndpoint } from "./routes/agent.ts";
 import { ROUTES } from "./routes/index.ts";
 import { createTable } from "./routes/tables.ts";
+import { assertSynced } from "./write.ts";
 import { type AccessPolicy, isLoopback, loopbackHosts } from "./security.ts";
 
 export interface ServeOptions {
@@ -59,12 +60,6 @@ function listen(server: HttpServer, port: number, host: string): Promise<number>
   });
 }
 
-function assertSynced(results: TableResult[], prefix: string, suffix = ""): void {
-  const failed = results.filter((r) => !r.ok);
-  if (failed.length > 0)
-    throw new Error(`${prefix}: ${failed.map((r) => `${r.table} (${r.error})`).join("; ")}${suffix}`);
-}
-
 export async function serve(opts: ServeOptions): Promise<Server> {
   const host = opts.host ?? "127.0.0.1";
   const config = resolveConfig({ root: opts.root, db: opts.db });
@@ -96,7 +91,9 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     dry = new Store(config.db);
     const repo = await findRepo(opts.root);
     const agents = opts.agent === false ? [] : (opts.agents ?? detectAgents());
-    const gh = opts.gh !== undefined ? opts.gh : repo && agents.length > 0 && (await ghReady()) ? which("gh") : null;
+    let probed: Promise<string | null> | undefined;
+    const gh = () =>
+      (probed ??= opts.gh !== undefined ? Promise.resolve(opts.gh) : ghReady().then((ok) => (ok ? which("gh") : null)));
     const gitCtx = repo ? { repo, gh } : null;
     const proposals = new ProposalStore(
       {
@@ -111,7 +108,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
               // UI edits reach the files before git reads them
               assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
               return runSteps(gitCtx.repo, steps, {
-                gh: gitCtx.gh,
+                gh: await gitCtx.gh(),
                 expectBranch: startBranch,
                 // git wrote these files, so a branch with fewer records is not a wipe
                 afterTreeChange: async () =>

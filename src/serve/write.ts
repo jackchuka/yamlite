@@ -1,3 +1,4 @@
+import type { TableResult } from "../engine.ts";
 import { inferType } from "../schema.ts";
 import type { Store } from "../store.ts";
 import type { ColumnType, Rec, TableSpec } from "../types.ts";
@@ -39,4 +40,10 @@ export function ensureColumns(store: Store, spec: TableSpec, record: Rec): Map<s
   }
   if (wanted.size > 0) store.ensureTable(spec.name, spec.key, wanted, existing);
   return store.columns(spec.name);
+}
+
+export function assertSynced(results: TableResult[], prefix: string, suffix = ""): void {
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length > 0)
+    throw new Error(`${prefix}: ${failed.map((r) => `${r.table} (${r.error})`).join("; ")}${suffix}`);
 }

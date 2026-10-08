@@ -3,6 +3,7 @@ import type { Router } from "../http.ts";
 import { agentRoutes } from "./agent.ts";
 import { conflictRoutes } from "./conflicts.ts";
 import { eventRoutes } from "./events.ts";
+import { gitRoutes } from "./git.ts";
 import { historyRoutes } from "./history.ts";
 import { metaRoutes } from "./meta.ts";
 import { pageRoutes } from "./pages.ts";
@@ -24,4 +25,5 @@ export const ROUTES: Routes[] = [
   pageRoutes,
   conflictRoutes,
   agentRoutes,
+  gitRoutes,
 ];

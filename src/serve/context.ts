@@ -24,7 +24,8 @@ export interface ApiContext {
   proposals: ProposalStore;
   agent: AgentHost | null;
   // the git repository holding the root, and the logged-in gh binary; null outside a repository
-  git: { repo: Repo; gh: string | null } | null;
+  // gh is probed on first use, so starting serve never waits on it
+  git: { repo: Repo; gh: () => Promise<string | null> } | null;
 }
 
 // relative to the root when inside it (--db and listed tables may live elsewhere)
