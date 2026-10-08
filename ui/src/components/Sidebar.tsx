@@ -28,7 +28,12 @@ import { m } from "@/paraglide/messages.js";
 
 const item =
   "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2 max-md:py-2.5 max-md:text-[15px]";
-const active = { className: cn(item, "bg-tomato text-[var(--y-on-accent)] font-semibold hover:bg-tomato [&>[data-count]]:text-current [&>[data-count]]:opacity-80") };
+const active = {
+  className: cn(
+    item,
+    "bg-tomato text-[var(--y-on-accent)] font-semibold hover:bg-tomato [&>[data-count]]:text-current [&>[data-count]]:opacity-80",
+  ),
+};
 
 // a table or view with warnings shows how many in place of its icon, so its row count stays on the right
 function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
