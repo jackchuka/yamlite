@@ -47,10 +47,13 @@ export async function start(
   track?: (r: Running) => void,
   config?: string,
   env: Record<string, string> = {},
+  // runs on the files before serve starts, e.g. to make the folder a git repository
+  prepare?: (root: string) => void,
 ): Promise<Running> {
   const root = mkdtempSync(join(tmpdir(), "yamlite-e2e-"));
   put(join(root, "yamlite.yaml"), config ?? "tables: {}\n");
   for (const [path, content] of Object.entries(files)) put(join(root, path), content);
+  prepare?.(root);
   const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], {
     stdio: ["ignore", "pipe", "inherit"],
     env: { ...process.env, ...env },

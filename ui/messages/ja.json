@@ -57,16 +57,6 @@
       }
     }
   ],
-  "nav_footer_tables": [
-    {
-      "declarations": ["input count", "local n = count: plural"],
-      "selectors": ["n"],
-      "match": {
-        "n=other": "{count} テーブル"
-      }
-    }
-  ],
-  "nav_footer_db": "DB {db}",
   "nav_new_record": "+ 新しいレコード",
   "nav_rename": "名前を変更",
   "nav_rename_key": "キーの名前を変更",
@@ -452,5 +442,64 @@
   "dialog_rename_title": "キーを変更",
   "dialog_rename_files": "ファイル名が変わります。新しいファイルは DB の値から書き直されるので、元のファイルのコメントは失われます。",
   "dialog_rename_list": "リスト内のレコードのキーが変わります。このレコードのコメントは失われることがあります。",
-  "dialog_rename": "変更"
+  "dialog_rename": "変更",
+  "nav_root_info": "データフォルダの詳細",
+  "nav_root_config": "設定",
+  "nav_root_db": "データベース",
+  "nav_root_host": "アドレス",
+  "git_detached": "ブランチなし",
+  "git_changes": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "{count} 件の変更" }
+    }
+  ],
+  "git_no_changes": "変更なし",
+  "git_send_review": "レビューに出す",
+  "review_title": "レビューに出す",
+  "review_new_branch": "選んだファイルを新しいブランチに commit して push し、draft のプルリクエストを作成します。作業はそのまま新しいブランチで続きます。{branch} は変更されません。",
+  "review_same_branch": "選んだファイルを {branch} に commit して push します。プルリクエストがあれば更新され、なければ draft で作成されます。",
+  "review_sent": "{branch} に push しました。",
+  "review_open_pr": "プルリクエストを開く",
+  "review_create_pr": "GitHub でプルリクエストを作成する",
+  "review_files": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "{count} 件のファイルを選択中" }
+    }
+  ],
+  "review_other_files": "その他のファイル",
+  "review_pr_title": "タイトル",
+  "review_pr_body": "説明（任意）",
+  "review_send": "送信",
+  "review_sending": "送信中…",
+  "review_status_added": "追加",
+  "review_status_modified": "変更",
+  "review_status_deleted": "削除",
+  "review_loading": "読み込み中…",
+  "review_format_only": "書式かコメントだけが変わっています。",
+  "review_committed": "コミット時点",
+  "review_now": "現在",
+  "review_delete_confirm": "削除",
+  "review_delete_record": "{record} を削除（一度も commit されていません）",
+  "review_revert_record": "{record} をコミット時点に戻す",
+  "review_include": "{file} を含める",
+  "review_show_diff": "{file} の変更を表示",
+  "review_reverted": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "{count} 件のレコードをコミット時点に戻しました" }
+    }
+  ],
+  "review_undo": "取り消す",
+  "review_revert_selected": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "{count} 件をコミット時点に戻す" }
+    }
+  ]
 }

@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftRight,
+  ArrowUp,
+  ChevronDown,
   ChevronRight,
+  GitBranch,
   Layers,
   LayoutDashboard,
   ListFilter,
@@ -14,9 +17,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { agentPanel, useAgents } from "@/lib/agent";
 import { warningLinks } from "@/lib/activity";
 import { openCommandMenu } from "@/lib/commandMenu";
+import { useGit } from "@/lib/git";
 import { groupTables, useCollapsedGroups, useExpandedTables } from "@/lib/groups";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
@@ -25,6 +30,7 @@ import { isSplitActive, splitFilter } from "@/lib/split";
 import type { Filter, TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages.js";
+import { ReviewDialog } from "./ReviewDialog";
 
 const item =
   "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2 max-md:py-2.5 max-md:text-[15px]";
@@ -165,33 +171,36 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
         <img src="./favicon.svg" alt="" className="size-6" />
         yamlite
-        <span className="ml-auto truncate font-mono text-[11px] font-normal text-muted-foreground">{meta?.root}</span>
+        <RootInfo />
       </div>
-      <button
-        type="button"
-        className="mx-2.5 mb-2 flex justify-between rounded-md border bg-background px-2 py-1.5 text-[12px] text-muted-foreground max-md:py-2.5 max-md:text-[14px]"
-        onClick={() => {
-          onSearch?.();
-          openCommandMenu();
-        }}
-      >
-        <span>{m.nav_search_placeholder()}</span>
-        <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
-      </button>
-      {agents.length > 0 && (
+      <div className="mx-2.5 mb-2 flex gap-1.5">
         <button
           type="button"
-          className="mx-2.5 mb-2 flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-[13px] max-md:py-2.5 max-md:text-[14px]"
+          className="flex min-w-0 flex-1 justify-between rounded-md border bg-background px-2 py-1.5 text-[12px] text-muted-foreground max-md:py-2.5 max-md:text-[14px]"
           onClick={() => {
-            if (!onSearch) return agentPanel.toggle();
-            onSearch();
-            agentPanel.open();
+            onSearch?.();
+            openCommandMenu();
           }}
         >
-          <Sparkles className="size-4" />
-          {m.nav_ask_ai()}
+          <span>{m.nav_search_placeholder()}</span>
+          <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
         </button>
-      )}
+        {agents.length > 0 && (
+          <button
+            type="button"
+            aria-label={m.nav_ask_ai()}
+            title={m.nav_ask_ai()}
+            className="grid place-items-center rounded-md border bg-background px-2 hover:bg-panel-2 max-md:px-3"
+            onClick={() => {
+              if (!onSearch) return agentPanel.toggle();
+              onSearch();
+              agentPanel.open();
+            }}
+          >
+            <Sparkles className="size-4" />
+          </button>
+        )}
+      </div>
       <div className="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase max-md:text-[12px]">
         {m.nav_tables()}
       </div>
@@ -263,15 +272,76 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           </Link>
         )}
       </nav>
-      <div className="mt-auto border-t px-3.5 py-2.5 text-[11px] text-muted-foreground max-md:pb-[calc(0.625rem+env(safe-area-inset-bottom))] max-md:text-[12px]">
-        {meta?.configFile} · {m.nav_footer_tables({ count: meta?.tables.length ?? 0 })}
-        <br />
-        {m.nav_footer_db({ db: meta?.db ?? "" })}
-        <span className="md:hidden">
-          <br />
-          {location.host}
-        </span>
-      </div>
+      {!readOnly && <GitFooter />}
     </aside>
+  );
+}
+
+function RootInfo() {
+  const { data: meta } = useMeta();
+  const root = meta?.root ?? "";
+  const name = root.split(/[\\/]/).filter(Boolean).at(-1) ?? root;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={m.nav_root_info()}
+          className="ml-auto flex min-w-0 items-center gap-0.5 rounded px-1 font-mono text-[11px] font-normal text-muted-foreground hover:bg-panel-2 max-md:text-[12.5px]"
+        >
+          <span className="truncate">{name}</span>
+          <ChevronDown className="size-3 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 text-[13px]">
+        <div className="font-mono text-[12px] break-all text-muted-foreground">{root}</div>
+        <dl className="mt-2.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          <dt className="text-muted-foreground">{m.nav_root_config()}</dt>
+          <dd className="truncate font-mono">{meta?.configFile}</dd>
+          <dt className="text-muted-foreground">{m.nav_root_db()}</dt>
+          <dd className="truncate font-mono">{meta?.db}</dd>
+          <dt className="text-muted-foreground">{m.nav_tables()}</dt>
+          <dd>{meta?.tables.length ?? 0}</dd>
+          <dt className="text-muted-foreground">{m.nav_root_host()}</dt>
+          <dd className="truncate font-mono">{location.host}</dd>
+        </dl>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function GitFooter() {
+  const git = useGit();
+  const [open, setOpen] = useState(false);
+  if (!git) return null;
+  const count = git.changes.length;
+  return (
+    <div className="mt-auto border-t px-3.5 py-2.5 text-[12px] max-md:pb-[calc(0.625rem+env(safe-area-inset-bottom))] max-md:text-[13.5px]">
+      <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
+        <GitBranch className="size-3.5 shrink-0" />
+        <span className="truncate font-mono">{git.branch ?? m.git_detached()}</span>
+        <span>·</span>
+        {count > 0 ? (
+          <span className="shrink-0 font-semibold text-foreground">{m.git_changes({ count })}</span>
+        ) : (
+          <span className="shrink-0">{m.git_no_changes()}</span>
+        )}
+      </div>
+      <button
+        type="button"
+        disabled={count === 0 || git.branch === null}
+        className={cn(
+          "mt-2 flex w-full items-center justify-center gap-1.5 rounded-md py-1.5 text-[13px] max-md:py-2.5 max-md:text-[15px]",
+          count > 0
+            ? "bg-tomato font-semibold text-[var(--y-on-accent)] hover:opacity-90"
+            : "border bg-background text-muted-foreground disabled:opacity-60",
+        )}
+        onClick={() => setOpen(true)}
+      >
+        <ArrowUp className="size-3.5" />
+        {m.git_send_review()}
+      </button>
+      {open && <ReviewDialog git={git} open={open} onOpenChange={setOpen} />}
+    </div>
   );
 }

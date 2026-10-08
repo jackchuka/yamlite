@@ -2,6 +2,7 @@ import { act, fireEvent, render, renderHook, screen } from "@testing-library/rea
 import { afterEach, expect, test, vi } from "vitest";
 import { agentPanel, useAgentPanelOpen, type AgentMeta } from "@/lib/agent";
 import { openCommandMenu } from "@/lib/commandMenu";
+import type { GitState } from "@/lib/git";
 import { MobileNav } from "./MobileNav";
 
 let pathname = "/t/tasks";
@@ -13,8 +14,17 @@ vi.mock("@/lib/agent", async (orig) => ({
   ...(await orig<typeof import("@/lib/agent")>()),
   useAgents: () => agents,
 }));
+let gitState: GitState | null = null;
+vi.mock("@/lib/git", async (orig) => ({
+  ...(await orig<typeof import("@/lib/git")>()),
+  useGit: () => gitState,
+}));
+vi.mock("./ReviewDialog", () => ({
+  ReviewDialog: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="review" /> : null),
+}));
 afterEach(() => {
   agents = [];
+  gitState = null;
   act(() => agentPanel.close());
 });
 vi.mock("@/lib/providers", () => ({ useMeta: () => ({ data: { pages: [] } }) }));
@@ -65,4 +75,31 @@ test("the AI button shows only when an agent exists and opens the panel", () => 
 test("no AI button without agents", () => {
   render(<MobileNav onNewTable={() => {}} />);
   expect(screen.queryByRole("button", { name: "Ask AI" })).toBeNull();
+});
+
+test("the review button shows the number of changes and opens the dialog", () => {
+  gitState = {
+    branch: "main",
+    defaultBranch: "main",
+    upstream: "origin/main",
+    changes: [
+      { path: "tasks/a.yaml", status: "modified", table: "tasks", records: null },
+      { path: "tasks/b.yaml", status: "added", table: "tasks", records: null },
+    ],
+  };
+  render(<MobileNav onNewTable={() => {}} />);
+  const button = screen.getByRole("button", { name: /2/ });
+  expect(button.textContent).toBe("2");
+  fireEvent.click(button);
+  expect(screen.getByRole("dialog", { name: "review" })).toBeTruthy();
+});
+
+test("no review button without changes or outside git", () => {
+  gitState = { branch: "main", defaultBranch: "main", upstream: null, changes: [] };
+  const { unmount } = render(<MobileNav onNewTable={() => {}} />);
+  expect(screen.getAllByRole("button").map((b) => b.getAttribute("aria-label"))).toEqual(["menu", "search"]);
+  unmount();
+  gitState = null;
+  render(<MobileNav onNewTable={() => {}} />);
+  expect(screen.getAllByRole("button")).toHaveLength(2);
 });

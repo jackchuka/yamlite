@@ -60,17 +60,6 @@
       }
     }
   ],
-  "nav_footer_tables": [
-    {
-      "declarations": ["input count", "local n = count: plural"],
-      "selectors": ["n"],
-      "match": {
-        "n=one": "{count} table",
-        "n=other": "{count} tables"
-      }
-    }
-  ],
-  "nav_footer_db": "DB {db}",
   "nav_new_record": "+ New record",
   "nav_rename": "rename",
   "nav_rename_key": "rename key",
@@ -468,5 +457,64 @@
   "dialog_rename_title": "Change key",
   "dialog_rename_files": "The file name changes. The new file is rewritten from the DB values, so comments in the original file are lost.",
   "dialog_rename_list": "The record's key in the list changes. Comments on this record may be lost.",
-  "dialog_rename": "Change"
+  "dialog_rename": "Change",
+  "nav_root_info": "Data folder details",
+  "nav_root_config": "Config",
+  "nav_root_db": "Database",
+  "nav_root_host": "Address",
+  "git_detached": "no branch",
+  "git_changes": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "{count} change", "n=other": "{count} changes" }
+    }
+  ],
+  "git_no_changes": "no changes",
+  "git_send_review": "Send for review",
+  "review_title": "Send for review",
+  "review_new_branch": "The selected files are committed to a new branch, pushed, and opened as a draft pull request. You stay on the new branch; {branch} is not changed.",
+  "review_same_branch": "The selected files are committed to {branch} and pushed. Its pull request is updated, or opened as a draft if it has none.",
+  "review_sent": "Pushed to {branch}.",
+  "review_open_pr": "Open the pull request",
+  "review_create_pr": "Create the pull request on GitHub",
+  "review_files": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "{count} file selected", "n=other": "{count} files selected" }
+    }
+  ],
+  "review_other_files": "Other files",
+  "review_pr_title": "Title",
+  "review_pr_body": "Description (optional)",
+  "review_send": "Send",
+  "review_sending": "Sending…",
+  "review_status_added": "added",
+  "review_status_modified": "changed",
+  "review_status_deleted": "deleted",
+  "review_loading": "Loading…",
+  "review_format_only": "Only formatting or comments changed.",
+  "review_committed": "Committed",
+  "review_now": "Now",
+  "review_delete_confirm": "Delete",
+  "review_delete_record": "Delete {record}; it was never committed",
+  "review_revert_record": "Put {record} back as committed",
+  "review_include": "Include {file}",
+  "review_show_diff": "Show the changes in {file}",
+  "review_reverted": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "Put {count} record back as committed", "n=other": "Put {count} records back as committed" }
+    }
+  ],
+  "review_undo": "Undo",
+  "review_revert_selected": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "Put back {count} record", "n=other": "Put back {count} records" }
+    }
+  ]
 }

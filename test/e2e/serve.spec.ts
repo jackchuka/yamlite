@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { file, type Running, sqlite, start, stop } from "./app.ts";
+import { file, put, type Running, sqlite, start, stop } from "./app.ts";
 
 let app: Running | undefined;
 test.afterEach(async () => {
@@ -302,4 +302,47 @@ test("an edit from the form shows up in History as an uncommitted change", async
   await drawer.getByRole("tab", { name: /History/ }).click();
   await expect(drawer.getByText("Uncommitted changes")).toBeVisible();
   await expect(drawer.getByText("add fix-ci")).toBeVisible();
+});
+
+test("a record is put back as committed from the review dialog, and the toast's undo brings the edit back", async ({
+  page,
+}) => {
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "alice",
+    GIT_AUTHOR_EMAIL: "alice@example.com",
+    GIT_COMMITTER_NAME: "alice",
+    GIT_COMMITTER_EMAIL: "alice@example.com",
+  };
+  app = await start(
+    { "tasks/fix-ci.yaml": "title: Fix CI\n" },
+    (r) => (app = r),
+    undefined,
+    {},
+    (root) => {
+      const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env });
+      git("init", "-q", "-b", "main");
+      writeFileSync(join(root, ".gitignore"), ".yamlite/\n");
+      git("add", "-A");
+      git("commit", "-q", "-m", "add fix-ci");
+      git("remote", "add", "origin", "https://github.com/acme/notes.git");
+      git("update-ref", "refs/remotes/origin/main", "HEAD");
+      git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main");
+    },
+  );
+  const running = app;
+  await page.goto(running.url);
+  put(join(running.root, "tasks/fix-ci.yaml"), "title: Fix flaky CI\n");
+  await expect(page.getByText("1 change")).toBeVisible();
+  await page.getByRole("button", { name: "Send for review" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Show the changes in tasks/fix-ci.yaml" }).click();
+  await expect(dialog.getByTestId("field-diff")).toContainText("Fix CI");
+  await expect(dialog.getByTestId("field-diff")).toContainText("Fix flaky CI");
+  await dialog.getByRole("button", { name: "Put fix-ci back as committed" }).click();
+  await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix CI\n");
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix flaky CI\n");
 });
