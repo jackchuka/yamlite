@@ -187,6 +187,8 @@ test("the ERD draws tables and their references, and opens a table on double-cli
     (r) => (app = r),
   );
   await page.goto(app.url);
+  // "/" redirects to the first table once the tables load; a click before that lands on the table instead of the ERD
+  await expect(page.getByRole("heading", { name: "people", exact: true })).toBeVisible();
   await page.getByRole("complementary", { name: "sidebar" }).getByRole("link", { name: /^ERD/ }).click();
   const tasks = page.getByTestId("erd-node-tasks");
   await expect(tasks).toBeVisible();
