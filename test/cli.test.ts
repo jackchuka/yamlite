@@ -174,3 +174,22 @@ test("query --limit 0 does not truncate, and one row is singular", () => {
   expect(one.stderr).toContain("1 row");
   expect(one.stderr).not.toContain("1 rows");
 });
+
+test("guide prints the guide to writing yamlite.yaml", () => {
+  const r = run("guide");
+  expect(r.status).toBe(0);
+  expect(r.stdout).toBe(readFileSync(join(repo, "src", "guide.md"), "utf8"));
+});
+
+test("guide piped into a reader that stops early prints no error", () => {
+  const r = spawnSync("sh", ["-c", `"${process.execPath}" "${bin}" guide | head -1`], { encoding: "utf8" });
+  expect(r.stdout).toBe("# Writing yamlite.yaml\n");
+  expect(r.stderr).toBe("");
+});
+
+test("every command the guide names exists", () => {
+  const help = run("--help").stdout;
+  const named = new Set([...run("guide").stdout.matchAll(/`yamlite (\w+)/g)].map((m) => m[1]!));
+  expect(named.size).toBeGreaterThan(0);
+  for (const cmd of named) expect(help, cmd).toMatch(new RegExp(`^\\s+${cmd}\\b`, "m"));
+});

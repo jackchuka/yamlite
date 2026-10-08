@@ -141,6 +141,15 @@ test("feedback lines and the preamble go before the first prompt; feedback only 
   expect(texts(c.events)[1]).toBe("Proposal p_2 failed.\n---\nsecond");
 });
 
+test("the preamble sends schema questions to the guide and says what the agent cannot do", async () => {
+  const { host } = setup([[{ echo: true }]]);
+  const c = await host.start("test");
+  host.prompt(c.id, "first");
+  await idle(c);
+  expect(texts(c.events)[0]).toContain("read the guide tool");
+  expect(texts(c.events)[0]).toContain("you cannot run yamlite commands or edit yamlite.yaml");
+});
+
 test("a second prompt while busy is refused; cancel ends the turn", async () => {
   const { host } = setup([[{ wait: 10_000 }]]);
   const c = await host.start("test");

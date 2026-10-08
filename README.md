@@ -151,6 +151,7 @@ npx @jackchuka/yamlite status ./notes
 | Command                      | Options                                                               | Description                                                         |
 | ---------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------- |
 | `yamlite init [root]`        | `--db`, `--force`, `--print`                                          | Create `yamlite.yaml` from your files and database                  |
+| `yamlite guide`              |                                                                       | Print the guide to writing `yamlite.yaml`, for people and AI agents |
 | `yamlite check [root]`       | `--table <name>`, `--json`                                            | Check the YAML files against `yamlite.yaml`; exits 1 on any problem |
 | `yamlite query <sql> [root]` | `--db`, `--format` (table, json, csv), `--limit` (1000)               | Run one read-only SQL statement and print the rows                  |
 | `yamlite status [root]`      | `--db`, `--table <name>`, `--json`                                    | Show what `sync` would change, without writing                      |
@@ -413,6 +414,16 @@ join projects__milestones__tasks t on t.projects_id = m.projects_id and t.milest
 - Columns and types are inferred from the data on every sync; `columns` pins a type. Nothing is written back to `yamlite.yaml`.
 - Views are read-only: edit the YAML, or update the JSON column of the table. `serve` lists them under their table and opens the record a row comes from.
 - `references` on a view are checked like a table's, and `status` shows planned `+ view` / `− view` changes. A list that can't become a view (the field isn't a JSON column, or a view of that name was made by hand) is a warning.
+
+## Use with AI agents
+
+`yamlite guide` prints a guide to writing `yamlite.yaml` — the workflow (`init`, `status`, `check`), how to lay out tables, and when each rule fits — matching the installed version. Point any coding agent at it, or install it as an [Agent Skill](https://agentskills.io) for Claude Code, Codex, Cursor and others:
+
+```bash
+npx skills add jackchuka/yamlite
+```
+
+The skill tells the agent to read `yamlite guide` and to finish with `yamlite check` passing. The Ask AI panel in `yamlite serve` reads the same guide.
 
 ## Configuration
 

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "vitest";
 import { agentTools } from "../../src/agent/tools.ts";
+import { guide } from "../../src/guide.ts";
 import { type Served, startServe } from "../serve/helpers.ts";
 
 let t: Served | undefined;
@@ -109,4 +110,9 @@ test("query cannot reach internal tables or hide writes in a WITH", async () => 
 test("check reports unregistered tables", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" });
   expect(await call(t, "check")).toMatchObject({ ok: true, unregisteredTables: expect.any(Array) });
+});
+
+test("guide returns the guide to writing yamlite.yaml", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  expect(await call(t, "guide")).toBe(guide());
 });
