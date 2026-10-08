@@ -1,3 +1,4 @@
+import { transport } from "./transport";
 import { api } from "./api";
 import type { Hello, ServeEvent } from "./types";
 
@@ -40,7 +41,7 @@ export class EventStore {
   private readonly listeners = new Set<Listener>();
   private source: EventSource | null = null;
 
-  connect(url = "/api/events", make: (url: string) => EventSource = (u) => new EventSource(u)): void {
+  connect(url = "/api/events", make: (url: string) => EventSource = (u) => transport().eventSource(u)): void {
     const source = make(url);
     this.source = source;
     source.addEventListener("hello", (m) => {

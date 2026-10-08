@@ -36,8 +36,7 @@ function imports(entry: string, seen = new Set<string>(), out = new Map<string, 
 }
 
 test("every Node API core imports has a browser module that exports it", async () => {
-  const used = imports(resolve(repo, "src/serve/workspace.ts"));
-  imports(resolve(repo, "src/index.ts"), new Set(), used);
+  const used = imports(resolve(repo, "src/core.ts"));
   const missing: string[] = [];
   for (const [spec, names] of used) {
     if (UNAVAILABLE.has(spec)) continue;

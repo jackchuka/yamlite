@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { request } from "./api";
 import { isReadOnly } from "./mode";
+import { transport } from "./transport";
 import { queryClient, useMeta } from "./providers";
 import type { Row } from "./types";
 import { m } from "@/paraglide/messages.js";
@@ -178,7 +179,7 @@ export class Chat {
   private source: EventSource | null = null;
   private readonly listeners = new Set<() => void>();
 
-  constructor(private readonly make: (url: string) => EventSource = (u) => new EventSource(u)) {}
+  constructor(private readonly make: (url: string) => EventSource = (u) => transport().eventSource(u)) {}
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);

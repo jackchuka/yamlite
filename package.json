@@ -30,13 +30,33 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
-    }
+    },
+    "./core": {
+      "types": "./dist/core.d.mts",
+      "import": "./dist/core.mjs"
+    },
+    "./browser/aliases": {
+      "types": "./dist/browser/aliases.d.mts",
+      "import": "./dist/browser/aliases.mjs"
+    },
+    "./browser/globals": {
+      "types": "./dist/browser/globals.d.mts",
+      "import": "./dist/browser/globals.mjs"
+    },
+    "./browser/expose": {
+      "types": "./dist/browser/expose.d.mts",
+      "import": "./dist/browser/expose.mjs"
+    },
+    "./ui": {
+      "import": "./dist/ui-embed/embed.js"
+    },
+    "./ui/style.css": "./dist/ui-embed/style.css"
   },
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsdown && vite build --config ui/vite.config.ts",
+    "build": "tsdown && vite build --config ui/vite.config.ts && vite build --config ui/vite.embed.config.ts",
     "dev:ui": "vite --config ui/vite.config.ts",
     "test": "vitest run",
     "test:wasm": "YAMLITE_SQLITE=wasm vitest run",
