@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { openPr } from "./pr.ts";
+import type { GitDriver } from "./driver.ts";
 import { currentBranch, defaultBranch, GitError, insideRoot, type Repo, runGit, SLOW_MS } from "./repo.ts";
 
 export type GitStep =
@@ -143,8 +143,9 @@ export async function validateSteps(
   return { steps, startBranch };
 }
 
-async function runOne(repo: Repo, s: GitStep, gh: string | null): Promise<StepResult> {
-  const g = (args: string[], slow = false) => runGit(repo.top, args, slow ? { timeoutMs: SLOW_MS } : {});
+async function runOne(repo: Repo, s: GitStep, driver: GitDriver): Promise<StepResult> {
+  const g = (args: string[], o: { slow?: boolean; env?: Record<string, string> } = {}) =>
+    runGit(repo.top, args, { ...(o.slow ? { timeoutMs: SLOW_MS } : {}), ...(o.env ? { env: o.env } : {}) });
   switch (s.kind) {
     case "create_branch":
       await g(["switch", "-c", s.name, ...(s.from ? [s.from] : [])]);
@@ -154,26 +155,38 @@ async function runOne(repo: Repo, s: GitStep, gh: string | null): Promise<StepRe
       break;
     case "commit": {
       const tops = s.paths.map((p) => insideRoot(repo, p) as string);
+      const who = await driver.author();
+      const env = who
+        ? {
+            GIT_AUTHOR_NAME: who.name,
+            GIT_AUTHOR_EMAIL: who.email,
+            GIT_COMMITTER_NAME: who.name,
+            GIT_COMMITTER_EMAIL: who.email,
+          }
+        : undefined;
       await g(["add", "-A", "--", ...tops]);
       // --only: changes staged earlier for other files stay out of this commit
-      await g(["commit", "-q", "--only", "-m", s.message, "--", ...tops]);
+      await g(["commit", "-q", "--only", "-m", s.message, "--", ...tops], { env });
       break;
     }
     case "push":
-      await g(["push", "-u", "origin", `refs/heads/${s.branch}:refs/heads/${s.branch}`], true);
+      await g(["push", "-u", "origin", `refs/heads/${s.branch}:refs/heads/${s.branch}`], {
+        slow: true,
+        env: await driver.remoteEnv(),
+      });
       break;
     case "pull": {
       const now = await currentBranch(repo);
       if (now !== s.branch)
         throw new GitError(`pull ${s.branch} needs ${s.branch} checked out, but ${now ?? "no branch"} is`);
-      await g(["pull", "--ff-only", "origin", `refs/heads/${s.branch}`], true);
+      await g(["pull", "--ff-only", "origin", `refs/heads/${s.branch}`], { slow: true, env: await driver.remoteEnv() });
       break;
     }
     case "open_pr": {
       const head = await currentBranch(repo);
       const base = s.base ?? (await defaultBranch(repo));
       if (!head || !base) throw new GitError("cannot tell the branch or the base branch for the PR");
-      const pr = await openPr(repo, { base, head, title: s.title, body: s.body, gh });
+      const pr = await driver.openPr(repo, { base, head, title: s.title, body: s.body });
       return { status: "done", url: pr.url, created: pr.created };
     }
   }
@@ -184,7 +197,7 @@ export async function runSteps(
   repo: Repo,
   steps: GitStep[],
   o: {
-    gh: string | null;
+    driver: GitDriver;
     expectBranch: string | null;
     afterTreeChange: () => Promise<void>;
     onProgress?: (r: StepResult[]) => void;
@@ -203,7 +216,7 @@ export async function runSteps(
   }
   for (const [i, s] of steps.entries()) {
     try {
-      results[i] = await runOne(repo, s, o.gh);
+      results[i] = await runOne(repo, s, o.driver);
     } catch (e) {
       results[i] = { status: "failed", message: e instanceof Error ? e.message : String(e) };
       o.onProgress?.(results);

@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { expect, test } from "@playwright/test";
 import { file, put, type Running, sqlite, start, stop } from "./app.ts";
 
@@ -319,7 +320,8 @@ test("a record is put back as committed from the review dialog, and the toast's 
   app = await start(
     { "tasks/fix-ci.yaml": "title: Fix CI\n" },
     (r) => (app = r),
-    undefined,
+    // committed as serve writes it, so the only change is the edit below
+    "tables:\n  tasks:\n    columns:\n      title: TEXT\n",
     {},
     (root) => {
       const git = (...args: string[]) => execFileSync("git", args, { cwd: root, env });
@@ -333,8 +335,10 @@ test("a record is put back as committed from the review dialog, and the toast's 
     },
   );
   const running = app;
-  await page.goto(running.url);
+  // edited before the page opens: an edit made while it connects could land before its event stream does
   put(join(running.root, "tasks/fix-ci.yaml"), "title: Fix flaky CI\n");
+  await expect.poll(() => titleOf(running, "fix-ci")).toBe("Fix flaky CI");
+  await page.goto(running.url);
   await expect(page.getByText("1 change")).toBeVisible();
   await page.getByRole("button", { name: "Send for review" }).click();
   const dialog = page.getByRole("dialog");
@@ -346,3 +350,16 @@ test("a record is put back as committed from the review dialog, and the toast's 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix flaky CI\n");
 });
+
+// what the database holds now; null until the first sync has created the row
+function titleOf(app: Running, key: string): string | null {
+  const db = new DatabaseSync(join(app.root, ".yamlite", "db.sqlite"), { readOnly: true });
+  try {
+    const row = db.prepare("SELECT title FROM tasks WHERE id = ?").get(key) as { title: string } | undefined;
+    return row?.title ?? null;
+  } catch {
+    return null;
+  } finally {
+    db.close();
+  }
+}

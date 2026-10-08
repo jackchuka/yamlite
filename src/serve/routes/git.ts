@@ -1,6 +1,5 @@
+import { ReviewRefused } from "../../git/driver.ts";
 import { defaultBranch, gitStatus, insideRoot, runGit } from "../../git/repo.ts";
-import { openPrUrl, reviewSteps } from "../../git/review.ts";
-import { runSteps, validateSteps } from "../../git/steps.ts";
 import { canonical } from "../../hash.ts";
 import { own, type Rec } from "../../types.ts";
 import { type ApiContext, tableSpec } from "../context.ts";
@@ -90,37 +89,25 @@ export const gitRoutes: Routes = (router, ctx) => {
     if (!git || !(await hasOrigin(ctx)))
       throw new HttpError(404, "the data folder is not in a git repository with an origin");
     const req = reviewBody(body);
+    const target = objectBody(body, "body").target;
+    if (target !== undefined && target !== null && typeof target !== "string")
+      throw new HttpError(400, "target must be a branch name or null", { field: "target" });
     return ctx.proposals.exclusive(async () => {
       // UI edits reach the files before git reads them
       assertSynced(await ctx.y.sync(), "could not write the latest edits to files for", "; nothing was sent");
-      const { branch } = await gitStatus(git.repo);
-      if (branch === null) throw new HttpError(409, "check out a branch first; HEAD is detached");
-      const defaultBranch = await baseBranch();
-      if (defaultBranch === null) throw new HttpError(409, "cannot tell the remote default branch of origin");
-      const existing = branch === defaultBranch ? null : await openPrUrl(git.repo, await git.gh(), branch);
-      const planned = reviewSteps(req, { branch, defaultBranch, now: new Date(), openPr: existing === null });
-      let steps;
       try {
-        ({ steps } = await validateSteps(git.repo, planned));
+        return await git.driver.review(
+          git.repo,
+          { ...req, target: target ?? null },
+          {
+            afterTreeChange: async () =>
+              assertSynced(await ctx.y.sync(), "the database could not follow the files for"),
+          },
+        );
       } catch (e) {
-        throw new HttpError(400, e instanceof Error ? e.message : String(e));
+        if (e instanceof ReviewRefused) throw new HttpError(e.status, e.message);
+        throw e;
       }
-      const results = await runSteps(git.repo, steps, {
-        gh: await git.gh(),
-        expectBranch: branch,
-        afterTreeChange: async () => assertSynced(await ctx.y.sync(), "the database could not follow the files for"),
-      });
-      const failed = results.find((r) => r.status === "failed");
-      const pr = results.find((r) => r.url);
-      const head = steps[0]?.kind === "create_branch" ? steps[0].name : branch;
-      return {
-        branch: head,
-        steps: steps.map((s) => s.kind),
-        results,
-        url: pr?.url ?? existing,
-        created: pr?.created ?? false,
-        ...(failed ? { error: failed.message ?? "a git step failed" } : {}),
-      };
     });
   });
 

@@ -76,7 +76,9 @@ export const agentRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/agent/proposals", () => ({ proposals: ctx.proposals.pending() }));
   router.add("POST", "/api/agent/proposals/:id/apply", ({ params }) => {
     const id = params.id as string;
-    return ctx.proposals.get(id)?.git ? ctx.proposals.applyGit(id) : ctx.proposals.apply(id);
+    const p = ctx.proposals.get(id);
+    if (p?.git && !ctx.git?.driver.steps) throw new HttpError(404, "git steps are not available here");
+    return p?.git ? ctx.proposals.applyGit(id) : ctx.proposals.apply(id);
   });
   router.add("POST", "/api/agent/proposals/:id/discard", ({ params }) => ctx.proposals.discard(params.id as string));
 };

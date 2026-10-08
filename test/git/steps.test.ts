@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
+import { type GitDriver, localDriver } from "../../src/git/driver.ts";
 import { findRepo } from "../../src/git/repo.ts";
 import { runSteps, validateSteps } from "../../src/git/steps.ts";
 import { dataRoot, read, tmpRoot, write } from "../helpers.ts";
@@ -16,7 +17,7 @@ async function setup() {
   const repo = (await findRepo(root))!;
   return { root, bare, repo };
 }
-const noop = { gh: null, expectBranch: "main", afterTreeChange: async () => {} };
+const noop = { driver: localDriver(async () => null), expectBranch: "main", afterTreeChange: async () => {} };
 
 test("branch → commit → push → switch back", async () => {
   const { root, bare, repo } = await setup();
@@ -220,4 +221,48 @@ test("nothing runs when the checked-out branch changed since validation", async 
     message: "the checked-out branch changed from main to elsewhere since this was proposed; nothing was run",
   });
   expect(git(root, "branch", "--list", "x")).toBe("");
+});
+
+const driverWith = (over: Partial<GitDriver>): GitDriver => ({ ...localDriver(async () => null), ...over });
+
+test("the driver's author signs commits", async () => {
+  const root = dataRoot();
+  const bare = withRemote(root);
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  const repo = (await findRepo(root))!;
+  const results = await runSteps(
+    repo,
+    [
+      { kind: "create_branch", name: "work" },
+      { kind: "commit", message: "add a", paths: ["tasks/a.yaml"] },
+      { kind: "push", branch: "work" },
+    ],
+    {
+      driver: driverWith({ author: async () => ({ name: "Bob", email: "1+bob@users.noreply.github.com" }) }),
+      expectBranch: "main",
+      afterTreeChange: async () => {},
+    },
+  );
+  expect(results.map((r) => r.status)).toEqual(["done", "done", "done"]);
+  expect(git(bare, "log", "-1", "--format=%an <%ae>", "work").trim()).toBe("Bob <1+bob@users.noreply.github.com>");
+});
+
+test("a failing remote env fails the push step", async () => {
+  const root = dataRoot();
+  withRemote(root);
+  const repo = (await findRepo(root))!;
+  const results = await runSteps(
+    repo,
+    [
+      { kind: "create_branch", name: "work" },
+      { kind: "push", branch: "work" },
+      { kind: "switch", branch: "main" },
+    ],
+    {
+      driver: driverWith({ remoteEnv: async () => Promise.reject(new Error("token expired")) }),
+      expectBranch: "main",
+      afterTreeChange: async () => {},
+    },
+  );
+  expect(results).toEqual([{ status: "done" }, { status: "failed", message: "token expired" }, { status: "skipped" }]);
 });

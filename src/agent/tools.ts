@@ -215,7 +215,7 @@ function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
   if (!git) return [];
   const { repo } = git;
   const paths = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
-  return [
+  const tools: McpTool[] = [
     {
       name: "git_status",
       description:
@@ -263,10 +263,13 @@ function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
         required: ["title", "steps"],
       },
       call: async (a) => {
+        // an agent may still hold a tool list from before git steps were turned off
+        if (!ctx.git?.driver.steps) throw new Error("git steps are not available here");
         const { steps, startBranch } = await validateSteps(repo, a.steps);
         const p = ctx.proposals.forGit(conversationId, str(a.title, "title"), steps, startBranch);
         return `Proposal ${p.id} created: ${steps.length} git step${steps.length === 1 ? "" : "s"}. Nothing runs until the user applies it. The proposal appears as a card in this same chat panel; tell the user to review the card above and press its button, and do not say the steps ran.`;
       },
     },
   ];
+  return git.driver.steps ? tools : tools.filter((t) => t.name !== "propose_git");
 }
