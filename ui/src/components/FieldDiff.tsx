@@ -1,23 +1,28 @@
 import type { ReactNode } from "react";
+import { isLongText } from "@/lib/textdiff";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
+import { TextDiff } from "./TextDiff";
 
 export interface DiffRow {
   field: string;
-  a: string;
-  b: string;
+  a: unknown;
+  b: unknown;
   dim?: boolean;
 }
 
-// two versions of a record side by side; a phone has no room for three columns, so each field stacks its two values
-export function FieldDiff({
+const asText = (v: unknown) => (typeof v === "string" ? v : v === null || v === undefined ? "" : JSON.stringify(v));
+// side by side, a long text is unreadable: its line breaks collapse and the second column runs off
+const isTextChange = (r: DiffRow) => !r.dim && r.a !== r.b && (isLongText(r.a) || isLongText(r.b));
+
+function Columns({
   labels,
   rows,
   note,
   className,
 }: {
   labels: [ReactNode, ReactNode];
-  rows: DiffRow[];
+  rows: { field: string; a: string; b: string; dim?: boolean }[];
   note?: ReactNode;
   className?: string;
 }) {
@@ -42,7 +47,7 @@ export function FieldDiff({
             ).map(([label, value], i) => (
               <div key={i} className="flex gap-2 border-t px-2.5 py-1.5 break-all">
                 <span className="w-24 shrink-0 font-sans text-[12px] text-muted-foreground">{label}</span>
-                <span>{value}</span>
+                <span className={cn(r.dim && "line-clamp-2")}>{value}</span>
               </div>
             ))}
           </div>
@@ -62,9 +67,42 @@ export function FieldDiff({
       {rows.map((r) => (
         <div key={r.field} className={cn("contents", r.dim && "opacity-50")}>
           <span className="text-syn-key">{r.field}</span>
-          <span>{r.a}</span>
-          <span>{r.b}</span>
+          <span className={cn("[overflow-wrap:anywhere]", r.dim && "line-clamp-2")}>{r.a}</span>
+          <span className={cn("[overflow-wrap:anywhere]", r.dim && "line-clamp-2")}>{r.b}</span>
         </div>
+      ))}
+    </div>
+  );
+}
+
+// two versions of a record: short values side by side (stacked on a phone), changed long text as a line diff
+export function FieldDiff({
+  labels,
+  rows,
+  format,
+  note,
+  className,
+}: {
+  labels: [ReactNode, ReactNode];
+  rows: DiffRow[];
+  format: (v: unknown) => string;
+  note?: ReactNode;
+  className?: string;
+}) {
+  const columns = rows.filter((r) => !isTextChange(r));
+  const texts = rows.filter(isTextChange);
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      {(columns.length > 0 || note) && (
+        <Columns
+          labels={labels}
+          note={note}
+          className={className}
+          rows={columns.map((r) => ({ field: r.field, a: format(r.a), b: format(r.b), dim: r.dim }))}
+        />
+      )}
+      {texts.map((r) => (
+        <TextDiff key={r.field} field={r.field} legend={labels} before={asText(r.a)} after={asText(r.b)} />
       ))}
     </div>
   );

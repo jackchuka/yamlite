@@ -103,7 +103,8 @@ function RowDiff({ row }: { row: ProposalRow }) {
       {row.op !== "delete" && scalars.length > 0 && (
         <FieldDiff
           labels={[m.proposal_before(), m.proposal_after()]}
-          rows={scalars.map((f) => ({ field: f, a: show(row.before?.[f]), b: show(row.after?.[f]) }))}
+          format={show}
+          rows={scalars.map((f) => ({ field: f, a: row.before?.[f], b: row.after?.[f] }))}
         />
       )}
       {row.op !== "delete" &&

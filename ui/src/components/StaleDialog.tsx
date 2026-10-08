@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,23 +27,27 @@ export function StaleDialog({
   onOverwrite: () => void;
   onClose: () => void;
 }) {
+  const reload = useRef<HTMLButtonElement>(null);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      {/* the diff's fold buttons come first in tab order; start on the choice the dialog asks for */}
+      <DialogContent
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          reload.current?.focus();
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{m.record_stale_title()}</DialogTitle>
           <DialogDescription>{m.record_stale_description()}</DialogDescription>
         </DialogHeader>
         <FieldDiff
           labels={[m.record_stale_theirs(), m.record_stale_mine()]}
-          rows={stale.map((f) => ({
-            field: f,
-            a: JSON.stringify(current[f] ?? null),
-            b: JSON.stringify(draft[f] ?? null),
-          }))}
+          format={(v) => JSON.stringify(v ?? null)}
+          rows={stale.map((f) => ({ field: f, a: current[f], b: draft[f] }))}
         />
         <DialogFooter>
-          <Button variant="outline" onClick={onReload}>
+          <Button ref={reload} variant="outline" onClick={onReload}>
             {m.record_reload()}
           </Button>
           <Button onClick={onOverwrite}>{m.record_overwrite()}</Button>

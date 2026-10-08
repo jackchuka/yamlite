@@ -24,10 +24,11 @@ function Diff({ entry, detail, keyCol }: { entry: ConflictEntry; detail: Conflic
       className="md:text-[11.5px]"
       labels={[<span className="text-ok">{m.sync_kept({ winner: entry.winner ?? "" })}</span>, m.sync_backup()]}
       note={detail.deleted ? m.sync_deleted_on_backup() : undefined}
+      format={show}
       rows={diffRows(detail.current, detail.saved, keyCol).map((d) => ({
         field: d.field,
-        a: show(d.winner),
-        b: show(d.saved),
+        a: d.winner,
+        b: d.saved,
         dim: d.same,
       }))}
     />
