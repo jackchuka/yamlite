@@ -3,7 +3,7 @@ import { existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, expect, test } from "vitest";
 import { type GitDriver, localDriver } from "../../src/git/driver.ts";
-import { findRepo } from "../../src/git/repo.ts";
+import { findRepo, type Repo } from "../../src/git/repo.ts";
 import { runSteps, validateSteps } from "../../src/git/steps.ts";
 import { dataRoot, read, tmpRoot, write } from "../helpers.ts";
 import { commit, git, useGitEnv, withRemote } from "../gitrepo.ts";
@@ -17,7 +17,11 @@ async function setup() {
   const repo = (await findRepo(root))!;
   return { root, bare, repo };
 }
-const noop = { driver: localDriver(async () => null), expectBranch: "main", afterTreeChange: async () => {} };
+const noop = (repo: Repo, root: string) => ({
+  driver: localDriver(repo, root, async () => null),
+  expectBranch: "main",
+  afterTreeChange: async () => {},
+});
 
 test("branch → commit → push → switch back", async () => {
   const { root, bare, repo } = await setup();
@@ -30,7 +34,7 @@ test("branch → commit → push → switch back", async () => {
     { kind: "switch", branch: "main" },
   ]);
   let synced = 0;
-  const results = await runSteps(repo, steps, { ...noop, afterTreeChange: async () => void synced++ });
+  const results = await runSteps(repo, steps, { ...noop(repo, root), afterTreeChange: async () => void synced++ });
   expect(results.map((r) => r.status)).toEqual(["done", "done", "done", "done"]);
   expect(git(bare, "show", "edit-a:tasks/a.yaml")).toBe("title: B\n");
   expect(git(bare, "show", "--stat", "--format=%s", "edit-a")).not.toContain("new.yaml");
@@ -48,7 +52,7 @@ test("commit of a deleted tracked file records the deletion", async () => {
     { kind: "commit", message: "drop a", paths: ["tasks/a.yaml"] },
     { kind: "push", branch: "drop-a" },
   ]);
-  expect((await runSteps(repo, steps, noop)).map((r) => r.status)).toEqual(["done", "done", "done"]);
+  expect((await runSteps(repo, steps, noop(repo, root))).map((r) => r.status)).toEqual(["done", "done", "done"]);
   expect(() =>
     execFileSync("git", ["cat-file", "-e", "drop-a:tasks/a.yaml"], { cwd: bare, stdio: "ignore" }),
   ).toThrow();
@@ -65,7 +69,7 @@ test("a conflicting uncommitted change stops the steps", async () => {
     { kind: "switch", branch: "other" },
     { kind: "commit", message: "x", paths: ["tasks/a.yaml"] },
   ]);
-  const results = await runSteps(repo, steps, noop);
+  const results = await runSteps(repo, steps, noop(repo, root));
   expect(results[0]).toMatchObject({ status: "failed" });
   expect(results[0]?.message).toMatch(/overwritten|local changes/);
   expect(results[1]).toEqual({ status: "skipped" });
@@ -80,7 +84,7 @@ test("push to an unreachable remote fails without prompting", async () => {
     { kind: "push", branch: "x" },
   ]);
   const started = Date.now();
-  const results = await runSteps(repo, steps, noop);
+  const results = await runSteps(repo, steps, noop(repo, root));
   expect(results[1]?.status).toBe("failed");
   expect(Date.now() - started).toBeLessThan(20_000);
 });
@@ -124,7 +128,7 @@ test("open_pr returns the PR URL and uses the default branch as base", async () 
     { kind: "push", branch: "edit-a" },
     { kind: "open_pr", title: "Edit A", body: "why" },
   ]);
-  const results = await runSteps(repo, steps, noop);
+  const results = await runSteps(repo, steps, noop(repo, root));
   expect(results[3]).toEqual({
     status: "done",
     url: "https://github.com/o/r/compare/main...edit-a?quick_pull=1&title=Edit%20A&body=why",
@@ -154,7 +158,7 @@ test("pull fast-forwards from the remote", async () => {
   git(w, "push", "-q", "origin", "main");
   const { steps } = await validateSteps(repo, [{ kind: "pull", branch: "main" }]);
   let synced = 0;
-  const results = await runSteps(repo, steps, { ...noop, afterTreeChange: async () => void synced++ });
+  const results = await runSteps(repo, steps, { ...noop(repo, root), afterTreeChange: async () => void synced++ });
   expect(results.map((r) => r.status)).toEqual(["done"]);
   expect(read(join(root, "tasks/a.yaml"))).toBe("title: REMOTE\n");
   expect(synced).toBe(1);
@@ -166,10 +170,10 @@ test("pull needs the branch checked out", async () => {
 });
 
 test("create_branch from a base syncs the tree", async () => {
-  const { repo } = await setup();
+  const { root, repo } = await setup();
   const { steps } = await validateSteps(repo, [{ kind: "create_branch", name: "x", from: "main" }]);
   let synced = 0;
-  await runSteps(repo, steps, { ...noop, afterTreeChange: async () => void synced++ });
+  await runSteps(repo, steps, { ...noop(repo, root), afterTreeChange: async () => void synced++ });
   expect(synced).toBe(1);
 });
 
@@ -180,7 +184,7 @@ test("a failed sync after git succeeded marks the step failed", async () => {
     { kind: "switch", branch: "main" },
   ]);
   const results = await runSteps(repo, steps, {
-    ...noop,
+    ...noop(repo, root),
     afterTreeChange: async () => {
       throw new Error("boom");
     },
@@ -206,7 +210,7 @@ test("a commit stages only the listed file, not an untracked neighbour", async (
     { kind: "commit", message: "m", paths: ["tasks/a.yaml"] },
     { kind: "push", branch: "x" },
   ]);
-  expect((await runSteps(repo, steps, noop)).map((r) => r.status)).toEqual(["done", "done", "done"]);
+  expect((await runSteps(repo, steps, noop(repo, root))).map((r) => r.status)).toEqual(["done", "done", "done"]);
   expect(git(bare, "ls-tree", "-r", "--name-only", "x")).not.toContain("key.env");
 });
 
@@ -215,7 +219,7 @@ test("nothing runs when the checked-out branch changed since validation", async 
   const { steps, startBranch } = await validateSteps(repo, [{ kind: "create_branch", name: "x" }]);
   expect(startBranch).toBe("main");
   git(root, "switch", "-q", "-c", "elsewhere");
-  const results = await runSteps(repo, steps, { ...noop, expectBranch: startBranch });
+  const results = await runSteps(repo, steps, { ...noop(repo, root), expectBranch: startBranch });
   expect(results[0]).toEqual({
     status: "failed",
     message: "the checked-out branch changed from main to elsewhere since this was proposed; nothing was run",
@@ -223,7 +227,10 @@ test("nothing runs when the checked-out branch changed since validation", async 
   expect(git(root, "branch", "--list", "x")).toBe("");
 });
 
-const driverWith = (over: Partial<GitDriver>): GitDriver => ({ ...localDriver(async () => null), ...over });
+const driverWith = (repo: Repo, root: string, over: Partial<GitDriver>): GitDriver => ({
+  ...localDriver(repo, root, async () => null),
+  ...over,
+});
 
 test("the driver's author signs commits", async () => {
   const root = dataRoot();
@@ -238,7 +245,9 @@ test("the driver's author signs commits", async () => {
       { kind: "push", branch: "work" },
     ],
     {
-      driver: driverWith({ author: async () => ({ name: "Bob", email: "1+bob@users.noreply.github.com" }) }),
+      driver: driverWith(repo, root, {
+        author: async () => ({ name: "Bob", email: "1+bob@users.noreply.github.com" }),
+      }),
       expectBranch: "main",
       afterTreeChange: async () => {},
     },
@@ -259,7 +268,7 @@ test("a failing remote env fails the push step", async () => {
       { kind: "switch", branch: "main" },
     ],
     {
-      driver: driverWith({ remoteEnv: async () => Promise.reject(new Error("token expired")) }),
+      driver: driverWith(repo, root, { remoteEnv: async () => Promise.reject(new Error("token expired")) }),
       expectBranch: "main",
       afterTreeChange: async () => {},
     },

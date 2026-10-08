@@ -186,7 +186,7 @@ async function runOne(repo: Repo, s: GitStep, driver: GitDriver): Promise<StepRe
       const head = await currentBranch(repo);
       const base = s.base ?? (await defaultBranch(repo));
       if (!head || !base) throw new GitError("cannot tell the branch or the base branch for the PR");
-      const pr = await driver.openPr(repo, { base, head, title: s.title, body: s.body });
+      const pr = await driver.openPr({ base, head, title: s.title, body: s.body });
       return { status: "done", url: pr.url, created: pr.created };
     }
   }

@@ -150,6 +150,7 @@ export async function writeSnapshotData(opts: {
         // the export routes are GET-only, so the shared store is never begun or rolled back here
         agent: null,
         git: null,
+        history: null,
         proposals: new ProposalStore({
           store,
           dry: store,

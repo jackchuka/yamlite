@@ -4,7 +4,6 @@ import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { type AgentInfo, detectAgents } from "../agent/detect.ts";
 import type { GitDriver } from "../git/driver.ts";
-import type { Repo } from "../git/repo.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
 import { createHandler } from "./http.ts";
@@ -22,8 +21,8 @@ export interface ServeOptions {
   agents?: AgentInfo[];
   // skips gh detection; null means no gh
   gh?: string | null;
-  // absent: the local driver, built from the gh probe
-  driver?: (repo: Repo) => GitDriver;
+  // absent: the local repository, if any; null: no git
+  git?: GitDriver | null;
 }
 
 export interface Server {
@@ -60,7 +59,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     agents: opts.agent === false ? [] : (opts.agents ?? detectAgents()),
     mcpUrl: () => `http://${mcpHost}:${port}/mcp`,
     gh: opts.gh,
-    driver: opts.driver,
+    git: opts.git,
   });
   try {
     const token = randomBytes(24).toString("hex");

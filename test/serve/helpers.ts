@@ -12,10 +12,14 @@ afterEach(async () => {
   for (const w of open.splice(0)) await w.close();
 });
 
-export async function tasksWorkspace(opts: Partial<Parameters<typeof createWorkspace>[0]> = {}) {
+export async function tasksWorkspace(
+  opts: Partial<Parameters<typeof createWorkspace>[0]> = {},
+  setup?: (root: string) => void,
+) {
   const root = dataRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns:\n      title: TEXT\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
+  setup?.(root);
   const w = await createWorkspace({ root, watch: fast, agents: [], mcpUrl: () => "", gh: null, ...opts });
   open.push(w);
   return { w, root };

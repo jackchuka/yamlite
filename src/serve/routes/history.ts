@@ -1,6 +1,6 @@
 import { dirname } from "node:path";
 import { isMap, isSeq, parseDocument } from "yaml";
-import { type Extract, fileDiff, type HistoryTarget, recordHistory } from "../../githistory.ts";
+import type { Extract, HistoryTarget } from "../../githistory.ts";
 import { markdownCodec, markdownExt } from "../../source/markdown.ts";
 import { PARSE_OPTIONS, yamlCodec } from "../../source/yamldoc.ts";
 import { own, type Rec, type TableSpec } from "../../types.ts";
@@ -53,7 +53,8 @@ export const historyRoutes: Routes = (router, ctx) => {
     const { spec, key, t } = target(ctx, params);
     const cursor = query.get("cursor") ?? undefined;
     if (cursor !== undefined && !CURSOR.test(cursor)) throw new HttpError(400, "invalid cursor");
-    const page = await recordHistory(t, extractor(spec, key), { cursor });
+    if (!ctx.history) return { state: "nogit" };
+    const page = await ctx.history.history(t, extractor(spec, key), { cursor });
     if (page.state !== "ok") return page;
     return {
       ...page,
@@ -71,7 +72,8 @@ export const historyRoutes: Routes = (router, ctx) => {
     const rev = params.sha as string;
     if (!REV.test(rev)) throw new HttpError(400, "invalid commit");
     const { t } = target(ctx, params);
-    const res = await fileDiff(t, rev);
+    if (!ctx.history) throw new HttpError(404, "no git history (nogit)");
+    const res = await ctx.history.fileDiff(t, rev);
     if (res.state === "ok") return { text: res.text };
     if (res.state === "error") throw new HttpError(500, res.message);
     throw new HttpError(

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { agentTools } from "../../src/agent/tools.ts";
 import { localDriver } from "../../src/git/driver.ts";
+import { findRepo } from "../../src/git/repo.ts";
 import { commit, git, useGitEnv, withRemote } from "../gitrepo.ts";
 import { dataRoot, read, sql, tmpRoot, waitFor, write } from "../helpers.ts";
 import { type Served, startServe } from "./helpers.ts";
@@ -180,7 +181,7 @@ test("with git steps off there is no propose_git and git proposals cannot be app
   t = await startServe({}, undefined, {
     root,
     gh: null,
-    driver: () => ({ ...localDriver(async () => null), steps: false }),
+    git: { ...localDriver((await findRepo(root))!, root, async () => null), steps: false },
   });
   const names = agentTools(t.s.context, "c1").map((x) => x.name);
   expect(names).toContain("git_status");

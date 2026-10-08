@@ -2,7 +2,6 @@ import { relative } from "node:path";
 import type { AgentHost } from "../agent/host.ts";
 import type { ProposalStore } from "../agent/proposals.ts";
 import type { GitDriver } from "../git/driver.ts";
-import type { Repo } from "../git/repo.ts";
 import type { Yamlite } from "../index.ts";
 import type { Store } from "../store.ts";
 import type { TableSpec, ViewRecord } from "../types.ts";
@@ -24,8 +23,10 @@ export interface ApiContext {
   // agent proposals; present even when no agent is offered, so the routes stay simple
   proposals: ProposalStore;
   agent: AgentHost | null;
-  // the git repository holding the root and how git reaches its remote; null outside a repository
-  git: { repo: Repo; driver: GitDriver } | null;
+  // reads and writes git for the root; null when there is no git
+  git: GitDriver | null;
+  // record history; without a driver, a local serve still finds a repository created after it started
+  history: Pick<GitDriver, "history" | "fileDiff"> | null;
 }
 
 // relative to the root when inside it (--db and listed tables may live elsewhere)

@@ -1,33 +1,14 @@
 import { ReviewRefused } from "../../git/driver.ts";
-import { defaultBranch, gitStatus, insideRoot, runGit } from "../../git/repo.ts";
+import { isAbsolute, relative, resolve } from "node:path";
 import { canonical } from "../../hash.ts";
 import { own, type Rec } from "../../types.ts";
-import { type ApiContext, tableSpec } from "../context.ts";
+import { tableSpec } from "../context.ts";
 import { headRecord, type RecordChange, recordChanges } from "../gitrecords.ts";
 import { deleteRecord, insertRecord, readRecord, updateRecord } from "../records.ts";
 import { wireValue } from "../wire.ts";
 import { HttpError } from "../http.ts";
 import { assertSynced, objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
-
-type ChangeStatus = "added" | "modified" | "deleted";
-
-// porcelain v2 XY codes, staged or not
-function changeStatus(xy: string): ChangeStatus {
-  if (xy === "??" || xy.includes("A")) return "added";
-  if (xy.includes("D")) return "deleted";
-  return "modified";
-}
-
-async function hasOrigin(ctx: ApiContext): Promise<boolean> {
-  if (!ctx.git) return false;
-  try {
-    await runGit(ctx.git.repo.top, ["remote", "get-url", "origin"]);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function reviewBody(body: unknown): { title: string; body: string; paths: string[] } {
   const b = objectBody(body, "body");
@@ -41,22 +22,21 @@ function reviewBody(body: unknown): { title: string; body: string; paths: string
 }
 
 export const gitRoutes: Routes = (router, ctx) => {
-  let base: string | null = null;
-  const baseBranch = async () => (base ??= ctx.git ? await defaultBranch(ctx.git.repo) : null);
-
   router.add("GET", "/api/git", async () => {
-    if (!ctx.git || !(await hasOrigin(ctx))) return { git: null };
-    const { repo } = ctx.git;
-    const status = await gitStatus(repo);
+    const git = ctx.git;
+    if (!git || !(await git.hasRemote())) return { git: null };
+    const status = await git.status();
     const changes = await Promise.all(
       status.changes.map(async (c) => ({
         path: c.path,
-        status: changeStatus(c.status),
-        ...summary(await recordChanges(repo, ctx.root, ctx.y.tables, c.path)),
+        status: c.status,
+        ...summary(await recordChanges(git, ctx.root, ctx.y.tables, c.path)),
       })),
     );
     changes.sort((a, b) => a.path.localeCompare(b.path));
-    return { git: { branch: status.branch, defaultBranch: await baseBranch(), upstream: status.upstream, changes } };
+    return {
+      git: { branch: status.branch, defaultBranch: await git.defaultBranch(), upstream: status.upstream, changes },
+    };
   });
 
   // the field values behind one changed file's records, fetched when the UI shows them
@@ -64,8 +44,10 @@ export const gitRoutes: Routes = (router, ctx) => {
     const git = ctx.git;
     if (!git) throw new HttpError(404, "the data folder is not in a git repository");
     const path = query.get("path") ?? "";
-    if (insideRoot(git.repo, path) === null) throw new HttpError(400, `${path} is outside the data folder`);
-    const found = await recordChanges(git.repo, ctx.root, ctx.y.tables, path);
+    const rel = relative(ctx.root, resolve(ctx.root, path));
+    if (rel === "" || rel.startsWith("..") || isAbsolute(rel))
+      throw new HttpError(400, `${path} is outside the data folder`);
+    const found = await recordChanges(git, ctx.root, ctx.y.tables, path);
     if (!found?.records) throw new HttpError(404, `${path} holds no records to compare`);
     return {
       records: found.records.map((r) => {
@@ -86,7 +68,7 @@ export const gitRoutes: Routes = (router, ctx) => {
 
   router.add("POST", "/api/git/review", async ({ body }) => {
     const git = ctx.git;
-    if (!git || !(await hasOrigin(ctx)))
+    if (!git || !(await git.hasRemote()))
       throw new HttpError(404, "the data folder is not in a git repository with an origin");
     const req = reviewBody(body);
     const target = objectBody(body, "body").target;
@@ -96,8 +78,7 @@ export const gitRoutes: Routes = (router, ctx) => {
       // UI edits reach the files before git reads them
       assertSynced(await ctx.y.sync(), "could not write the latest edits to files for", "; nothing was sent");
       try {
-        return await git.driver.review(
-          git.repo,
+        return await git.review(
           { ...req, target: target ?? null },
           {
             afterTreeChange: async () =>
@@ -124,7 +105,7 @@ export const gitRoutes: Routes = (router, ctx) => {
         const item = objectBody(raw, "record");
         const spec = tableSpec(ctx, String(item.table));
         const key = String(item.key);
-        const head = await headRecord(git.repo, ctx.root, spec, key);
+        const head = await headRecord(git, ctx.root, spec, key);
         const now = readRecord(ctx.store, spec, key);
         const before = now ? withoutKey(now, spec.key) : null;
         const after = head ? (wireValue(head) as Rec) : null;

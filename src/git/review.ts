@@ -41,7 +41,7 @@ export async function localReview(
   if (branch === null) throw new ReviewRefused(409, "check out a branch first; HEAD is detached");
   const base = await defaultBranch(repo);
   if (base === null) throw new ReviewRefused(409, "cannot tell the remote default branch of origin");
-  const existing = branch === base ? null : await driver.findOpenPr(repo, branch);
+  const existing = branch === base ? null : await driver.findOpenPr(branch);
   const planned = reviewSteps(req, { branch, defaultBranch: base, now: new Date(), openPr: existing === null });
   let steps;
   try {

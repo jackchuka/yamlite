@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { isMap, isSeq, parseDocument } from "yaml";
 import { fieldChanges } from "../githistory.ts";
-import { insideRoot, type Repo, runGit } from "../git/repo.ts";
+import type { GitDriver } from "../git/driver.ts";
 import { claims } from "../source/files.ts";
 import { PARSE_OPTIONS } from "../source/yamldoc.ts";
 import { own, type Rec, type TableSpec } from "../types.ts";
@@ -42,17 +42,6 @@ export function ownerOf(tables: readonly TableSpec[], file: string): { spec: Tab
   return null;
 }
 
-// the file as HEAD has it; null when HEAD has no such file
-export async function headContent(repo: Repo, rootPath: string): Promise<string | null> {
-  const top = insideRoot(repo, rootPath);
-  if (top === null) return null;
-  try {
-    return await runGit(repo.top, ["show", `HEAD:${top}`]);
-  } catch {
-    return null;
-  }
-}
-
 const currentContent = (root: string, rootPath: string): string | null => {
   const abs = join(root, rootPath);
   return existsSync(abs) ? readFileSync(abs, "utf8") : null;
@@ -85,7 +74,7 @@ function compare(key: string, before: Rec | null, after: Rec | null): RecordChan
 
 // the records a changed file adds, changes or removes; null for files that are not records or cannot be read
 export async function recordChanges(
-  repo: Repo,
+  git: GitDriver,
   root: string,
   tables: readonly TableSpec[],
   rootPath: string,
@@ -93,7 +82,7 @@ export async function recordChanges(
   const owner = ownerOf(tables, join(root, rootPath));
   if (!owner) return null;
   const { spec } = owner;
-  const [head, now] = [await headContent(repo, rootPath), currentContent(root, rootPath)];
+  const [head, now] = [await git.baseContent(rootPath), currentContent(root, rootPath)];
   if (owner.key === null) {
     const [a, b] = [listRecords(spec, head), listRecords(spec, now)];
     if (!a || !b) return { table: spec.name, records: null };
@@ -112,9 +101,9 @@ export async function recordChanges(
 }
 
 // the record as HEAD has it, without its key; null when HEAD does not have it
-export async function headRecord(repo: Repo, root: string, spec: TableSpec, key: string): Promise<Rec | null> {
+export async function headRecord(git: GitDriver, root: string, spec: TableSpec, key: string): Promise<Rec | null> {
   const file = recordFile(spec, key);
-  const content = await headContent(repo, relative(root, file));
+  const content = await git.baseContent(relative(root, file));
   if (content === null) return null;
   const found = extractor(spec, key)(content);
   if (found === null) return null;

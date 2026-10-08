@@ -4,8 +4,9 @@ import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
 import { ProposalStore } from "../agent/proposals.ts";
 import { configPath, resolveConfig } from "../config.ts";
 import { type GitDriver, localDriver } from "../git/driver.ts";
-import { findRepo, ghReady, type Repo } from "../git/repo.ts";
+import { findRepo, ghReady } from "../git/repo.ts";
 import { runSteps } from "../git/steps.ts";
+import { fileDiff, recordHistory } from "../githistory.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
@@ -26,8 +27,8 @@ export interface WorkspaceOptions {
   agents: AgentInfo[];
   // the URL agents reach this workspace's MCP endpoint at; read when an agent starts
   mcpUrl: () => string;
-  // absent: the local driver, built from the gh probe
-  driver?: (repo: Repo) => GitDriver;
+  // absent: the local repository, if any, with the gh probe; null: no git
+  git?: GitDriver | null;
   // skips gh detection; null means no gh
   gh?: string | null;
 }
@@ -68,11 +69,16 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     store = new Store(config.db);
     pageSql = new PageSql(config.db);
     dry = new Store(config.db);
-    const repo = await findRepo(o.root);
     let probed: Promise<string | null> | undefined;
     const gh = () =>
       (probed ??= o.gh !== undefined ? Promise.resolve(o.gh) : ghReady().then((ok) => (ok ? which("gh") : null)));
-    const gitCtx = repo ? { repo, driver: o.driver ? o.driver(repo) : localDriver(gh) } : null;
+    const detectLocal = async () => {
+      const repo = await findRepo(o.root);
+      return repo ? localDriver(repo, resolve(o.root), gh) : null;
+    };
+    const git = o.git !== undefined ? o.git : await detectLocal();
+    const history = git ?? (o.git === undefined ? { history: recordHistory, fileDiff } : null);
+    const repo = git?.steps ? git.repo : null;
     const proposals = new ProposalStore(
       {
         store,
@@ -81,20 +87,21 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         createTable: (t) => {
           createTable(ctx, { ...t });
         },
-        runGit: gitCtx
-          ? async (steps, startBranch, onProgress) => {
-              // UI edits reach the files before git reads them
-              assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
-              return runSteps(gitCtx.repo, steps, {
-                driver: gitCtx.driver,
-                expectBranch: startBranch,
-                // git wrote these files, so a branch with fewer records is not a wipe
-                afterTreeChange: async () =>
-                  assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
-                onProgress,
-              });
-            }
-          : undefined,
+        runGit:
+          git && repo
+            ? async (steps, startBranch, onProgress) => {
+                // UI edits reach the files before git reads them
+                assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
+                return runSteps(repo, steps, {
+                  driver: git,
+                  expectBranch: startBranch,
+                  // git wrote these files, so a branch with fewer records is not a wipe
+                  afterTreeChange: async () =>
+                    assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
+                  onProgress,
+                });
+              }
+            : undefined,
       },
       (p) => {
         ctx.agent?.publish(p.conversationId, { type: "proposal", proposal: p });
@@ -112,7 +119,8 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
       hub,
       proposals,
       agent: null,
-      git: gitCtx,
+      git,
+      history,
     };
     const router = new Router();
     for (const routes of ROUTES) routes(router, ctx);
@@ -121,7 +129,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         root: ctx.root,
         agents: o.agents,
         mcpUrl: o.mcpUrl,
-        notes: gitCtx ? [GIT_NOTE] : [],
+        notes: git?.repo ? [GIT_NOTE] : [],
         feedback: (id) => ctx.proposals.takeFeedback(id),
       });
     }
