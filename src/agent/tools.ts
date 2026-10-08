@@ -1,4 +1,5 @@
 import { check } from "../check.ts";
+import { guide } from "../guide.ts";
 import type { ApiContext } from "../serve/context.ts";
 import { readRecord } from "../serve/records.ts";
 import { validateNewTable } from "../serve/routes/tables.ts";
@@ -195,6 +196,13 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
             .map(({ table, error, warnings }) => ({ table, error, warnings })),
         };
       },
+    },
+    {
+      name: "guide",
+      description:
+        "The guide to writing yamlite.yaml: how tables are laid out, when to declare column types, and which rules (values, required, formats, bounds, references, indexes, expand, group, split) fit. Read it before answering questions about the schema or yamlite.yaml.",
+      inputSchema: { type: "object", properties: {} },
+      call: () => guide(),
     },
   ];
 }
