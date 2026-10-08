@@ -31,6 +31,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          // an open modal turns pointer events off on <body>; a toast's action must stay clickable over it
+          pointerEvents: "auto",
         } as React.CSSProperties
       }
       {...props}

@@ -8,7 +8,16 @@ export function invalidationsFor(e: ServeEvent | { type: "hello" }): QueryKey[] 
       return [[]];
     case "sync":
       if (e.changes.length === 0 && e.schema.length === 0) return [];
-      return [["rows", e.table], ["record", e.table], ["history", e.table], ["refKeys", e.table], ["schema"], ["meta"]];
+      return [
+        ["rows", e.table],
+        ["record", e.table],
+        ["history", e.table],
+        ["refKeys", e.table],
+        ["schema"],
+        ["meta"],
+        ["git"],
+        ["gitdiff"],
+      ];
     case "reload":
       return [["meta"], ["page"]];
     case "page":

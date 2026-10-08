@@ -194,6 +194,19 @@ The UI is available in English and Japanese. It follows your browser language on
 - The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
 - A record's History tab lists the git commits that changed it, newest first, with uncommitted changes on top: each shows the fields it changed, and the YAML diff on request. Renames are followed, and in a list file only the commits that changed that record are shown. **Restore this version** puts an older version's values into the form without saving them. It needs `git` and only reads the repository; the static export has no History tab.
 
+### Send for review
+
+When the data folder is in a git repository with an `origin` remote, the bottom of the sidebar shows the current branch and how many files under the data folder changed. **Send for review** lists the changed files by table and record, asks for a title and an optional description, and sends the files you keep checked:
+
+- On the default branch, it creates a branch named `yamlite/review-<date>-<time>`, commits the files there, pushes it and opens a draft pull request. The UI stays on the new branch, so later edits go to the same pull request.
+- On any other branch, it commits and pushes to that branch. If the branch already has an open pull request, it links to it; otherwise it opens a draft pull request.
+- With [`gh`](https://cli.github.com) installed and logged in, the pull request is created for you. Without it, you get a GitHub link that opens the pull request form already filled in. For other hosts the branch is pushed and you open the pull request there.
+- Only files under the data folder are committed. Git runs without prompts, so pushing needs credentials that already work without asking.
+- Each record is listed under its file, with the fields it changed; the arrow shows them as committed and now. ↶ puts a changed or deleted record back as committed, and the bin removes a record that was never committed, after a second click. These go through the same writes as the form, so comments and the safety checks apply. **Put back** does it for the changed and deleted records of the checked files. The toast that follows can undo it. `yamlite.yaml`, pages and other files are listed but never changed.
+- While it runs, edits and other git steps wait (they get 409). Switching back to the default branch after the pull request is merged is up to you.
+
+Click the folder name at the top of the sidebar to see its full path, `yamlite.yaml`, the database file and the address.
+
 ### Ask an AI agent
 
 If [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex) is on your PATH and logged in, `serve` adds an **Ask AI** button. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the agent searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press **Apply**, and then it is saved like an edit in the form, so comments and the safety checks apply.

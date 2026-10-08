@@ -1,11 +1,13 @@
 import { useRouterState } from "@tanstack/react-router";
-import { Menu, Search, Sparkles } from "lucide-react";
+import { ArrowUp, Menu, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { agentPanel, useAgents } from "@/lib/agent";
 import { openCommandMenu } from "@/lib/commandMenu";
+import { useGit } from "@/lib/git";
 import { useMeta } from "@/lib/providers";
 import { screenTitle } from "@/lib/screen";
+import { ReviewDialog } from "./ReviewDialog";
 import { Sidebar } from "./Sidebar";
 import { m } from "@/paraglide/messages.js";
 
@@ -15,6 +17,9 @@ export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: meta } = useMeta();
   const agents = useAgents();
+  const git = useGit();
+  const [review, setReview] = useState(false);
+  const changes = git?.branch ? git.changes.length : 0;
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <div className="flex items-center gap-1 border-b bg-background px-2 pt-[env(safe-area-inset-top)]">
@@ -30,6 +35,20 @@ export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
           <Sparkles className="size-5" />
         </button>
       )}
+      {git && changes > 0 && (
+        <button
+          type="button"
+          aria-label={`${m.git_send_review()} (${m.git_changes({ count: changes })})`}
+          className={`${button} relative`}
+          onClick={() => setReview(true)}
+        >
+          <ArrowUp className="size-5" />
+          <span className="absolute top-1 right-1 min-w-4 rounded-full bg-tomato px-1 text-[10.5px] leading-4 font-semibold text-[var(--y-on-accent)]">
+            {changes}
+          </span>
+        </button>
+      )}
+      {git && review && <ReviewDialog git={git} open={review} onOpenChange={setReview} />}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="left"
