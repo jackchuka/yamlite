@@ -99,6 +99,7 @@ test("an expanded view is listed under its table and opens the record it comes f
   );
   await page.goto(app.url);
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
+  await sidebar.getByRole("button", { name: "Items of projects" }).click();
   await sidebar.getByRole("link", { name: /^projects__milestones(?!__)/ }).click();
   await expect(page.getByRole("heading", { name: "projects__milestones", exact: true })).toBeVisible();
   await expect(page.getByText("read-only view")).toBeVisible();

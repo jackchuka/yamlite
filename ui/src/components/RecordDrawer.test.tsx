@@ -34,6 +34,7 @@ const table: TableMeta = {
   count: 1,
   inDb: true,
   group: null,
+  split: null,
 };
 
 test("after a save the form keeps the saved values until the refetch arrives", async () => {

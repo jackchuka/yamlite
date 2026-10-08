@@ -99,6 +99,8 @@ export interface TableSpec {
   expand: ExpandSpec[];
   // the sidebar section the table is listed under
   group: string | null;
+  // the column whose values the sidebar lists under the table
+  split: string | null;
 }
 
 export type PageAccess = "read" | "write";

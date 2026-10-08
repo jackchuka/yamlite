@@ -20,29 +20,33 @@ export function groupNames(tables: Array<{ group: string | null }>): string[] {
   return [...new Set(tables.flatMap((t) => (t.group === null ? [] : [t.group])))];
 }
 
-const KEY = "yamlite-collapsed-groups";
-
-function read(): Set<string> {
+function read(key: string): Set<string> {
   try {
-    const parsed: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
     return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
   } catch {
     return new Set();
   }
 }
 
-// the sidebar groups folded away, kept across reloads
-export function useCollapsedGroups(): [Set<string>, (group: string) => void] {
-  const [collapsed, setCollapsed] = useState(read);
-  const toggle = (group: string) => {
-    const next = new Set(collapsed);
-    if (!next.delete(group)) next.add(group);
-    setCollapsed(next);
+// a set of names kept across reloads in this browser
+export function useStoredSet(key: string): [Set<string>, (name: string) => void] {
+  const [set, setSet] = useState(() => read(key));
+  const toggle = (name: string) => {
+    const next = new Set(set);
+    if (!next.delete(name)) next.add(name);
+    setSet(next);
     try {
-      localStorage.setItem(KEY, JSON.stringify([...next]));
+      localStorage.setItem(key, JSON.stringify([...next]));
     } catch {
-      // folding still applies for this session
+      // the change still applies for this session
     }
   };
-  return [collapsed, toggle];
+  return [set, toggle];
 }
+
+// the sidebar groups folded away
+export const useCollapsedGroups = () => useStoredSet("yamlite-collapsed-groups");
+
+// the tables whose split items are shown
+export const useExpandedTables = () => useStoredSet("yamlite-expanded-tables");

@@ -9,6 +9,7 @@ import type { Snapshot, TableMeta } from "./types";
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
+  useRouterState: ({ select }: { select: (s: unknown) => unknown }) => select({ matches: [] }),
   Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
 }));
 vi.mock("./api", async (orig) => ({
@@ -31,6 +32,7 @@ const table: TableMeta = {
   count: 1,
   inDb: true,
   group: null,
+  split: null,
 };
 const snapshot: Snapshot = {
   version: 1,

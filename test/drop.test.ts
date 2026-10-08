@@ -172,6 +172,7 @@ describe("dropping columns", () => {
       exclude: [],
       expand: [],
       group: null,
+      split: null,
     };
     syncTable(ctx, spec);
     sql(db, "ALTER TABLE tasks ADD COLUMN note TEXT");

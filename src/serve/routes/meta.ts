@@ -1,6 +1,8 @@
 import { filesOf } from "../../config.ts";
 import { q } from "../../store.ts";
 import { displayPath, findView } from "../context.ts";
+import { splitOf } from "../split.ts";
+import type { ColumnType } from "../../types.ts";
 import { declaredViews } from "../../views.ts";
 import type { Routes } from "./index.ts";
 
@@ -15,7 +17,9 @@ export const metaRoutes: Routes = (router, ctx) => {
     configError: ctx.hub.configError(),
     tables: ctx.y.tables.map((t) => {
       const inDb = ctx.store.tableExists(t.name);
-      const columns = inDb ? Object.fromEntries(ctx.store.columns(t.name)) : { [t.key]: "TEXT", ...t.columns };
+      const columns: Record<string, ColumnType> = inDb
+        ? Object.fromEntries(ctx.store.columns(t.name))
+        : { [t.key]: "TEXT", ...t.columns };
       const count = inDb ? Number(ctx.store.query(`SELECT count(*) AS n FROM ${q(t.name)}`)[0]?.n ?? 0) : 0;
       return {
         name: t.name,
@@ -33,6 +37,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         count,
         inDb,
         group: t.group,
+        split: splitOf(ctx.store, t, columns),
       };
     }),
     pages: ctx.y.pages.map((p) => ({

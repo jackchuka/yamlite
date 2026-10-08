@@ -212,6 +212,7 @@ function setup(list: ExpandSpec[]) {
     exclude: [],
     expand: list,
     group: null,
+    split: null,
   };
   return {
     db,
@@ -406,6 +407,7 @@ describe("reconcileViews", () => {
         },
       ],
       group: null,
+      split: null,
     };
     write(spec.path, "- id: 1\n  roles: [admin, editor]\n");
     syncTable({ store: new Store(db, { busyTimeoutMs: 0 }), stateDir }, spec);
