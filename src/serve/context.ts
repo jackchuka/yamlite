@@ -1,6 +1,7 @@
 import { relative } from "node:path";
 import type { AgentHost } from "../agent/host.ts";
 import type { ProposalStore } from "../agent/proposals.ts";
+import type { Repo } from "../git/repo.ts";
 import type { Yamlite } from "../index.ts";
 import type { Store } from "../store.ts";
 import type { TableSpec, ViewRecord } from "../types.ts";
@@ -22,6 +23,8 @@ export interface ApiContext {
   // agent proposals; present even when no agent is offered, so the routes stay simple
   proposals: ProposalStore;
   agent: AgentHost | null;
+  // the git repository holding the root, and the logged-in gh binary; null outside a repository
+  git: { repo: Repo; gh: string | null } | null;
 }
 
 // relative to the root when inside it (--db and listed tables may live elsewhere)

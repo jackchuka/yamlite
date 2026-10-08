@@ -1,5 +1,7 @@
 import { check } from "../check.ts";
 import { guide } from "../guide.ts";
+import { DIFF_LIMIT, LOG_LIMIT, gitBranches, gitDiff, gitLog, gitStatus } from "../git/repo.ts";
+import { STEP_KINDS, validateSteps } from "../git/steps.ts";
 import type { ApiContext } from "../serve/context.ts";
 import { readRecord } from "../serve/records.ts";
 import { validateNewTable } from "../serve/routes/tables.ts";
@@ -42,7 +44,7 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
     if (!s) throw new Error(`unknown table: ${String(name)}`);
     return s;
   };
-  return [
+  const tools: McpTool[] = [
     {
       name: "schema",
       description:
@@ -203,6 +205,68 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
         "The guide to writing yamlite.yaml: how tables are laid out, when to declare column types, and which rules (values, required, formats, bounds, references, indexes, expand, group, split) fit. Read it before answering questions about the schema or yamlite.yaml.",
       inputSchema: { type: "object", properties: {} },
       call: () => guide(),
+    },
+  ];
+  return [...tools, ...gitTools(ctx, conversationId)];
+}
+
+function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
+  const git = ctx.git;
+  if (!git) return [];
+  const { repo } = git;
+  const paths = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+  return [
+    {
+      name: "git_status",
+      description:
+        "The current branch, its upstream, ahead/behind counts and the changed files under the data folder (paths relative to it).",
+      inputSchema: { type: "object", properties: {} },
+      call: async () => {
+        if (!ctx.proposals.running) await ctx.y.sync();
+        return gitStatus(repo);
+      },
+    },
+    {
+      name: "git_diff",
+      description: `The diff of the working tree against HEAD, optionally only for some files (paths relative to the data folder). Capped at ${DIFF_LIMIT} bytes.`,
+      inputSchema: { type: "object", properties: { paths: { type: "array", items: { type: "string" } } } },
+      call: async (a) => {
+        if (!ctx.proposals.running) await ctx.y.sync();
+        return gitDiff(repo, paths(a.paths));
+      },
+    },
+    {
+      name: "git_log",
+      description: `Recent commits of the current branch (at most ${LOG_LIMIT}).`,
+      inputSchema: { type: "object", properties: { limit: { type: "integer", minimum: 1, maximum: LOG_LIMIT } } },
+      call: (a) => gitLog(repo, typeof a.limit === "number" ? a.limit : LOG_LIMIT),
+    },
+    {
+      name: "git_branches",
+      description: "Local branches, the current one and the remote's default branch.",
+      inputSchema: { type: "object", properties: {} },
+      call: () => gitBranches(repo),
+    },
+    {
+      name: "propose_git",
+      description:
+        "Propose git steps that run in order when the user presses the card's button: create_branch {name, from?} (creates and switches), switch {branch}, commit {message, paths} (paths relative to the data folder; choose them yourself), push {branch} (never the default branch), pull {branch} (fast-forward only, on the current branch), open_pr {title, body, base?} (a draft PR from the current branch; push it first). Branch names must be plain short names: no leading + or -, no refs/ or heads/ prefix, no @. Steps stop at the first failure.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "a short summary the user will read, in the user's language" },
+          steps: {
+            type: "array",
+            items: { type: "object", properties: { kind: { enum: [...STEP_KINDS] } }, required: ["kind"] },
+          },
+        },
+        required: ["title", "steps"],
+      },
+      call: async (a) => {
+        const { steps, startBranch } = await validateSteps(repo, a.steps);
+        const p = ctx.proposals.forGit(conversationId, str(a.title, "title"), steps, startBranch);
+        return `Proposal ${p.id} created: ${steps.length} git step${steps.length === 1 ? "" : "s"}. Nothing runs until the user applies it. The proposal appears as a card in this same chat panel; tell the user to review the card above and press its button, and do not say the steps ran.`;
+      },
     },
   ];
 }

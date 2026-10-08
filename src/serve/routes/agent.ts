@@ -74,7 +74,10 @@ export const agentRoutes: Routes = (router, ctx) => {
   });
 
   router.add("GET", "/api/agent/proposals", () => ({ proposals: ctx.proposals.pending() }));
-  router.add("POST", "/api/agent/proposals/:id/apply", ({ params }) => ctx.proposals.apply(params.id as string));
+  router.add("POST", "/api/agent/proposals/:id/apply", ({ params }) => {
+    const id = params.id as string;
+    return ctx.proposals.get(id)?.git ? ctx.proposals.applyGit(id) : ctx.proposals.apply(id);
+  });
   router.add("POST", "/api/agent/proposals/:id/discard", ({ params }) => ctx.proposals.discard(params.id as string));
 };
 

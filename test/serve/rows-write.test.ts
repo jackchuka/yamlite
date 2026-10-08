@@ -146,3 +146,10 @@ test("a field named like a prototype member is saved like any other", async () =
   await waitFor(() => read(file(t!, "tasks/a.yaml")).includes("constructor: z"));
   expect(yamlOf(t, "tasks/a.yaml")).toEqual({ title: "A", constructor: "z" });
 });
+
+test("writes are refused while git steps run", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  Object.defineProperty(t.s.context.proposals, "running", { get: () => true });
+  const r = await t.api(rowsUrl(), { method: "POST", body: { key: "b", values: { title: "B" } } });
+  expect(r.status).toBe(409);
+});

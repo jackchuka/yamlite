@@ -36,6 +36,7 @@ export const sqlRoutes: Routes = (router, ctx) => {
     if (statementCount(sql) > 1) throw new HttpError(400, "run one statement at a time");
     if (b.page !== undefined) return pageQuery(ctx, b.page, sql);
     const read = isRead(sql);
+    if (!read) ctx.proposals.assertIdle();
     if (!read && touchesInternal(sql)) {
       throw new HttpError(
         400,

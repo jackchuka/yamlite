@@ -150,6 +150,22 @@ test("the preamble sends schema questions to the guide and says what the agent c
   expect(texts(c.events)[0]).toContain("you cannot run yamlite commands or edit yamlite.yaml");
 });
 
+test("notify runs a turn with the feedback and no user message; while busy it waits for the next prompt", async () => {
+  const feedback: string[] = [];
+  const { host } = setup([[{ wait: 10_000 }], [{ echo: true }], [{ echo: true }]], feedback);
+  const c = await host.start("test");
+  host.prompt(c.id, "slow");
+  feedback.push("The user applied proposal p_1.");
+  host.notify(c.id, "report");
+  await host.cancel(c.id);
+  await idle(c);
+  host.notify(c.id, "report");
+  await idle(c);
+  expect(texts(c.events).at(-1)).toMatch(/The user applied proposal p_1\.\n---\nreport$/);
+  expect(c.events.filter((e) => e.type === "user")).toHaveLength(1);
+  host.notify("missing", "report");
+});
+
 test("a second prompt while busy is refused; cancel ends the turn", async () => {
   const { host } = setup([[{ wait: 10_000 }]]);
   const c = await host.start("test");
@@ -553,4 +569,12 @@ test("eviction skips conversations someone is watching, and drops their feedback
   expect(host.get(b.id)).toBeUndefined();
   expect(forgotten).toContain(b.id);
   expect(host.list().map((x) => x.id)).toEqual([c.id, a.id]);
+});
+
+test("notes are appended to the preamble", async () => {
+  const { host } = setup([[{ echo: true }]], [], {}, { notes: ["GIT NOTE"] });
+  const c = await host.start("test");
+  host.prompt(c.id, "first");
+  await idle(c);
+  expect(texts(c.events)[0]).toMatch(/read the guide tool[\s\S]*GIT NOTE/);
 });

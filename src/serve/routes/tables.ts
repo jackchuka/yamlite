@@ -84,9 +84,13 @@ export function createTable(ctx: ApiContext, b: Record<string, unknown>): string
 }
 
 export const tableRoutes: Routes = (router, ctx) => {
-  router.add("POST", "/api/tables", ({ body }) => new Reply(201, { name: createTable(ctx, objectBody(body, "body")) }));
+  router.add("POST", "/api/tables", ({ body }) => {
+    ctx.proposals.assertIdle();
+    return new Reply(201, { name: createTable(ctx, objectBody(body, "body")) });
+  });
 
   router.add("PATCH", "/api/tables/:table", ({ params, body }) => {
+    ctx.proposals.assertIdle();
     const spec = tableSpec(ctx, params.table ?? "");
     const b = objectBody(body, "body");
     if (!("group" in b)) throw new HttpError(400, "group is required", { field: "group" });

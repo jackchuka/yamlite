@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:sqlite";
 import { canonical } from "../hash.ts";
+import type { GitStep, StepResult } from "../git/steps.ts";
 import { checkRequired } from "../required.ts";
 import { checkBounds, checkFormats } from "../rulecheck.ts";
 import { HttpError } from "../serve/http.ts";
@@ -45,6 +46,7 @@ export interface Proposal {
   warnings: string[];
   table?: NewTable;
   sql?: string;
+  git?: { steps: GitStep[]; startBranch: string | null; results: StepResult[] };
   stale?: string[];
   error?: string;
 }
@@ -63,6 +65,11 @@ export interface ProposalDeps {
   dry: Store;
   tables: () => readonly TableSpec[];
   createTable: (t: NewTable) => void;
+  runGit?: (
+    steps: GitStep[],
+    startBranch: string | null,
+    onProgress: (r: StepResult[]) => void,
+  ) => Promise<StepResult[]>;
 }
 
 class StaleError extends Error {}
@@ -116,6 +123,7 @@ function ruleWarnings(store: Store, spec: TableSpec): string[] {
 export class ProposalStore {
   private readonly proposals = new Map<string, Proposal>();
   private readonly feedback = new Map<string, string[]>();
+  private runningId: string | null = null;
 
   constructor(
     private readonly deps: ProposalDeps,
@@ -185,6 +193,19 @@ export class ProposalStore {
     return this.add({ conversationId, title, rows: [], warnings: [], table }, true);
   }
 
+  forGit(conversationId: string, title: string, steps: GitStep[], startBranch: string | null): Proposal {
+    const results: StepResult[] = steps.map(() => ({ status: "skipped" }));
+    return this.add({ conversationId, title, rows: [], warnings: [], git: { steps, startBranch, results } }, true);
+  }
+
+  get running(): boolean {
+    return this.runningId !== null;
+  }
+
+  assertIdle(): void {
+    if (this.running) throw new HttpError(409, "git steps are running; try again when they finish");
+  }
+
   get(id: string): Proposal | undefined {
     return this.proposals.get(id);
   }
@@ -193,7 +214,34 @@ export class ProposalStore {
     return [...this.proposals.values()].filter((p) => p.status === "pending");
   }
 
+  async applyGit(id: string): Promise<Proposal> {
+    this.assertIdle();
+    const p = this.mustBePending(id);
+    if (!p.git) throw new HttpError(400, `proposal ${id} has no git steps`);
+    const git = p.git;
+    if (!this.deps.runGit) return this.settle(p, "failed", { error: "git is not available" });
+    this.runningId = id;
+    try {
+      git.results = await this.deps.runGit(git.steps, git.startBranch, (r) => {
+        git.results = r;
+        this.onChange(p);
+      });
+    } catch (e) {
+      return this.settle(p, "failed", { error: message(e) });
+    } finally {
+      this.runningId = null;
+    }
+    const failed = git.results.findIndex((r) => r.status === "failed");
+    if (failed < 0) return this.settle(p, "applied");
+    const step = git.steps[failed] as GitStep;
+    return this.settle(p, "failed", {
+      error: `step ${failed + 1} (${step.kind}) failed${git.results[failed]?.message ? `: ${git.results[failed].message}` : ""}`,
+    });
+  }
+
   apply(id: string): Proposal {
+    this.assertIdle();
+    if (this.proposals.get(id)?.git) throw new HttpError(400, "git proposals run with applyGit");
     const p = this.mustBePending(id);
     if (p.table) {
       try {
@@ -233,6 +281,7 @@ export class ProposalStore {
   }
 
   discard(id: string): Proposal {
+    this.assertIdle();
     return this.settle(this.mustBePending(id), "discarded");
   }
 
@@ -259,7 +308,7 @@ export class ProposalStore {
   }
 
   private add(
-    p: Pick<Proposal, "conversationId" | "title" | "rows" | "warnings" | "table" | "sql">,
+    p: Pick<Proposal, "conversationId" | "title" | "rows" | "warnings" | "table" | "sql" | "git">,
     empty = false,
   ): Proposal {
     if (!empty && p.rows.length === 0) throw new HttpError(400, "the changes would not change anything");
@@ -278,17 +327,46 @@ export class ProposalStore {
   private settle(p: Proposal, status: ProposalStatus, extra: Partial<Proposal> = {}): Proposal {
     Object.assign(p, { status, ...extra });
     const name = `proposal ${p.id} ("${p.title}")`;
-    const note =
+    const steps = p.git
+      ? ` Steps: ${p.git.steps
+          .map((s, i) => {
+            const r = p.git?.results[i];
+            const what =
+              s.kind === "create_branch"
+                ? s.name
+                : s.kind === "commit"
+                  ? s.message
+                  : s.kind === "open_pr"
+                    ? s.title
+                    : s.branch;
+            const extra = r?.url
+              ? ` ${r.created ? "PR" : "the user must open this link to create the PR:"} ${r.url}`
+              : "";
+            return `${s.kind} ${what}: ${r?.status ?? "skipped"}${extra}`;
+          })
+          .join("; ")}.`
+      : "";
+    const stopped = p.git?.results.findIndex((r) => r.status === "failed") ?? -1;
+    const stoppedStep = p.git?.steps[stopped];
+    const gitNote =
       status === "applied"
-        ? `The user applied ${name}; the changes are saved.`
-        : status === "discarded"
-          ? `The user discarded ${name}; nothing was saved.`
-          : status === "stale"
-            ? `${name} was not applied: these records changed since it was made: ${p.stale?.join(", ")}. Nothing was saved.`
-            : `${name} failed to apply: ${p.error}. Nothing was saved.`;
+        ? `The user applied ${name}; all git steps ran.`
+        : stoppedStep
+          ? `${name} stopped at step ${stopped + 1} (${stoppedStep.kind})${p.git?.results[stopped]?.message ? `: ${p.git.results[stopped].message}` : ""}. Earlier steps were done and are not undone.`
+          : `${name} failed to run: ${p.error}. Steps that already ran are not undone.`;
+    const note =
+      p.git && (status === "applied" || status === "failed")
+        ? gitNote
+        : status === "applied"
+          ? `The user applied ${name}; the changes are saved.`
+          : status === "discarded"
+            ? `The user discarded ${name}; nothing was saved.`
+            : status === "stale"
+              ? `${name} was not applied: these records changed since it was made: ${p.stale?.join(", ")}. Nothing was saved.`
+              : `${name} failed to apply: ${p.error}. Nothing was saved.`;
     this.feedback.set(p.conversationId, [
       ...(this.feedback.get(p.conversationId) ?? []),
-      note[0]?.toUpperCase() + note.slice(1),
+      note[0]?.toUpperCase() + note.slice(1) + steps,
     ]);
     this.onChange(p);
     return p;

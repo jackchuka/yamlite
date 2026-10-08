@@ -3,10 +3,13 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectAgents, type AgentInfo } from "../agent/detect.ts";
-import { AgentHost } from "../agent/host.ts";
+import { detectAgents, type AgentInfo, which } from "../agent/detect.ts";
+import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
 import { ProposalStore } from "../agent/proposals.ts";
 import { configPath, resolveConfig } from "../config.ts";
+import { findRepo, ghReady } from "../git/repo.ts";
+import { runSteps } from "../git/steps.ts";
+import type { TableResult } from "../engine.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
@@ -29,6 +32,8 @@ export interface ServeOptions {
   watch?: WatchOptions;
   agent?: boolean;
   agents?: AgentInfo[];
+  // skips gh detection; null means no gh
+  gh?: string | null;
 }
 
 export interface Server {
@@ -52,6 +57,12 @@ function listen(server: HttpServer, port: number, host: string): Promise<number>
     });
     server.listen(port, host, () => done((server.address() as AddressInfo).port));
   });
+}
+
+function assertSynced(results: TableResult[], prefix: string, suffix = ""): void {
+  const failed = results.filter((r) => !r.ok);
+  if (failed.length > 0)
+    throw new Error(`${prefix}: ${failed.map((r) => `${r.table} (${r.error})`).join("; ")}${suffix}`);
 }
 
 export async function serve(opts: ServeOptions): Promise<Server> {
@@ -83,6 +94,10 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     store = new Store(config.db);
     pageSql = new PageSql(config.db);
     dry = new Store(config.db);
+    const repo = await findRepo(opts.root);
+    const agents = opts.agent === false ? [] : (opts.agents ?? detectAgents());
+    const gh = opts.gh !== undefined ? opts.gh : repo && agents.length > 0 && (await ghReady()) ? which("gh") : null;
+    const gitCtx = repo ? { repo, gh } : null;
     const proposals = new ProposalStore(
       {
         store,
@@ -91,8 +106,25 @@ export async function serve(opts: ServeOptions): Promise<Server> {
         createTable: (t) => {
           createTable(ctx, { ...t });
         },
+        runGit: gitCtx
+          ? async (steps, startBranch, onProgress) => {
+              // UI edits reach the files before git reads them
+              assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
+              return runSteps(gitCtx.repo, steps, {
+                gh: gitCtx.gh,
+                expectBranch: startBranch,
+                // git wrote these files, so a branch with fewer records is not a wipe
+                afterTreeChange: async () =>
+                  assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
+                onProgress,
+              });
+            }
+          : undefined,
       },
-      (p) => ctx.agent?.publish(p.conversationId, { type: "proposal", proposal: p }),
+      (p) => {
+        ctx.agent?.publish(p.conversationId, { type: "proposal", proposal: p });
+        if (p.git && (p.status === "applied" || p.status === "failed")) ctx.agent?.notify(p.conversationId, GIT_DONE);
+      },
     );
     const ctx: ApiContext = {
       y,
@@ -105,19 +137,20 @@ export async function serve(opts: ServeOptions): Promise<Server> {
       hub,
       proposals,
       agent: null,
+      git: gitCtx,
     };
     const router = new Router();
     for (const routes of ROUTES) routes(router, ctx);
     const token = randomBytes(24).toString("hex");
     let policy: AccessPolicy = { token, allowedHosts: new Set() };
     let port = 0;
-    const agents = opts.agent === false ? [] : (opts.agents ?? detectAgents());
     let mcpHost = "127.0.0.1";
     if (agents.length > 0) {
       ctx.agent = new AgentHost({
         root: ctx.root,
         agents,
         mcpUrl: () => `http://${mcpHost}:${port}/mcp`,
+        notes: gitCtx ? [GIT_NOTE] : [],
         feedback: (id) => ctx.proposals.takeFeedback(id),
       });
     }

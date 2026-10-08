@@ -1,7 +1,14 @@
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import { MAX_PROPOSAL_ROWS, type Proposal, ProposalStore, type RecordChange } from "../../src/agent/proposals.ts";
+import {
+  MAX_PROPOSAL_ROWS,
+  type Proposal,
+  type ProposalDeps,
+  ProposalStore,
+  type RecordChange,
+} from "../../src/agent/proposals.ts";
 import { open, type Yamlite } from "../../src/index.ts";
+import { HttpError } from "../../src/serve/http.ts";
 import { readRecord, updateRecord } from "../../src/serve/records.ts";
 import { writeTx } from "../../src/serve/write.ts";
 import { Store } from "../../src/store.ts";
@@ -15,7 +22,7 @@ afterEach(async () => {
   y = undefined;
 });
 
-async function setup(files: Record<string, string> = {}) {
+async function setup(files: Record<string, string> = {}, runGit?: ProposalDeps["runGit"]) {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\ndone: false\ntags: [errand]\n");
   write(join(root, "tasks/b.yaml"), "title: B\ndone: false\ntags: [work]\n");
@@ -29,7 +36,7 @@ async function setup(files: Record<string, string> = {}) {
   const changes: Proposal[] = [];
   const created: string[] = [];
   const tables = () => y!.tables;
-  const proposals = new ProposalStore({ store, dry, tables, createTable: (t) => created.push(t.name) }, (p) =>
+  const proposals = new ProposalStore({ store, dry, tables, createTable: (t) => created.push(t.name), runGit }, (p) =>
     changes.push(p),
   );
   const spec = (name: string) => tables().find((t) => t.name === name)!;
@@ -181,4 +188,68 @@ test("a change with an unknown op is refused before the dry run", async () => {
   expect(() => t.proposals.fromChanges("c1", "x", [bad])).toThrow(expect.objectContaining({ status: 400 }));
   expect(sql(t.db, "SELECT count(*) AS n FROM tasks")).toEqual([{ n: 2 }]);
   expect(t.proposals.pending()).toEqual([]);
+});
+
+const STEPS = [
+  { kind: "create_branch", name: "x" },
+  { kind: "push", branch: "x" },
+] as const;
+
+test("a git proposal runs its steps and tells the agent what happened", async () => {
+  const t = await setup({}, async (steps) => steps.map(() => ({ status: "done" as const })));
+  const p = t.proposals.forGit("c1", "send for review", [...STEPS], "main");
+  expect(p.git?.results.map((r) => r.status)).toEqual(["skipped", "skipped"]);
+  const out = await t.proposals.applyGit(p.id);
+  expect(out.status).toBe("applied");
+  expect(t.proposals.takeFeedback("c1")[0]).toMatch(
+    /applied proposal .*"send for review"\); all git steps ran\. Steps: create_branch x: done; push x: done/,
+  );
+});
+
+test("a failed step fails the proposal and names what was done", async () => {
+  const t = await setup({}, async () => [{ status: "done" }, { status: "failed", message: "rejected" }]);
+  const p = t.proposals.forGit("c1", "send", [...STEPS], "main");
+  const out = await t.proposals.applyGit(p.id);
+  expect(out.status).toBe("failed");
+  expect(out.error).toBe("step 2 (push) failed: rejected");
+  expect(t.proposals.takeFeedback("c1")[0]).toMatch(
+    /stopped at step 2 \(push\): rejected\. Earlier steps were done and are not undone\..*create_branch x: done/s,
+  );
+});
+
+test("a running git proposal blocks other applies and writes", async () => {
+  let release!: () => void;
+  const t = await setup(
+    {},
+    () =>
+      new Promise((r) => {
+        release = () => r([{ status: "done" }, { status: "done" }]);
+      }),
+  );
+  const p = t.proposals.forGit("c1", "send", [...STEPS], "main");
+  const data = t.proposals.fromChanges("c1", "x", [{ table: "tasks", key: "a", op: "update", values: { done: true } }]);
+  const running = t.proposals.applyGit(p.id);
+  expect(t.proposals.running).toBe(true);
+  expect(() => t.proposals.assertIdle()).toThrow(HttpError);
+  expect(() => t.proposals.apply(data.id)).toThrow(/git steps are running/);
+  expect(() => t.proposals.discard(p.id)).toThrow(/git steps are running/);
+  expect(p.status).toBe("pending");
+  await expect(t.proposals.applyGit(p.id)).rejects.toThrow(/not pending|running/);
+  release();
+  expect((await running).status).toBe("applied");
+  expect(t.proposals.running).toBe(false);
+  t.proposals.assertIdle();
+});
+
+test("apply refuses a git proposal; applyGit without a runner fails", async () => {
+  const t = await setup();
+  const p = t.proposals.forGit("c1", "send", [...STEPS], "main");
+  expect(() => t.proposals.apply(p.id)).toThrow(/applyGit/);
+  expect((await t.proposals.applyGit(p.id)).status).toBe("failed");
+});
+
+test("a failed step without a message does not leave a dangling colon", async () => {
+  const t = await setup({}, async () => [{ status: "done" }, { status: "failed" }]);
+  const p = t.proposals.forGit("c1", "send", [...STEPS], "main");
+  expect((await t.proposals.applyGit(p.id)).error).toBe("step 2 (push) failed");
 });

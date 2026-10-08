@@ -65,6 +65,11 @@ You cannot write files or run commands. To change data, call propose_changes, pr
 For questions about the schema, yamlite.yaml or how to structure data, read the guide tool first. Its workflow is for explaining: you cannot run yamlite commands or edit yamlite.yaml; propose_table is the only schema change you can propose.
 Reply in the language the user writes in, briefly and without SQL unless they ask for it.`;
 
+export const GIT_NOTE = `The data folder is in a git repository. Read it with git_status, git_diff, git_log and git_branches. To branch, commit, push, open a pull request or switch branches, call propose_git with the steps in order; like other proposals it runs only when the user presses the card's button ("Run N steps" / "N 件の手順を実行"). Read git_status first and choose the files to commit yourself: only files related to what the user asked. Pull requests are created as drafts. In the proposal title or your reply, say what the user will see afterwards, e.g. that switching back to the default branch hides the committed changes until the PR is merged and pulled, and that uncommitted changes stay as they are.`;
+
+// the text of the turn that follows a finished git proposal; its result arrives as feedback before it
+export const GIT_DONE = `The git steps you proposed have finished; their result is above. Tell the user briefly what happened, with the pull request link if there is one. If a step failed, say what to do next.`;
+
 const titleOf = (text: string) => {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > TITLE_LENGTH ? `${t.slice(0, TITLE_LENGTH)}…` : t;
@@ -137,6 +142,8 @@ export class Conversation {
 }
 
 export interface HostOptions {
+  // appended to the preamble
+  notes?: string[];
   root: string;
   agents: AgentInfo[];
   mcpUrl: () => string;
@@ -194,8 +201,20 @@ export class AgentHost {
     const c = this.mustGet(id);
     if (c.failed) throw new HttpError(409, "this conversation could not be resumed; start a new one");
     if (c.busy) throw new HttpError(409, "the agent is busy with the previous message");
-    c.busy = true;
     c.emit({ type: "user", text });
+    this.turn(c, text);
+  }
+
+  // a turn the user did not type, so that the agent reports what just happened (e.g. git steps that ran);
+  // a busy or failed conversation gets the queued feedback with its next prompt instead
+  notify(id: string, text: string): void {
+    const c = this.conversations.get(id);
+    if (!c || c.failed || c.busy) return;
+    this.turn(c, text);
+  }
+
+  private turn(c: Conversation, text: string): void {
+    c.busy = true;
     c.emit({ type: "busy", busy: true });
     if (c.child) {
       this.send(c, text);
@@ -271,7 +290,10 @@ export class AgentHost {
       this.idle(c);
       return;
     }
-    const lead = [...(c.greeted ? [] : [PREAMBLE]), ...this.opts.feedback(c.id)];
+    const lead = [
+      ...(c.greeted ? [] : [[PREAMBLE, ...(this.opts.notes ?? [])].join("\n")]),
+      ...this.opts.feedback(c.id),
+    ];
     c.greeted = true;
     const prompt = [
       ...(lead.length > 0 ? [{ type: "text" as const, text: lead.join("\n") }] : []),
