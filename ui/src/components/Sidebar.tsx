@@ -28,7 +28,12 @@ import { m } from "@/paraglide/messages.js";
 
 const item =
   "flex items-center gap-2 rounded-md px-2.5 py-1.5 mx-1.5 text-[13px] hover:bg-panel-2 max-md:py-2.5 max-md:text-[15px]";
-const active = { className: cn(item, "bg-tomato text-[var(--y-on-accent)] font-semibold hover:bg-tomato") };
+const active = {
+  className: cn(
+    item,
+    "bg-tomato text-[var(--y-on-accent)] font-semibold hover:bg-tomato [&>[data-count]]:text-current [&>[data-count]]:opacity-80",
+  ),
+};
 
 // a table or view with warnings shows how many in place of its icon, so its row count stays on the right
 function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
@@ -101,7 +106,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           >
             <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
             <span className="truncate">{t.name}</span>
-            <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+            <span data-count className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
               {t.count}
             </span>
           </Link>
@@ -130,7 +135,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
             >
               <ListFilter className="size-3.5 shrink-0 opacity-70" />
               <span className="truncate">{it.value === null ? m.nav_split_none() : String(it.value)}</span>
-              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+              <span data-count className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
                 {it.count}
               </span>
             </Link>
@@ -147,7 +152,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
             >
               <WarnMark count={warnOf(v.name)} fallback={<Layers className="size-3.5 shrink-0 opacity-70" />} />
               <span className="truncate">{v.name}</span>
-              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+              <span data-count className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
                 {v.count}
               </span>
             </Link>
