@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { vi } from "vitest";
 
@@ -33,4 +34,16 @@ export function commit(root: string, message: string, author = "alice", date = "
     env: { ...process.env, ...ENV, GIT_AUTHOR_NAME: author, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
   });
   return git(root, "rev-parse", "HEAD").trim();
+}
+
+// a repo at root whose origin is a bare repository, with main pushed and origin/HEAD set
+export function withRemote(root: string): string {
+  const bare = mkdtempSync(join(tmpdir(), "yamlite-remote-"));
+  git(bare, "init", "-q", "--bare", "-b", "main");
+  initRepo(root);
+  commit(root, "init");
+  git(root, "remote", "add", "origin", bare);
+  git(root, "push", "-q", "-u", "origin", "main");
+  git(root, "remote", "set-head", "origin", "main");
+  return bare;
 }
