@@ -151,8 +151,14 @@ test("a table covering the root picks up edits and does not loop on its own data
   const w = y.watch({ onError: (e) => errors.push(e), onSync: () => syncs++ }, fast);
   await w.ready;
   const titleOf = (id: string) => sql(db, "SELECT title FROM docs WHERE id = ?", id)[0]?.title;
-  await new Promise((r) => setTimeout(r, 1000));
-  expect(syncs).toBeLessThanOrEqual(2);
+  // FSEvents can report the writes made just before the watch began, each adding a sync, so
+  // count none: a loop on its own writes never lets the syncs go quiet
+  let last = syncs;
+  let since = Date.now();
+  await waitFor(() => {
+    if (syncs !== last) [last, since] = [syncs, Date.now()];
+    return Date.now() - since >= 500;
+  }, 3000);
   write(join(root, "sub/b.yaml"), "title: C\n");
   await waitFor(() => titleOf("sub/b") === "C");
   await y.close();
