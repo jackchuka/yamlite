@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { checkReport, displayPath, painter, reloadLine, report, watchEvents, watchHeader } from "./format.ts";
+import { guide } from "./guide.ts";
 import { check, exportSite, formatCsv, formatJson, formatTable, generateConfig, init, open, query } from "./index.ts";
 import { serve } from "./serve/index.ts";
 import { isLoopback } from "./serve/security.ts";
@@ -37,6 +38,13 @@ withRoot(program.command("init").description("create yamlite.yaml from the YAML 
     const tables = result.tables.length > 0 ? result.tables.join(", ") : "no tables yet";
     console.log(`${out("green", "✓")} wrote ${displayPath(result.path)} ${out("dim", `· ${tables}`)}`);
     console.log(`  next: ${out("bold", "yamlite status")} to preview, ${out("bold", "yamlite sync")} to apply`);
+  });
+
+program
+  .command("guide")
+  .description("print the guide to writing yamlite.yaml, for people and AI agents")
+  .action(() => {
+    process.stdout.write(guide());
   });
 
 program

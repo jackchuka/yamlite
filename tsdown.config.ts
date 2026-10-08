@@ -6,4 +6,5 @@ export default defineConfig({
   dts: true,
   platform: "node",
   target: "node24",
+  copy: ["src/guide.md"],
 });
