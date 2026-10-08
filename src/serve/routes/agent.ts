@@ -1,15 +1,49 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import pkg from "../../../package.json" with { type: "json" };
-import { AgentStartError } from "../../agent/host.ts";
+import { AgentStartError, type Conversation } from "../../agent/host.ts";
 import { handleMcp } from "../../agent/mcp.ts";
 import { agentTools } from "../../agent/tools.ts";
 import type { ApiContext } from "../context.ts";
-import { HttpError, readJson, Reply, sendJson, STREAMED } from "../http.ts";
+import { HttpError, readJson, Reply, sendJson } from "../http.ts";
 import { objectBody } from "../write.ts";
 import type { Routes } from "./index.ts";
 
 const { version } = pkg;
 const KEEPALIVE_MS = 15_000;
+
+const encoder = new TextEncoder();
+
+function agentStream(c: Conversation, signal: AbortSignal): ReadableStream<Uint8Array> {
+  let off = () => {};
+  let ping: ReturnType<typeof setInterval> | undefined;
+  let done = false;
+  let ctrl!: ReadableStreamDefaultController<Uint8Array>;
+  const stop = () => {
+    if (done) return;
+    done = true;
+    clearInterval(ping);
+    off();
+    try {
+      ctrl.close();
+    } catch {}
+  };
+  return new ReadableStream<Uint8Array>({
+    start: (k) => {
+      ctrl = k;
+      const send = (e: { type: string }) => {
+        if (done) return;
+        k.enqueue(encoder.encode(`event: agent\ndata: ${JSON.stringify(e)}\n\n`));
+        if (e.type === "closed") stop();
+      };
+      for (const e of c.events) send(e);
+      if (done) return;
+      off = c.subscribe(send);
+      ping = setInterval(() => k.enqueue(encoder.encode(": ping\n\n")), KEEPALIVE_MS);
+      signal.addEventListener("abort", stop, { once: true });
+    },
+    cancel: stop,
+  });
+}
 
 const host = (ctx: ApiContext) => {
   if (!ctx.agent) throw new HttpError(404, "no agent is available");
@@ -32,28 +66,16 @@ export const agentRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/agent/conversations", () => ({ conversations: host(ctx).list() }));
 
   // works for stopped conversations too: replays the history and stays open for a resumed turn
-  router.add("GET", "/api/agent/conversations/:id/events", ({ params, res }) => {
+  router.add("GET", "/api/agent/conversations/:id/events", ({ params, signal }) => {
     const c = host(ctx).get(params.id as string);
     if (!c) throw new HttpError(404, "unknown conversation");
-    res.writeHead(200, {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-store",
-      connection: "keep-alive",
+    return new Response(agentStream(c, signal), {
+      headers: {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-store",
+        connection: "keep-alive",
+      },
     });
-    res.flushHeaders();
-    const send = (e: { type: string }) => {
-      if (res.writableEnded) return;
-      res.write(`event: agent\ndata: ${JSON.stringify(e)}\n\n`);
-      if (e.type === "closed") res.end();
-    };
-    for (const e of c.events) send(e);
-    const off = res.writableEnded ? () => {} : c.subscribe(send);
-    const ping = setInterval(() => res.write(": ping\n\n"), KEEPALIVE_MS);
-    res.on("close", () => {
-      clearInterval(ping);
-      off();
-    });
-    return STREAMED;
   });
 
   router.add("POST", "/api/agent/conversations/:id/prompt", ({ params, body }) => {

@@ -1,7 +1,7 @@
 import { createReadStream, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { extname, resolve, sep } from "node:path";
-import { pipeline } from "node:stream";
+import { pipeline, Readable } from "node:stream";
 import { BusyError, isConstraintError } from "../store.ts";
 import { type AccessPolicy, checkAccess, loginCookie } from "./security.ts";
 import { HttpError } from "./errors.ts";
@@ -15,15 +15,11 @@ export class Reply {
   ) {}
 }
 
-// returned by a handler that wrote the response itself (SSE)
-export const STREAMED = Symbol("streamed");
-
 export interface ApiRequest {
   params: Record<string, string>;
   query: URLSearchParams;
   body: unknown;
-  raw: IncomingMessage;
-  res: ServerResponse;
+  signal: AbortSignal;
 }
 
 export type Handler = (req: ApiRequest) => unknown;
@@ -68,9 +64,40 @@ export class Router {
     }
     return wrongMethod ? "method" : null;
   }
+
+  async dispatch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const match = this.match(request.method, url.pathname);
+    if (match === null) return json(404, { error: "not found" });
+    if (match === "method") return json(405, { error: "method not allowed" });
+    try {
+      let body: unknown;
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        // anything but JSON would be a "simple" cross-site request that skips the CORS preflight
+        if (!/^application\/json\s*(;|$)/i.test(request.headers.get("content-type") ?? ""))
+          throw new HttpError(415, "content-type must be application/json");
+        body = await readBody(request);
+      }
+      const out = await match.handler({ params: match.params, query: url.searchParams, body, signal: request.signal });
+      if (out instanceof Response) return out;
+      if (out instanceof Reply) return json(out.status, out.body);
+      return json(200, out ?? { ok: true });
+    } catch (e) {
+      if (e instanceof HttpError) return json(e.status, { error: e.message, ...e.extra });
+      if (e instanceof BusyError) return json(503, { error: "the database is busy; try again" });
+      if (isConstraintError(e)) return json(400, { error: e.message });
+      return json(500, { error: e instanceof Error ? e.message : String(e) });
+    }
+  }
 }
 
 const jsonReplacer = (_key: string, value: unknown) => (typeof value === "bigint" ? value.toString() : value);
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body, jsonReplacer), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
 
 export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -78,6 +105,50 @@ export function sendJson(res: ServerResponse, status: number, body: unknown): vo
 }
 
 const MAX_BODY = 1_048_576;
+
+async function readBody(request: Request): Promise<unknown> {
+  const tooLarge = () => new HttpError(413, "request body is too large");
+  if (Number(request.headers.get("content-length")) > MAX_BODY) throw tooLarge();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (request.body) {
+    const reader = request.body.getReader();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > MAX_BODY) {
+        await reader.cancel().catch(() => {});
+        throw tooLarge();
+      }
+      chunks.push(value);
+    }
+  }
+  const text = Buffer.concat(chunks).toString("utf8");
+  if (text.trim() === "") return undefined;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    throw new HttpError(400, "invalid JSON body");
+  }
+}
+
+export async function sendResponse(res: ServerResponse, response: Response): Promise<void> {
+  const headers = Object.fromEntries(response.headers);
+  if (!response.body || !headers["content-type"]?.startsWith("text/event-stream")) {
+    const body = Buffer.from(await response.arrayBuffer());
+    res.writeHead(response.status, { ...headers, "content-length": body.length });
+    res.end(body);
+    return;
+  }
+  res.writeHead(response.status, headers);
+  // flushHeaders so an event stream reaches the client before its first event
+  res.flushHeaders();
+  for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
+    if (!res.write(chunk)) await new Promise((r) => res.once("drain", r));
+  }
+  res.end();
+}
 
 export async function readJson(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -199,33 +270,15 @@ function handleRequest(router: Router, policy: () => AccessPolicy, uiDir: string
       else sendJson(res, 405, { error: "method not allowed" });
       return;
     }
-    const match = router.match(method, url.pathname);
-    if (match === null) {
-      notFound(res);
-      return;
-    }
-    if (match === "method") {
-      sendJson(res, 405, { error: "method not allowed" });
-      return;
-    }
-    try {
-      let body: unknown;
-      if (method !== "GET" && method !== "HEAD") {
-        // anything but JSON would be a "simple" cross-site request that skips the CORS preflight
-        if (!/^application\/json\s*(;|$)/i.test(req.headers["content-type"] ?? "")) {
-          throw new HttpError(415, "content-type must be application/json");
-        }
-        body = await readJson(req);
-      }
-      const out = await match.handler({ params: match.params, query: url.searchParams, body, raw: req, res });
-      if (out === STREAMED) return;
-      if (out instanceof Reply) sendJson(res, out.status, out.body);
-      else sendJson(res, 200, out ?? { ok: true });
-    } catch (e) {
-      if (e instanceof HttpError) sendJson(res, e.status, { error: e.message, ...e.extra });
-      else if (e instanceof BusyError) sendJson(res, 503, { error: "the database is busy; try again" });
-      else if (isConstraintError(e)) sendJson(res, 400, { error: e.message });
-      else sendJson(res, 500, { error: e instanceof Error ? e.message : String(e) });
-    }
+    const ac = new AbortController();
+    res.on("close", () => ac.abort());
+    const request = new Request(url, {
+      method,
+      headers: req.headers as Record<string, string>,
+      body: method === "GET" || method === "HEAD" ? undefined : (Readable.toWeb(req) as ReadableStream),
+      duplex: "half",
+      signal: ac.signal,
+    } as RequestInit);
+    await sendResponse(res, await router.dispatch(request));
   };
 }

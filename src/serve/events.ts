@@ -1,4 +1,3 @@
-import type { ServerResponse } from "node:http";
 import type { Change, ConflictInfo, SchemaChange, TableResult, WatchHandlers } from "../index.ts";
 
 export type ServeEvent =
@@ -20,6 +19,7 @@ export type ServeEvent =
 const KEEP = 200;
 const KEEPALIVE_MS = 15_000;
 const sameList = (a: string[] = [], b: string[] = []) => a.length === b.length && a.every((x, i) => x === b[i]);
+const encoder = new TextEncoder();
 const now = () => new Date().toISOString();
 const jsonReplacer = (_key: string, value: unknown) => (typeof value === "bigint" ? value.toString() : value);
 
@@ -28,7 +28,7 @@ export class EventHub {
   private readonly lastWarnings = new Map<string, string[]>();
   private readonly lastOk = new Map<string, boolean>();
   private readonly lastError = new Map<string, string | undefined>();
-  private readonly clients = new Map<ServerResponse, NodeJS.Timeout>();
+  private readonly clients = new Map<ReadableStreamDefaultController<Uint8Array>, ReturnType<typeof setInterval>>();
   private brokenConfig: string | null = null;
 
   readonly handlers: WatchHandlers = {
@@ -64,25 +64,37 @@ export class EventHub {
     for (const res of this.clients.keys()) this.send(res, event.type, event);
   }
 
-  subscribe(res: ServerResponse): void {
-    res.writeHead(200, {
-      "content-type": "text/event-stream; charset=utf-8",
-      "cache-control": "no-store",
-      connection: "keep-alive",
-    });
-    this.send(res, "hello", { activity: this.activity(), warnings: this.warnings(), configError: this.brokenConfig });
-    const ping = setInterval(() => res.write(": ping\n\n"), KEEPALIVE_MS);
-    this.clients.set(res, ping);
-    res.on("close", () => {
+  stream(signal: AbortSignal): ReadableStream<Uint8Array> {
+    let ctrl!: ReadableStreamDefaultController<Uint8Array>;
+    const drop = () => {
+      const ping = this.clients.get(ctrl);
+      if (ping === undefined) return;
       clearInterval(ping);
-      this.clients.delete(res);
+      this.clients.delete(ctrl);
+      try {
+        ctrl.close();
+      } catch {}
+    };
+    return new ReadableStream<Uint8Array>({
+      start: (c) => {
+        ctrl = c;
+        this.send(c, "hello", { activity: this.activity(), warnings: this.warnings(), configError: this.brokenConfig });
+        this.clients.set(
+          c,
+          setInterval(() => c.enqueue(encoder.encode(": ping\n\n")), KEEPALIVE_MS),
+        );
+        signal.addEventListener("abort", drop, { once: true });
+      },
+      cancel: drop,
     });
   }
 
   close(): void {
-    for (const [res, ping] of this.clients) {
+    for (const [ctrl, ping] of this.clients) {
       clearInterval(ping);
-      res.end();
+      try {
+        ctrl.close();
+      } catch {}
     }
     this.clients.clear();
   }
@@ -116,7 +128,7 @@ export class EventHub {
     for (const res of this.clients.keys()) this.send(res, event.type, event);
   }
 
-  private send(res: ServerResponse, type: string, data: unknown): void {
-    res.write(`event: ${type}\ndata: ${JSON.stringify(data, jsonReplacer)}\n\n`);
+  private send(ctrl: ReadableStreamDefaultController<Uint8Array>, type: string, data: unknown): void {
+    ctrl.enqueue(encoder.encode(`event: ${type}\ndata: ${JSON.stringify(data, jsonReplacer)}\n\n`));
   }
 }
