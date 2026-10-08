@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { beforeAll, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import type { TableMeta } from "@/lib/types";
 import { setMobile } from "@/test/media";
@@ -18,6 +18,9 @@ vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   api: { record: vi.fn(), update: vi.fn(), remove: vi.fn(), rows: vi.fn(), history: vi.fn(), historyDiff: vi.fn() },
 }));
+
+// the lazy chunk pulls in CodeMirror and remark: loading it inside a findBy* outlasts its 1s wait on a slow runner
+beforeAll(() => import("./MarkdownField"));
 
 const table: TableMeta = {
   name: "tasks",

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
-import { expect, test, vi } from "vitest";
+import { beforeAll, expect, test, vi } from "vitest";
 import { setMobile } from "@/test/media";
 import { FormField } from "./FormField";
 
@@ -26,6 +26,9 @@ vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
   api: { rows: vi.fn(() => new Promise(() => {})) },
 }));
+
+// the lazy chunk pulls in CodeMirror and remark: loading it inside a findBy* outlasts its 1s wait on a slow runner
+beforeAll(() => import("./MarkdownField"));
 
 const wrap = (ui: React.ReactNode) => <QueryClientProvider client={new QueryClient()}>{ui}</QueryClientProvider>;
 
