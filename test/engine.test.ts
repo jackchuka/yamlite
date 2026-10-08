@@ -33,6 +33,7 @@ function setup(mode: Mode = "files") {
     exclude: [],
     expand: [],
     group: null,
+    split: null,
   };
   return {
     db,

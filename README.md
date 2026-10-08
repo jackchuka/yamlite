@@ -423,8 +423,9 @@ tables:
   people:
     key: slug # default: id
     group: CRM # the web UI's sidebar section
+    split: team # the web UI's sidebar lists one item per value
     values: { team: [platform, sales] }
-    columns: { age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
+    columns: { team: TEXT, age: INTEGER, tags: JSON } # INTEGER | REAL | TEXT | BOOLEAN | JSON
     formats: { bio: markdown } # how the web UI edits a TEXT column
     expand: { tags: {} } # lists as views — see Expanded views
     indexes:
@@ -474,6 +475,10 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 ### Groups
 
 `group` puts a table under a named section in the web UI's sidebar; it never changes the database. Grouped tables follow the ungrouped ones, and groups are listed in the order their first table appears. A section folds away with a click and stays folded in that browser. The table header's Group button sets or clears a table's group from the UI, writing `group:` into `yamlite.yaml`, and New table takes one too.
+
+### Split
+
+`split` names a column whose values the web UI's sidebar lists under the table, each with its count; it never changes the database. A table of notes with `split: type` stays one table, and the sidebar shows `idea`, `todo` and so on under it. Clicking one opens the table filtered to that value, and New record there starts with the value filled in. A JSON column lists each element of its arrays, so a record tagged `[a, b]` is under both `a` and `b`. Records with no value are under "(none)", shown only when there are some. The items fold with the table's views behind the arrow on its row: they start folded, an open table stays open in that browser, and a table opens by itself while one of its items or views is shown. The column must be declared in `columns`, and cannot be the key or the Markdown body.
 
 ### Formats
 
@@ -634,6 +639,7 @@ Open your own `node:sqlite` (or any SQLite) connection to write to the database 
 - Local, single-machine use. One yamlite process per data folder.
 - Sized for hundreds to thousands of records per table; every sync scans the whole table.
 - No SQLite foreign-key constraints ([references](#references) are checked, not enforced). Only YAML is read: `.md` and `.mdx` files through their YAML front matter, never TOML or JSON front matter or other formats.
+- A table splits by one column only.
 - When a file is rewritten, the space before an inline comment is normalized to one (`a: 1  # note` → `a: 1 # note`).
 
 ## License

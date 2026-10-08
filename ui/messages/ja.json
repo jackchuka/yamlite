@@ -70,6 +70,8 @@
   "nav_new_record": "+ 新しいレコード",
   "nav_rename": "名前を変更",
   "nav_rename_key": "キーの名前を変更",
+  "nav_split_none": "(なし)",
+  "nav_table_toggle": "{table} の項目",
   "grid_resize": "{column} の幅を変更",
   "grid_key": "キー",
   "grid_unpin_key": "キー列の固定を解除",

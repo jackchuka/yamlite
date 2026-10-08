@@ -42,6 +42,7 @@ test("discovers tables by convention", () => {
     exclude: [],
     expand: [],
     group: null,
+    split: null,
   });
   expect(cfg.db).toBe(join(root, ".yamlite", "db.sqlite"));
   expect(cfg.stateDir).toBe(join(root, ".yamlite"));
@@ -573,6 +574,35 @@ test.each([['group: ""'], ['group: "  "'], ["group: 1"], ["group: [a]"]])("rejec
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), `tables:\n  t:\n    ${entry}\n`);
   expect(() => resolveConfig({ root })).toThrow('table "t": group must be a non-empty string');
+});
+
+test("a table's split is read from yamlite.yaml", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  notes:\n    split: type\n    columns: { type: TEXT }\n  tasks: {}\n");
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  expect(t.notes?.split).toBe("type");
+  expect(t.tasks?.split).toBeNull();
+});
+
+test.each([
+  ['split: ""', "split must be a column name"],
+  ["split: 1", "split must be a column name"],
+  ["split: [type]", "split must be a column name"],
+  ["split: other", 'split column "other" is not in columns'],
+  ["split: id", "split cannot be the key or body column"],
+])("rejects %s", (entry, message) => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), `tables:\n  t:\n    ${entry}\n    columns: { type: TEXT }\n`);
+  expect(() => resolveConfig({ root })).toThrow(`table "t": ${message}`);
+});
+
+test("split cannot be the markdown body column", () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    'tables:\n  docs:\n    files: "docs/*.md"\n    split: body\n    columns: { body: TEXT }\n',
+  );
+  expect(() => resolveConfig({ root })).toThrow('table "docs": split cannot be the key or body column');
 });
 
 const bounded = (yaml: string) => {

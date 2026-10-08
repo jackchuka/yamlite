@@ -98,6 +98,7 @@ test("an export browses, queries and refuses writes from a subdirectory", async 
   await page.keyboard.press("Escape");
 
   const sidebar = page.getByRole("complementary", { name: "sidebar" });
+  await sidebar.getByRole("button", { name: "Items of projects" }).click();
   await sidebar.getByRole("link", { name: /projects__milestones/ }).click();
   await expect(page.getByRole("row", { name: /Launch/ })).toBeVisible();
 

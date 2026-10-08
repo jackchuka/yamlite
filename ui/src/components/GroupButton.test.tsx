@@ -20,6 +20,7 @@ const table = (name: string, group: string | null): TableMeta => ({
   count: 0,
   inDb: true,
   group,
+  split: null,
 });
 const tables = [table("tasks", null), table("people", "CRM"), table("deals", "Sales")];
 

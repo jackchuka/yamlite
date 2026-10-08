@@ -9,6 +9,17 @@ export interface Reference {
   target?: string;
 }
 
+export interface SplitItem {
+  value: string | number | boolean | null;
+  count: number;
+}
+
+export interface SplitMeta {
+  column: string;
+  json: boolean;
+  items: SplitItem[];
+}
+
 export interface TableMeta {
   name: string;
   mode: "files" | "list";
@@ -26,6 +37,7 @@ export interface TableMeta {
   count: number;
   inDb: boolean;
   group: string | null;
+  split: SplitMeta | null;
 }
 
 export interface ViewMeta {

@@ -42,6 +42,7 @@ export interface TableInput {
   max?: unknown;
   expand?: Record<string, unknown>;
   group?: string;
+  split?: string;
 }
 
 // a table input whose files are found: path is absolute, glob is null for a list table
@@ -195,6 +196,7 @@ interface RawTable {
   max?: unknown;
   expand?: Record<string, unknown>;
   group?: unknown;
+  split?: unknown;
 }
 
 export function configPath(root: string): string | null {
@@ -248,6 +250,12 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
   if (t.group !== undefined && (typeof t.group !== "string" || t.group.trim() === "")) {
     throw new Error(`${where}group must be a non-empty string`);
   }
+  if (t.split !== undefined) {
+    if (typeof t.split !== "string" || t.split === "") throw new Error(`${where}split must be a column name`);
+    if (t.split === (t.key ?? "id") || t.split === body)
+      throw new Error(`${where}split cannot be the key or body column`);
+    if (!Object.hasOwn(columns, t.split)) throw new Error(`${where}split column "${t.split}" is not in columns`);
+  }
   const formats = toFormats(where, body === null ? t.formats : { [body]: "markdown", ...t.formats }, columns);
   return {
     name: t.name,
@@ -270,6 +278,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
     group: t.group ?? null,
+    split: t.split ?? null,
   };
 }
 
@@ -609,6 +618,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
         max: o.max,
         expand: o.expand,
         group: o.group as string | undefined,
+        split: o.split as string | undefined,
       });
     }
     if (pathErrors.length > 0) throw new Error(pathErrors.join("\n"));

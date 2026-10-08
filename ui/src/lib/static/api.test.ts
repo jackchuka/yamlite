@@ -67,6 +67,7 @@ const snapshot: Snapshot = {
         count: 5,
         inDb: true,
         group: null,
+        split: null,
       },
       {
         name: "nums",
@@ -83,6 +84,7 @@ const snapshot: Snapshot = {
         count: 2,
         inDb: true,
         group: null,
+        split: null,
       },
     ],
     views: [

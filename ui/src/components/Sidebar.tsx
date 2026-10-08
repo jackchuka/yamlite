@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ArrowLeftRight,
   ChevronRight,
   Layers,
   LayoutDashboard,
+  ListFilter,
   Network,
   Plus,
   Sparkles,
@@ -12,15 +13,16 @@ import {
   Terminal,
   TriangleAlert,
 } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { agentPanel, useAgents } from "@/lib/agent";
 import { warningLinks } from "@/lib/activity";
 import { openCommandMenu } from "@/lib/commandMenu";
-import { groupTables, useCollapsedGroups } from "@/lib/groups";
+import { groupTables, useCollapsedGroups, useExpandedTables } from "@/lib/groups";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
-import type { TableMeta } from "@/lib/types";
+import { isSplitActive, splitFilter } from "@/lib/split";
+import type { Filter, TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages.js";
 
@@ -53,19 +55,88 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
   const conflictCount = conflicts?.conflicts.length ?? 0;
   const viewNames = new Set(meta?.views.map((v) => v.name));
   const [collapsed, toggleGroup] = useCollapsedGroups();
+  const [expanded, toggleExpanded] = useExpandedTables();
+  const here = useRouterState({ select: (s) => s.matches.find((x) => x.routeId === "/t/$table") });
+  const hereTable = (here?.params as { table?: string } | undefined)?.table;
+  const hereFilters = (here?.search as { filter?: Filter[] } | undefined)?.filter ?? [];
+  const hereView = meta?.views.find((v) => v.name === hereTable);
+  const activeSplitItem = (t: TableMeta) => {
+    const split = t.split;
+    return split !== null && hereTable === t.name
+      ? split.items.find((it) => isSplitActive(hereFilters, split, it))
+      : undefined;
+  };
+  const activeParent = hereView?.table ?? meta?.tables.find((t) => activeSplitItem(t) !== undefined)?.name ?? null;
+  // a table opened because one of its items is shown can be folded until that table has none shown
+  const [shut, setShut] = useState<string | null>(null);
+  if (shut !== null && shut !== activeParent) setShut(null);
   const tableLinks = (t: TableMeta) => {
     const links = warningLinks({ [t.name]: warnings[t.name] ?? [] }, viewNames);
     const warnOf = (view: string | null) => links.filter((w) => w.view === view).length;
+    const split = t.split;
+    const views = meta?.views.filter((v) => v.table === t.name) ?? [];
+    const activeItem = activeSplitItem(t);
+    const foldable = (split !== null && split.items.length > 0) || views.length > 0;
+    const open = foldable && (expanded.has(t.name) || (activeParent === t.name && shut !== t.name));
+    const toggleOpen = () => {
+      if (activeParent !== t.name) {
+        toggleExpanded(t.name);
+        return;
+      }
+      if (!open) {
+        setShut(null);
+        return;
+      }
+      if (expanded.has(t.name)) toggleExpanded(t.name);
+      setShut(t.name);
+    };
     return (
       <Fragment key={t.name}>
-        <Link to="/t/$table" params={{ table: t.name }} className={item} activeProps={active}>
-          <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
-          {t.name}
-          <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">{t.count}</span>
-        </Link>
-        {meta?.views
-          .filter((v) => v.table === t.name)
-          .map((v) => (
+        <div className="flex items-center">
+          <Link
+            to="/t/$table"
+            params={{ table: t.name }}
+            className={cn(item, "min-w-0 flex-1")}
+            activeProps={activeItem ? {} : { className: cn(active.className, "min-w-0 flex-1") }}
+          >
+            <WarnMark count={warnOf(null)} fallback={<Table2 className="size-3.5 opacity-70" />} />
+            <span className="truncate">{t.name}</span>
+            <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+              {t.count}
+            </span>
+          </Link>
+          {foldable && (
+            <button
+              type="button"
+              aria-label={m.nav_table_toggle({ table: t.name })}
+              aria-expanded={open}
+              className="mr-1.5 rounded-md p-1 text-muted-foreground hover:bg-panel-2 max-md:p-2"
+              onClick={toggleOpen}
+            >
+              <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
+            </button>
+          )}
+        </div>
+        {open &&
+          split?.items.map((it) => (
+            <Link
+              key={JSON.stringify(it.value)}
+              to="/t/$table"
+              params={{ table: t.name }}
+              search={{ filter: [splitFilter(split, it)] }}
+              className={cn(it === activeItem ? active.className : item, "min-w-0")}
+              activeProps={{}}
+              style={{ paddingLeft: "24px" }}
+            >
+              <ListFilter className="size-3.5 shrink-0 opacity-70" />
+              <span className="truncate">{it.value === null ? m.nav_split_none() : String(it.value)}</span>
+              <span className="ml-auto text-[11px] text-muted-foreground tabular-nums max-md:text-[12.5px]">
+                {it.count}
+              </span>
+            </Link>
+          ))}
+        {open &&
+          views.map((v) => (
             <Link
               key={v.name}
               to="/t/$table"

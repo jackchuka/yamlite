@@ -74,6 +74,8 @@
   "nav_new_record": "+ New record",
   "nav_rename": "rename",
   "nav_rename_key": "rename key",
+  "nav_split_none": "(none)",
+  "nav_table_toggle": "Items of {table}",
   "grid_resize": "Resize {column}",
   "grid_key": "key",
   "grid_unpin_key": "unpin key column",

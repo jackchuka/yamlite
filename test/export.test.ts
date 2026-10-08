@@ -60,6 +60,14 @@ test("the snapshot meta and schemas match what serve answers, with machine paths
   expect(snap.generatedAt).toBe("2026-10-02T00:00:00.000Z");
 });
 
+test("the snapshot carries each table's split items", async () => {
+  const root = setup({ "yamlite.yaml": "tables:\n  notes:\n    split: text\n    columns: { text: TEXT }\n" });
+  const dir = tmpRoot();
+  await writeSnapshotData({ root, dir });
+  const notes = readJson(join(dir, "data/snapshot.json")).meta.tables.find((t: any) => t.name === "notes");
+  expect(notes.split).toEqual({ column: "text", json: false, items: [{ value: "日本語", count: 1 }] });
+});
+
 test("--table leaves the other tables and their views out of the snapshot and the database", async () => {
   const root = setup();
   const dir = tmpRoot();

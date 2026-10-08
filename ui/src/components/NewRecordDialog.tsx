@@ -15,16 +15,18 @@ export function NewRecordDialog({
   table,
   open,
   onOpenChange,
+  initial = {},
 }: {
   table: TableMeta;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  initial?: Row;
 }) {
   const navigate = useNavigate();
   const { connected } = useEvents();
   const dispatch = useReflectDispatch();
   const [key, setKey] = useState("");
-  const [values, setValues] = useState<Row>({});
+  const [values, setValues] = useState<Row>(initial);
   const create = useMutation({
     mutationFn: () => {
       const set = Object.fromEntries(
@@ -37,8 +39,12 @@ export function NewRecordDialog({
     onSuccess: () => {
       onOpenChange(false);
       setKey("");
-      setValues({});
-      void navigate({ to: "/t/$table", params: { table: table.name }, search: { key } });
+      setValues(initial);
+      void navigate({
+        to: "/t/$table",
+        params: { table: table.name },
+        search: (prev) => ({ ...prev, key }),
+      });
     },
   });
   const err = fieldError(create.error);

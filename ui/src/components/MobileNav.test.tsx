@@ -6,7 +6,7 @@ import { MobileNav } from "./MobileNav";
 
 let pathname = "/t/tasks";
 vi.mock("@tanstack/react-router", () => ({
-  useRouterState: ({ select }: { select: (s: unknown) => unknown }) => select({ location: { pathname } }),
+  useRouterState: ({ select }: { select: (s: unknown) => unknown }) => select({ location: { pathname }, matches: [] }),
 }));
 let agents: AgentMeta[] = [];
 vi.mock("@/lib/agent", async (orig) => ({
