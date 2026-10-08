@@ -387,6 +387,33 @@
       }
     }
   ],
+  "git_summary": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "Git · {count} step", "n=other": "Git · {count} steps" }
+    }
+  ],
+  "git_run": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=one": "Run {count} step", "n=other": "Run {count} steps" }
+    }
+  ],
+  "git_create_branch": "Create branch {name} and switch to it",
+  "git_create_branch_from": "Create branch {name} from {from} and switch to it",
+  "git_switch": "Switch to {branch}",
+  "git_commit": "Commit: {message}",
+  "git_push": "Push {branch}",
+  "git_pull": "Pull {branch}",
+  "git_open_pr": "Open a draft pull request: {title}",
+  "git_done": "Done",
+  "git_failed": "Failed",
+  "git_skipped": "Not run",
+  "git_pr_link": "Open the pull request",
+  "git_pr_create": "Create the pull request on GitHub",
+  "git_running": "Running the steps…",
   "activity_delete_to_db": "deleted · file → DB",
   "activity_delete_to_file": "deleted · DB → file",
   "activity_sync_failed": "sync failed",

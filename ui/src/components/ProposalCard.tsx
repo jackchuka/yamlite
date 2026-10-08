@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { agentApi, invalidateProposals, type Proposal, type ProposalRow } from "@/lib/agent";
+import { agentApi, invalidateProposals, type GitStep, type Proposal, type ProposalRow } from "@/lib/agent";
 import { diffJson, isStructured, type JsonChange } from "@/lib/jsondiff";
 import { cn } from "@/lib/utils";
 import { FieldDiff } from "./FieldDiff";
@@ -115,6 +115,76 @@ function RowDiff({ row }: { row: ProposalRow }) {
   );
 }
 
+const STEP_STATUS = { done: m.git_done, failed: m.git_failed, skipped: m.git_skipped } as const;
+
+function stepLabel(s: GitStep): string {
+  switch (s.kind) {
+    case "create_branch":
+      return s.from ? m.git_create_branch_from({ name: s.name, from: s.from }) : m.git_create_branch({ name: s.name });
+    case "switch":
+      return m.git_switch({ branch: s.branch });
+    case "commit":
+      return m.git_commit({ message: s.message });
+    case "push":
+      return m.git_push({ branch: s.branch });
+    case "pull":
+      return m.git_pull({ branch: s.branch });
+    case "open_pr":
+      return m.git_open_pr({ title: s.title });
+  }
+}
+
+function GitSteps({ git, ran }: { git: NonNullable<Proposal["git"]>; ran: boolean }) {
+  const showResults = ran || git.results.some((r) => r.status !== "skipped");
+  return (
+    <ol className="flex flex-col gap-2 py-2.5">
+      {git.steps.map((s, i) => {
+        const r = git.results[i];
+        return (
+          <li key={i} className="flex flex-col gap-1 text-[15px]">
+            <div className="flex items-baseline gap-2">
+              <span className="text-muted-foreground">{`${i + 1}.`}</span>
+              <span>{stepLabel(s)}</span>
+              {showResults && r && (
+                <span
+                  className={cn(
+                    "ml-auto shrink-0 rounded-full border px-2 text-[14px]",
+                    r.status === "done"
+                      ? "border-ok text-ok"
+                      : r.status === "failed"
+                        ? "border-err text-err"
+                        : "text-muted-foreground",
+                  )}
+                >
+                  {STEP_STATUS[r.status]()}
+                </span>
+              )}
+            </div>
+            {s.kind === "commit" && (
+              <ul className="ml-6 font-mono text-[14px] text-muted-foreground">
+                {s.paths.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            )}
+            {s.kind === "open_pr" && s.body && (
+              <p className="ml-6 text-[14px] whitespace-pre-wrap text-muted-foreground">{s.body}</p>
+            )}
+            {showResults && r?.message && (
+              <p className="ml-6 text-[14px] text-err [overflow-wrap:anywhere]">{r.message}</p>
+            )}
+            {showResults && r?.url && (
+              <a className="ml-6 text-[14px] underline" href={r.url} target="_blank" rel="noreferrer">
+                {r.created ? m.git_pr_link() : m.git_pr_create()}
+              </a>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
   const act = useMutation({
     mutationFn: (how: "apply" | "discard") => (how === "apply" ? agentApi.apply(p.id) : agentApi.discard(p.id)),
@@ -122,19 +192,23 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
     onError: (e) => toast.error(e.message),
   });
   const tables = [...new Set(p.rows.map((r) => r.table))];
-  const count = p.table ? 1 : p.rows.length;
+  const count = p.git ? p.git.steps.length : p.table ? 1 : p.rows.length;
   return (
     <section aria-label={m.proposal_label({ title: p.title })} className="overflow-hidden rounded-lg border">
       <header className="flex items-baseline justify-between gap-2 border-b bg-panel px-3 py-2.5">
         <h3 className="text-[16px] font-semibold">{p.title}</h3>
         <span className="text-[14px] text-muted-foreground">
-          {p.table
-            ? m.proposal_new_table({ name: p.table.name })
-            : m.proposal_summary({ tables: tables.join(", "), count })}
+          {p.git
+            ? m.git_summary({ count })
+            : p.table
+              ? m.proposal_new_table({ name: p.table.name })
+              : m.proposal_summary({ tables: tables.join(", "), count })}
         </span>
       </header>
       <div className="max-h-[360px] overflow-auto px-3">
-        {p.table ? (
+        {p.git ? (
+          <GitSteps git={p.git} ran={p.status !== "pending"} />
+        ) : p.table ? (
           <p className="py-2.5 text-[14px]">
             {(p.table.mode === "list" ? m.proposal_table_list : m.proposal_table_files)({
               name: p.table.name,
@@ -163,11 +237,16 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
       <footer className="flex items-center justify-end gap-2 border-t px-3 py-2.5">
         {p.status === "pending" ? (
           <>
+            {p.git && act.isPending && (
+              <p role="status" className="mr-auto text-[14px] text-muted-foreground">
+                {m.git_running()}
+              </p>
+            )}
             <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate("discard")}>
               {m.proposal_discard()}
             </Button>
             <Button disabled={act.isPending} onClick={() => act.mutate("apply")}>
-              {m.proposal_apply({ count })}
+              {p.git ? m.git_run({ count }) : m.proposal_apply({ count })}
             </Button>
           </>
         ) : (

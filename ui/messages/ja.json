@@ -371,6 +371,33 @@
       }
     }
   ],
+  "git_summary": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "Git · {count} 件の手順" }
+    }
+  ],
+  "git_run": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": { "n=other": "{count} 件の手順を実行" }
+    }
+  ],
+  "git_create_branch": "ブランチ {name} を作成して切り替える",
+  "git_create_branch_from": "{from} からブランチ {name} を作成して切り替える",
+  "git_switch": "{branch} に切り替える",
+  "git_commit": "コミット: {message}",
+  "git_push": "{branch} を push する",
+  "git_pull": "{branch} を pull する",
+  "git_open_pr": "Draft の PR を作成: {title}",
+  "git_done": "完了",
+  "git_failed": "失敗",
+  "git_skipped": "未実行",
+  "git_pr_link": "PR を開く",
+  "git_pr_create": "GitHub で PR を作成する",
+  "git_running": "手順を実行しています…",
   "activity_delete_to_db": "削除 · file → DB",
   "activity_delete_to_file": "削除 · DB → file",
   "activity_sync_failed": "同期に失敗しました",
