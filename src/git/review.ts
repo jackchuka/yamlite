@@ -1,6 +1,6 @@
-import { type GitDriver, type ReviewOutcome, ReviewRefused } from "./driver.ts";
-import { defaultBranch, gitStatus, type Repo } from "./repo.ts";
-import { type GitStep, runSteps, validateSteps } from "./steps.ts";
+import { type ReviewOutcome, ReviewRefused, type StepRunner } from "./driver.ts";
+import { defaultBranch, gitStatus } from "./repo.ts";
+import type { GitStep } from "./steps.ts";
 
 export interface ReviewRequest {
   title: string;
@@ -32,24 +32,24 @@ export function reviewSteps(
 
 // today's review: a new branch from the default branch, or more commits on the current one
 export async function localReview(
-  repo: Repo,
-  driver: GitDriver,
+  runner: StepRunner,
   req: ReviewRequest,
-  o: { afterTreeChange: () => Promise<void> },
+  o: { afterTreeChange: () => Promise<void>; findOpenPr: (branch: string) => Promise<string | null> },
 ): Promise<ReviewOutcome> {
+  const { repo } = runner;
   const { branch } = await gitStatus(repo);
   if (branch === null) throw new ReviewRefused(409, "check out a branch first; HEAD is detached");
   const base = await defaultBranch(repo);
   if (base === null) throw new ReviewRefused(409, "cannot tell the remote default branch of origin");
-  const existing = branch === base ? null : await driver.findOpenPr(branch);
+  const existing = branch === base ? null : await o.findOpenPr(branch);
   const planned = reviewSteps(req, { branch, defaultBranch: base, now: new Date(), openPr: existing === null });
   let steps;
   try {
-    ({ steps } = await validateSteps(repo, planned));
+    ({ steps } = await runner.validate(planned));
   } catch (e) {
     throw new ReviewRefused(400, e instanceof Error ? e.message : String(e));
   }
-  const results = await runSteps(repo, steps, { driver, expectBranch: branch, afterTreeChange: o.afterTreeChange });
+  const results = await runner.run(steps, { expectBranch: branch, afterTreeChange: o.afterTreeChange });
   const failed = results.find((r) => r.status === "failed");
   const pr = results.find((r) => r.url);
   return {

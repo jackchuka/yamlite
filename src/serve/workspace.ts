@@ -5,7 +5,6 @@ import { ProposalStore } from "../agent/proposals.ts";
 import { configPath, resolveConfig } from "../config.ts";
 import { type GitDriver, localDriver } from "../git/driver.ts";
 import { findRepo, ghReady } from "../git/repo.ts";
-import { runSteps } from "../git/steps.ts";
 import { fileDiff, recordHistory } from "../githistory.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
@@ -74,11 +73,11 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
       (probed ??= o.gh !== undefined ? Promise.resolve(o.gh) : ghReady().then((ok) => (ok ? which("gh") : null)));
     const detectLocal = async () => {
       const repo = await findRepo(o.root);
-      return repo ? localDriver(repo, resolve(o.root), gh) : null;
+      return repo ? localDriver(repo, gh) : null;
     };
     const git = o.git !== undefined ? o.git : await detectLocal();
     const history = git ?? (o.git === undefined ? { history: recordHistory, fileDiff } : null);
-    const repo = git?.steps ? git.repo : null;
+    const runner = git?.steps;
     const proposals = new ProposalStore(
       {
         store,
@@ -87,21 +86,19 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         createTable: (t) => {
           createTable(ctx, { ...t });
         },
-        runGit:
-          git && repo
-            ? async (steps, startBranch, onProgress) => {
-                // UI edits reach the files before git reads them
-                assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
-                return runSteps(repo, steps, {
-                  driver: git,
-                  expectBranch: startBranch,
-                  // git wrote these files, so a branch with fewer records is not a wipe
-                  afterTreeChange: async () =>
-                    assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
-                  onProgress,
-                });
-              }
-            : undefined,
+        runGit: runner
+          ? async (steps, startBranch, onProgress) => {
+              // UI edits reach the files before git reads them
+              assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
+              return runner.run(steps, {
+                expectBranch: startBranch,
+                // git wrote these files, so a branch with fewer records is not a wipe
+                afterTreeChange: async () =>
+                  assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
+                onProgress,
+              });
+            }
+          : undefined,
       },
       (p) => {
         ctx.agent?.publish(p.conversationId, { type: "proposal", proposal: p });
@@ -129,7 +126,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         root: ctx.root,
         agents: o.agents,
         mcpUrl: o.mcpUrl,
-        notes: git?.repo ? [GIT_NOTE] : [],
+        notes: git?.steps ? [GIT_NOTE] : [],
         feedback: (id) => ctx.proposals.takeFeedback(id),
       });
     }

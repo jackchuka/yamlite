@@ -6,17 +6,10 @@ import {
   type HistoryTarget,
   recordHistory,
 } from "../githistory.ts";
-import { openPr as ghOrCompare } from "./pr.ts";
-import { defaultBranch, gitStatus, insideRoot, type Repo, runGit, SLOW_MS } from "./repo.ts";
+import { findOpenPr } from "./pr.ts";
+import { defaultBranch, gitStatus, insideRoot, type Repo, runGit } from "./repo.ts";
 import { localReview, type ReviewRequest } from "./review.ts";
-import type { StepResult } from "./steps.ts";
-
-export interface PrRequest {
-  base: string;
-  head: string;
-  title: string;
-  body: string;
-}
+import { type GitStep, type RunOptions, runSteps, type StepResult, validateSteps } from "./steps.ts";
 
 export interface GitStatus {
   branch: string | null;
@@ -26,10 +19,6 @@ export interface GitStatus {
 
 // the git work the server needs: local serve uses the user's own git and gh, another host can supply its own
 export interface GitDriver {
-  // null when there is no repository on disk (a browser); steps must then be false
-  readonly repo: Repo | null;
-  // false: no propose_git for the agent, and applying a git proposal answers 404
-  readonly steps: boolean;
   // false: the UI shows no git footer
   hasRemote(): Promise<boolean>;
   status(): Promise<GitStatus>;
@@ -38,17 +27,21 @@ export interface GitDriver {
   baseContent(rootPath: string): Promise<string | null>;
   history(t: HistoryTarget, extract: Extract, o: { cursor?: string }): Promise<HistoryPage>;
   fileDiff(t: HistoryTarget, rev: string): Promise<DiffResult>;
-  // added to the env of git commands that reach the remote (push, pull, fetch)
-  remoteEnv(): Promise<Record<string, string>>;
-  // the commit author; null keeps git's own configuration
-  author(): Promise<{ name: string; email: string } | null>;
-  findOpenPr(branch: string): Promise<string | null>;
-  openPr(o: PrRequest): Promise<{ url: string; created: boolean }>;
   // runs inside the workspace's proposals.exclusive, after a sync; target null: a new PR
   review(
     req: ReviewRequest & { target: string | null },
     o: { afterTreeChange: () => Promise<void> },
   ): Promise<ReviewOutcome>;
+  // present only where arbitrary git steps can run (a local checkout);
+  // absent: no git tools for the agent, and applying a git proposal answers 404
+  readonly steps?: StepRunner;
+}
+
+// git steps on a repository on disk: what the agent's git tools and proposals run on
+export interface StepRunner {
+  readonly repo: Repo;
+  validate(raw: unknown): Promise<{ steps: GitStep[]; startBranch: string | null }>;
+  run(steps: GitStep[], o: RunOptions): Promise<StepResult[]>;
 }
 
 export interface ReviewOutcome {
@@ -77,11 +70,15 @@ function changeStatus(xy: string): GitStatus["changes"][number]["status"] {
   return "modified";
 }
 
-export function localDriver(repo: Repo, _root: string, gh: () => Promise<string | null>): GitDriver {
+export function localDriver(repo: Repo, gh: () => Promise<string | null>): GitDriver {
   let base: string | null = null;
-  const d: GitDriver = {
+  const steps: StepRunner = {
     repo,
-    steps: true,
+    validate: (raw) => validateSteps(repo, raw),
+    run: (s, o) => runSteps(repo, s, { ...o, gh }),
+  };
+  return {
+    steps,
     async hasRemote() {
       try {
         await runGit(repo.top, ["remote", "get-url", "origin"]);
@@ -112,29 +109,9 @@ export function localDriver(repo: Repo, _root: string, gh: () => Promise<string 
     },
     history: (t, extract, o) => recordHistory(t, extract, o),
     fileDiff: (t, rev) => fileDiff(t, rev),
-    remoteEnv: async () => ({}),
-    author: async () => null,
-    async findOpenPr(branch) {
-      const bin = await gh();
-      if (!bin) return null;
-      try {
-        const out = await runGit(repo.top, ["pr", "view", branch, "--json", "url,state"], {
-          cmd: bin,
-          timeoutMs: SLOW_MS,
-        });
-        const pr = JSON.parse(out) as { url?: unknown; state?: unknown };
-        return pr.state === "OPEN" && typeof pr.url === "string" && pr.url.startsWith("https://") ? pr.url : null;
-      } catch {
-        return null;
-      }
-    },
-    async openPr(o) {
-      return ghOrCompare(repo, { ...o, gh: await gh() });
-    },
     async review(req, o) {
       if (req.target !== null) throw new ReviewRefused(400, "this server cannot add to an existing pull request");
-      return localReview(repo, d, req, o);
+      return localReview(steps, req, { ...o, findOpenPr: async (branch) => findOpenPr(repo, branch, await gh()) });
     },
   };
-  return d;
 }

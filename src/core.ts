@@ -3,7 +3,7 @@ export * from "./index.ts";
 export { createWorkspace, type Workspace, type WorkspaceOptions } from "./serve/workspace.ts";
 export type { ApiContext } from "./serve/context.ts";
 export { HttpError } from "./serve/errors.ts";
-export { ReviewRefused, type GitDriver, type GitStatus, type PrRequest, type ReviewOutcome } from "./git/driver.ts";
+export { ReviewRefused, type GitDriver, type GitStatus, type ReviewOutcome, type StepRunner } from "./git/driver.ts";
 export {
   describeChange,
   fieldChanges,
@@ -16,4 +16,5 @@ export {
   type HistoryTarget,
 } from "./githistory.ts";
 export type { ReviewRequest } from "./git/review.ts";
-export type { StepResult } from "./git/steps.ts";
+export type { Repo } from "./git/repo.ts";
+export type { GitStep, RunOptions, StepResult } from "./git/steps.ts";

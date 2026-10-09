@@ -18,14 +18,14 @@ export interface Repo {
 export function runGit(
   cwd: string,
   args: string[],
-  opts: { input?: string; timeoutMs?: number; cmd?: string; env?: Record<string, string> } = {},
+  opts: { input?: string; timeoutMs?: number; cmd?: string } = {},
 ): Promise<string> {
   const cmd = opts.cmd ?? "git";
   return new Promise((done, fail) => {
-    // a missing credential must fail the step, not wait on a prompt nobody sees; a driver cannot turn that off
+    // a missing credential must fail the step, not wait on a prompt nobody sees
     const child = spawn(cmd, args, {
       cwd,
-      env: { ...process.env, ...opts.env, GIT_TERMINAL_PROMPT: "0", GIT_LITERAL_PATHSPECS: "1", LC_ALL: "C" },
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_LITERAL_PATHSPECS: "1", LC_ALL: "C" },
     });
     const out: Buffer[] = [];
     const err: Buffer[] = [];

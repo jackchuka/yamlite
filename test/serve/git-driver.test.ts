@@ -9,18 +9,12 @@ beforeEach(() => useGitEnv());
 
 function fakeDriver(files: Record<string, string>, changes: GitStatus): GitDriver {
   return {
-    repo: null,
-    steps: false,
     hasRemote: async () => true,
     status: async () => changes,
     defaultBranch: async () => "main",
     baseContent: async (p) => files[p] ?? null,
     history: async () => ({ state: "ok", entries: [], next: null }),
     fileDiff: async () => ({ state: "missing" }),
-    remoteEnv: async () => ({}),
-    author: async () => null,
-    findOpenPr: async () => null,
-    openPr: async () => ({ url: "https://example.test/pr/1", created: true }),
     review: async () => ({ branch: "b", steps: [], results: [], url: null, created: false }),
   };
 }

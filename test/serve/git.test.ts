@@ -174,18 +174,14 @@ test("a finished git proposal starts an agent turn that reports the result witho
   expect(c.events.filter((e) => e.type === "user")).toHaveLength(1);
 }, 30_000);
 
-test("with git steps off there is no propose_git and git proposals cannot be applied", async () => {
+test("a driver without steps offers no git tools and git proposals cannot be applied", async () => {
   const root = dataRoot();
   write(join(root, "yamlite.yaml"), TASKS);
   withRemote(root);
-  t = await startServe({}, undefined, {
-    root,
-    gh: null,
-    git: { ...localDriver((await findRepo(root))!, root, async () => null), steps: false },
-  });
+  const { steps: _, ...git } = localDriver((await findRepo(root))!, async () => null);
+  t = await startServe({}, undefined, { root, gh: null, git });
   const names = agentTools(t.s.context, "c1").map((x) => x.name);
-  expect(names).toContain("git_status");
-  expect(names).not.toContain("propose_git");
+  expect(names.filter((n) => n.startsWith("git_") || n === "propose_git")).toEqual([]);
   // a card made before the switch (or by an agent with a stale tool list) must not run
   const p = t.s.context.proposals.forGit("c1", "x", [{ kind: "create_branch", name: "edit-a" }], "main");
   expect((await t.api(`/api/agent/proposals/${p.id}/apply`, { method: "POST" })).status).toBe(404);
