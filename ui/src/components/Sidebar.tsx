@@ -30,6 +30,7 @@ import { isSplitActive, splitFilter } from "@/lib/split";
 import type { Filter, TableMeta } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { m } from "@/paraglide/messages.js";
+import { Logo } from "./Logo";
 import { ReviewDialog } from "./ReviewDialog";
 
 const item =
@@ -169,7 +170,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
   return (
     <aside className="flex h-full min-h-0 flex-col border-r bg-panel" aria-label={m.nav_sidebar()}>
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
-        <img src="./favicon.svg" alt="" className="size-6" />
+        <Logo className="size-6" />
         yamlite
         <RootInfo />
       </div>
