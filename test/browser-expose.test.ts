@@ -57,3 +57,48 @@ test("a failure after the head only ends the stream, without a JSON chunk", asyn
     { kind: "end" },
   ]);
 });
+
+test("interleaved bodies each decode their own split characters, and a cut-off one is flushed", async () => {
+  const { port1, port2 } = new MessageChannel();
+  ports = [port1, port2];
+  const controllers = new Map<string, ReadableStreamDefaultController<Uint8Array>>();
+  close = expose(port2, async (r) => {
+    const body = new ReadableStream<Uint8Array>({
+      start: (c) => void controllers.set(new URL(r.url).pathname, c),
+    });
+    return new Response(body);
+  });
+  const text = new Map<number, string>();
+  const ended = new Set<number>();
+  let seen = 0;
+  port1.onmessage = (e: MessageEvent<{ id: number; kind: string; data?: string }>) => {
+    const m = e.data;
+    if (m.kind === "chunk") text.set(m.id, (text.get(m.id) ?? "") + m.data);
+    if (m.kind === "end") ended.add(m.id);
+    seen++;
+  };
+  const until = async (ok: () => boolean) => {
+    while (!ok()) await new Promise((r) => setTimeout(r, 1));
+  };
+  const request = (id: number, url: string) =>
+    port1.postMessage({ id, kind: "request", method: "GET", url, headers: [], body: null });
+  request(1, "/a");
+  request(2, "/b");
+  await until(() => controllers.size === 2 && seen >= 2);
+  const send = async (path: string, bytes: number[]) => {
+    const before = seen;
+    controllers.get(path)!.enqueue(new Uint8Array(bytes));
+    await until(() => seen > before);
+  };
+  // "é" is C3 A9 and "日" is E6 97 A5; each is split across two chunks, alternating between the responses
+  await send("/a", [0x61, 0xc3]);
+  await send("/b", [0x62, 0xe6]);
+  await send("/a", [0xa9]);
+  await send("/b", [0x97, 0xa5, 0xe6]);
+  controllers.get("/a")!.close();
+  controllers.get("/b")!.close();
+  await until(() => ended.size === 2);
+  expect(text.get(1)).toBe("aé");
+  // the trailing lone lead byte is flushed as a replacement character, not dropped
+  expect(text.get(2)).toBe("b日�");
+});

@@ -5,7 +5,6 @@ type In =
 // answers the UI's requests posted over a port with a workspace's router, streaming bodies so event streams work
 export function expose(port: MessagePort, dispatch: (r: Request) => Promise<Response>): () => void {
   const open = new Map<number, AbortController>();
-  const decoder = new TextDecoder();
   port.onmessage = async (e: MessageEvent<In>) => {
     const m = e.data;
     if (m.kind === "abort") {
@@ -27,6 +26,8 @@ export function expose(port: MessagePort, dispatch: (r: Request) => Promise<Resp
       port.postMessage({ id: m.id, kind: "head", status: res.status, headers: [...res.headers] });
       headSent = true;
       if (res.body) {
+        // one decoder per body: a character split across chunks must not mix with another response's bytes
+        const decoder = new TextDecoder();
         const reader = res.body.getReader();
         ac.signal.addEventListener("abort", () => void reader.cancel(), { once: true });
         for (;;) {
@@ -34,6 +35,8 @@ export function expose(port: MessagePort, dispatch: (r: Request) => Promise<Resp
           if (done) break;
           port.postMessage({ id: m.id, kind: "chunk", data: decoder.decode(value, { stream: true }) });
         }
+        const rest = decoder.decode();
+        if (rest) port.postMessage({ id: m.id, kind: "chunk", data: rest });
       }
     } catch (err) {
       // once the head is out the body may be an event stream, so a failure there only ends it
