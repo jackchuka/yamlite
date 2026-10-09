@@ -1,10 +1,18 @@
-import { Document, isMap, isNode, isScalar, parseDocument, type YAMLMap } from "yaml";
+import { Document, isMap, isNode, isScalar, isSeq, parseDocument, type YAMLMap } from "yaml";
 import { canonical } from "../hash.ts";
 import { own, type Rec } from "../types.ts";
 import type { Codec } from "./types.ts";
 
 export const PARSE_OPTIONS = { intAsBigInt: true } as const;
 export const STRINGIFY_OPTIONS = { flowCollectionPadding: false } as const;
+
+// a line that could have been wrapped but was not: text with a space in it past the default width of 80
+const UNWRAPPED = /^(?=.{81})\s*\S+ \S/m;
+
+// The options to write a file back with. yaml wraps long text at 80 columns, so a file written with long lines
+// would be rewrapped throughout by any edit; such a file is written without wrapping.
+export const stringifyOptions = (source: string | null) =>
+  source !== null && UNWRAPPED.test(source) ? { ...STRINGIFY_OPTIONS, lineWidth: 0 } : STRINGIFY_OPTIONS;
 export const YAML_EXT = /\.ya?ml$/i;
 // the files of a table that was a plain folder: every YAML file below it
 export const YAML_GLOB = "**/*.{yaml,yml}";
@@ -38,10 +46,43 @@ export function updateMap(doc: Document, map: YAMLMap, record: Rec, keep: (field
   for (const [field, value] of Object.entries(record)) {
     if (value === null || value === undefined) continue;
     const current: unknown = map.get(field, true);
-    const currentJs = isNode(current) ? current.toJS(doc) : current;
-    if (current !== undefined && canonical(currentJs) === canonical(value)) continue;
-    map.set(field, doc.createNode(value));
+    if (current === undefined) map.set(field, doc.createNode(value));
+    else if (!updateNode(doc, current, value)) map.set(field, doc.createNode(value));
   }
+}
+
+const isPlainMap = (v: unknown): v is Rec => v !== null && typeof v === "object" && !Array.isArray(v);
+
+// Changes the node in place to hold the value, so the comments and styles on what stays the same are kept.
+// False when the node cannot become the value and must be replaced.
+function updateNode(doc: Document, node: unknown, value: unknown): boolean {
+  if (!isNode(node)) return false;
+  if (canonical(node.toJS(doc)) === canonical(value)) return true;
+  if (isMap(node) && isPlainMap(value)) {
+    for (const pair of node.items.slice()) {
+      const key = isScalar(pair.key) ? pair.key.value : pair.key;
+      if (!Object.hasOwn(value, String(key))) node.delete(pair.key);
+    }
+    for (const [key, next] of Object.entries(value)) {
+      const current: unknown = node.get(key, true);
+      if (current === undefined || !updateNode(doc, current, next)) node.set(key, doc.createNode(next));
+    }
+    return true;
+  }
+  if (isSeq(node) && Array.isArray(value)) {
+    node.items.splice(value.length);
+    value.forEach((next, i) => {
+      const current = node.items[i];
+      if (current === undefined) node.items.push(doc.createNode(next));
+      else if (!updateNode(doc, current, next)) node.items[i] = doc.createNode(next);
+    });
+    return true;
+  }
+  if (isScalar(node) && typeof node.value === typeof value && (typeof value !== "object" || value === null)) {
+    node.value = value;
+    return true;
+  }
+  return false;
 }
 
 export function stripNulls(record: Rec): Rec {
@@ -59,7 +100,7 @@ export const yamlCodec: Codec = {
     const parsed = current === null ? null : parseRecordFile(current);
     if (parsed?.ok && isMap(parsed.doc.contents)) {
       updateMap(parsed.doc, parsed.doc.contents, record, keep);
-      return parsed.doc.toString(STRINGIFY_OPTIONS);
+      return parsed.doc.toString(stringifyOptions(current));
     }
     return new Document(stripNulls(record)).toString(STRINGIFY_OPTIONS);
   },

@@ -4,7 +4,7 @@ import { type FileStamp, sameStamp, stamp, writeAtomic } from "../fsutil.ts";
 import { hashContent } from "../hash.ts";
 import type { Rec } from "../types.ts";
 import { emptyRead, type FileOp, type Source, type SourceApply, type SourceRead } from "./types.ts";
-import { firstError, PARSE_OPTIONS, STRINGIFY_OPTIONS, stripNulls, updateMap } from "./yamldoc.ts";
+import { firstError, PARSE_OPTIONS, stringifyOptions, stripNulls, updateMap } from "./yamldoc.ts";
 
 const UNREADABLE = "file could not be read; not modified";
 
@@ -83,7 +83,8 @@ export class ListSource implements Source {
       else allowed.push(op);
     }
     if (allowed.length === 0) return out;
-    const doc = parseDocument(existsSync(this.file) ? readFileSync(this.file, "utf8") : "", PARSE_OPTIONS);
+    const source = existsSync(this.file) ? readFileSync(this.file, "utf8") : "";
+    const doc = parseDocument(source, PARSE_OPTIONS);
     if (!isSeq(doc.contents)) doc.contents = doc.createNode([]) as typeof doc.contents;
     const seq = doc.contents as unknown as YAMLSeq;
     const keyOf = (item: unknown) => (isMap(item) ? String(item.get(this.keyField)) : undefined);
@@ -96,7 +97,7 @@ export class ListSource implements Source {
       if (index >= 0) updateMap(doc, seq.items[index] as YAMLMap, op.record, () => false);
       else seq.items.push(doc.createNode(stripNulls(op.record)));
     }
-    writeAtomic(this.file, doc.toString(STRINGIFY_OPTIONS));
+    writeAtomic(this.file, doc.toString(stringifyOptions(source)));
     const after = this.read();
     for (const op of allowed) {
       if (op.kind === "delete") {

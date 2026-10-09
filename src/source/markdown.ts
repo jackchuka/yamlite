@@ -2,7 +2,14 @@ import { Document, isMap } from "yaml";
 import { canonical } from "../hash.ts";
 import type { Rec } from "../types.ts";
 import type { Codec } from "./types.ts";
-import { NOT_A_MAPPING, parseRecordFile, STRINGIFY_OPTIONS, stripNulls, updateMap } from "./yamldoc.ts";
+import {
+  NOT_A_MAPPING,
+  parseRecordFile,
+  STRINGIFY_OPTIONS,
+  stringifyOptions,
+  stripNulls,
+  updateMap,
+} from "./yamldoc.ts";
 
 export type MarkdownExt = ".md" | ".mdx";
 
@@ -70,7 +77,7 @@ function frontFor(old: string | null, fields: Rec, keep: (field: string) => bool
   if (!isMap(parsed.doc.contents)) return Object.keys(wanted).length === 0 ? "" : fresh(wanted, eol);
   updateMap(parsed.doc, parsed.doc.contents, fields, keep);
   if (parsed.doc.contents.items.length === 0) return "";
-  return withEol(parsed.doc.toString(STRINGIFY_OPTIONS), eol);
+  return withEol(parsed.doc.toString(stringifyOptions(old)), eol);
 }
 
 export function markdownCodec(body: string, ext: MarkdownExt = ".md"): Codec {
