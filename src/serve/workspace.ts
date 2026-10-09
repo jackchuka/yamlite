@@ -4,8 +4,7 @@ import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
 import { ProposalStore } from "../agent/proposals.ts";
 import { configPath, resolveConfig } from "../config.ts";
 import { type GitDriver, localDriver } from "../git/driver.ts";
-import { findRepo, ghReady } from "../git/repo.ts";
-import { fileDiff, recordHistory } from "../githistory.ts";
+import { ghReady } from "../git/repo.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
@@ -26,7 +25,7 @@ export interface WorkspaceOptions {
   agents: AgentInfo[];
   // the URL agents reach this workspace's MCP endpoint at; read when an agent starts
   mcpUrl: () => string;
-  // absent: the local repository, if any, with the gh probe; null: no git
+  // absent: the local repository (found once it exists) with the gh probe; null: no git
   git?: GitDriver | null;
   // skips gh detection; null means no gh
   gh?: string | null;
@@ -71,13 +70,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     let probed: Promise<string | null> | undefined;
     const gh = () =>
       (probed ??= o.gh !== undefined ? Promise.resolve(o.gh) : ghReady().then((ok) => (ok ? which("gh") : null)));
-    const detectLocal = async () => {
-      const repo = await findRepo(o.root);
-      return repo ? localDriver(repo, gh) : null;
-    };
-    const git = o.git !== undefined ? o.git : await detectLocal();
-    const history = git ?? (o.git === undefined ? { history: recordHistory, fileDiff } : null);
-    const runner = git?.steps;
+    const git = o.git === undefined ? await localDriver(o.root, gh) : o.git;
     const proposals = new ProposalStore(
       {
         store,
@@ -86,8 +79,10 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         createTable: (t) => {
           createTable(ctx, { ...t });
         },
-        runGit: runner
+        runGit: git
           ? async (steps, startBranch, onProgress) => {
+              const runner = git.steps;
+              if (!runner) throw new Error("git steps are not available here");
               // UI edits reach the files before git reads them
               assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
               return runner.run(steps, {
@@ -117,7 +112,6 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
       proposals,
       agent: null,
       git,
-      history,
     };
     const router = new Router();
     for (const routes of ROUTES) routes(router, ctx);

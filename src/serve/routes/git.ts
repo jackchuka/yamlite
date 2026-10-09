@@ -1,4 +1,4 @@
-import { ReviewRefused } from "../../git/driver.ts";
+import { NoRepository, ReviewRefused } from "../../git/driver.ts";
 import { isAbsolute, relative, resolve } from "node:path";
 import { canonical } from "../../hash.ts";
 import { own, type Rec } from "../../types.ts";
@@ -47,7 +47,7 @@ export const gitRoutes: Routes = (router, ctx) => {
     const rel = relative(ctx.root, resolve(ctx.root, path));
     if (rel === "" || rel.startsWith("..") || isAbsolute(rel))
       throw new HttpError(400, `${path} is outside the data folder`);
-    const found = await recordChanges(git, ctx.root, ctx.y.tables, path);
+    const found = await recordChanges(git, ctx.root, ctx.y.tables, path).catch(notFound);
     if (!found?.records) throw new HttpError(404, `${path} holds no records to compare`);
     return {
       records: found.records.map((r) => {
@@ -87,6 +87,8 @@ export const gitRoutes: Routes = (router, ctx) => {
         );
       } catch (e) {
         if (e instanceof ReviewRefused) throw new HttpError(e.status, e.message);
+        if (e instanceof NoRepository)
+          throw new HttpError(404, "the data folder is not in a git repository with an origin");
         throw e;
       }
     });
@@ -105,7 +107,7 @@ export const gitRoutes: Routes = (router, ctx) => {
         const item = objectBody(raw, "record");
         const spec = tableSpec(ctx, String(item.table));
         const key = String(item.key);
-        const head = await headRecord(git, ctx.root, spec, key);
+        const head = await headRecord(git, ctx.root, spec, key).catch(notFound);
         const now = readRecord(ctx.store, spec, key);
         const before = now ? withoutKey(now, spec.key) : null;
         const after = head ? (wireValue(head) as Rec) : null;
@@ -132,6 +134,12 @@ export const gitRoutes: Routes = (router, ctx) => {
     return { reverted: plan.map((p) => ({ table: p.spec.name, key: p.key, before: p.before, after: p.after })) };
   });
 };
+
+// a local serve started outside a repository answers as if it had no git
+function notFound(e: unknown): never {
+  if (e instanceof NoRepository) throw new HttpError(404, e.message);
+  throw e;
+}
 
 function withoutKey(record: Rec, key: string): Rec {
   return Object.fromEntries(Object.entries(record).filter(([f]) => f !== key && own(record, f) !== undefined));

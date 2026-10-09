@@ -21,7 +21,7 @@ export interface ServeOptions {
   agents?: AgentInfo[];
   // skips gh detection; null means no gh
   gh?: string | null;
-  // absent: the local repository, if any; null: no git
+  // absent: the local repository (found once it exists); null: no git
   git?: GitDriver | null;
 }
 

@@ -25,8 +25,6 @@ export interface ApiContext {
   agent: AgentHost | null;
   // reads and writes git for the root; null when there is no git
   git: GitDriver | null;
-  // record history; without a driver, a local serve still finds a repository created after it started
-  history: Pick<GitDriver, "history" | "fileDiff"> | null;
 }
 
 // relative to the root when inside it (--db and listed tables may live elsewhere)

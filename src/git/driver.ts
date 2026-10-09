@@ -7,7 +7,7 @@ import {
   recordHistory,
 } from "../githistory.ts";
 import { findOpenPr } from "./pr.ts";
-import { defaultBranch, gitStatus, insideRoot, type Repo, runGit } from "./repo.ts";
+import { defaultBranch, findRepo, gitStatus, insideRoot, type Repo, runGit } from "./repo.ts";
 import { localReview, type ReviewRequest } from "./review.ts";
 import { type GitStep, type RunOptions, runSteps, type StepResult, validateSteps } from "./steps.ts";
 
@@ -70,35 +70,68 @@ function changeStatus(xy: string): GitStatus["changes"][number]["status"] {
   return "modified";
 }
 
-export function localDriver(repo: Repo, gh: () => Promise<string | null>): GitDriver {
+// a local driver's answer when the data folder is not (yet) in a git repository
+export class NoRepository extends Error {
+  constructor() {
+    super("the data folder is not in a git repository");
+  }
+}
+
+// the user's own git and gh; the repository is looked up on each use until one exists, so `git init` after start works
+export async function localDriver(root: string, gh: () => Promise<string | null>): Promise<GitDriver> {
+  let found: { repo: Repo; steps: StepRunner } | null = null;
   let base: string | null = null;
-  const steps: StepRunner = {
-    repo,
-    validate: (raw) => validateSteps(repo, raw),
-    run: (s, o) => runSteps(repo, s, { ...o, gh }),
+  const lookup = async () => {
+    if (found) return found;
+    const repo = await findRepo(root);
+    if (!repo) return null;
+    found ??= {
+      repo,
+      steps: {
+        repo,
+        validate: (raw) => validateSteps(repo, raw),
+        run: (s, o) => runSteps(repo, s, { ...o, gh }),
+      },
+    };
+    return found;
   };
+  const need = async () => {
+    const f = await lookup();
+    if (!f) throw new NoRepository();
+    return f;
+  };
+  await lookup();
   return {
-    steps,
+    get steps() {
+      return found?.steps;
+    },
     async hasRemote() {
+      const f = await lookup();
+      if (!f) return false;
       try {
-        await runGit(repo.top, ["remote", "get-url", "origin"]);
+        await runGit(f.repo.top, ["remote", "get-url", "origin"]);
         return true;
       } catch {
         return false;
       }
     },
     async status() {
-      const s = await gitStatus(repo);
+      const f = await lookup();
+      if (!f) return { branch: null, upstream: null, changes: [] };
+      const s = await gitStatus(f.repo);
       const changes = s.changes
-        .filter((c) => insideRoot(repo, c.path) !== null)
+        .filter((c) => insideRoot(f.repo, c.path) !== null)
         .map((c) => ({ path: c.path, status: changeStatus(c.status) }));
       return { branch: s.branch, upstream: s.upstream, changes };
     },
     async defaultBranch() {
-      base ??= await defaultBranch(repo);
+      const f = await lookup();
+      if (!f) return null;
+      base ??= await defaultBranch(f.repo);
       return base;
     },
     async baseContent(rootPath) {
+      const { repo } = await need();
       const top = insideRoot(repo, rootPath);
       if (top === null) return null;
       try {
@@ -111,6 +144,7 @@ export function localDriver(repo: Repo, gh: () => Promise<string | null>): GitDr
     fileDiff: (t, rev) => fileDiff(t, rev),
     async review(req, o) {
       if (req.target !== null) throw new ReviewRefused(400, "this server cannot add to an existing pull request");
+      const { repo, steps } = await need();
       return localReview(steps, req, { ...o, findOpenPr: async (branch) => findOpenPr(repo, branch, await gh()) });
     },
   };
