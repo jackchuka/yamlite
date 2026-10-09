@@ -36,10 +36,9 @@ export function expose(port: MessagePort, dispatch: (r: Request) => Promise<Resp
         }
       }
     } catch (err) {
-      if (!ac.signal.aborted) {
-        if (!headSent) {
-          port.postMessage({ id: m.id, kind: "head", status: 500, headers: [["content-type", "application/json"]] });
-        }
+      // once the head is out the body may be an event stream, so a failure there only ends it
+      if (!ac.signal.aborted && !headSent) {
+        port.postMessage({ id: m.id, kind: "head", status: 500, headers: [["content-type", "application/json"]] });
         port.postMessage({ id: m.id, kind: "chunk", data: JSON.stringify({ error: String(err) }) });
       }
     } finally {
