@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type Document, isMap, parseDocument, type YAMLMap } from "yaml";
 import { writeAtomic } from "./fsutil.ts";
-import { STRINGIFY_OPTIONS } from "./source/yamldoc.ts";
+import { stringifyOptions } from "./source/yamldoc.ts";
 import type { ColumnType } from "./types.ts";
 
 export interface Registration {
@@ -55,7 +55,7 @@ export function registerInConfig(path: string, registrations: Registration[]): b
   }
   // keep the file's own flow style: `{ a: 1 }` stays padded, `{a: 1}` stays compact
   const padded = /[[{] [^\s\]}]/.test(text);
-  if (changed) writeAtomic(path, doc.toString({ ...STRINGIFY_OPTIONS, flowCollectionPadding: padded }));
+  if (changed) writeAtomic(path, doc.toString({ ...stringifyOptions(text), flowCollectionPadding: padded }));
   return changed;
 }
 
@@ -72,6 +72,6 @@ export function setTableGroup(path: string, table: string, group: string | null)
   if (group === null) listed?.delete("group");
   else blockMap(doc, tables, table).set("group", group);
   const padded = /[[{] [^\s\]}]/.test(text);
-  writeAtomic(path, doc.toString({ ...STRINGIFY_OPTIONS, flowCollectionPadding: padded }));
+  writeAtomic(path, doc.toString({ ...stringifyOptions(text), flowCollectionPadding: padded }));
   return true;
 }

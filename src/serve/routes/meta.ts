@@ -49,7 +49,7 @@ export const metaRoutes: Routes = (router, ctx) => {
       network: p.network,
     })),
     views: ctx.y.tables.flatMap((t) =>
-      declaredViews(t).map(({ spec, parent, depth }) => {
+      declaredViews(t).map(({ spec, parent, depth, path }) => {
         const record = findView(ctx, spec.name)?.record;
         let count = 0;
         try {
@@ -62,6 +62,7 @@ export const metaRoutes: Routes = (router, ctx) => {
           table: t.name,
           parent,
           depth,
+          path,
           columns: record?.columns ?? {},
           identity: record?.identity ?? [],
           declared: spec.columns,

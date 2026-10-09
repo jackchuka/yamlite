@@ -88,6 +88,7 @@ const meta = (taskCount = 3): Meta => ({
       table: "tasks",
       parent: "tasks",
       depth: 1,
+      path: ["subtasks"],
       columns: { tasks_id: "TEXT", title: "TEXT" },
       identity: ["tasks_id"],
       declared: {},

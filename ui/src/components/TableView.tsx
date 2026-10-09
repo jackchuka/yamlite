@@ -21,6 +21,7 @@ import { FilterBar } from "./FilterBar";
 import { Grid, type GridColumn } from "./Grid";
 import { SchemaDialog } from "./SchemaDialog";
 import { TableWarnings } from "./TableWarnings";
+import { ViewRowDrawer } from "./ViewRowDrawer";
 import { m } from "@/paraglide/messages.js";
 
 const PAGE = 100;
@@ -113,10 +114,8 @@ export function TableView({
       return { name, type, format, note: reference ? `→ ${reference.table}` : undefined, reference };
     });
   const rowId = view ? (row: Row) => view.identity.map((c) => String(row[c])).join("/") : undefined;
-  const onSelect = view
-    ? (_key: string, row: Row) =>
-        void goTo({ to: "/t/$table", params: { table: view.table }, search: { key: String(row[keyCol]) } })
-    : (key: string) => setSearch({ key });
+  const onSelect = (key: string) => setSearch({ key });
+  const viewRow = view && search.key !== undefined ? shown.find((r) => rowId?.(r) === search.key) : undefined;
   // a view's warnings come with its table's sync, prefixed by the view's name
   const source = t ? t.name : (view as ViewMeta).table;
   const links = warningLinks({ [source]: warnings[source] ?? [] }, new Set(meta?.views.map((v) => v.name)));
@@ -149,7 +148,7 @@ export function TableView({
                 {m.table_from({ parent: view?.parent ?? "" })}
               </span>
               <span className="shrink-0 rounded border px-1.5 text-[11px] whitespace-nowrap text-muted-foreground">
-                {m.table_read_only_view()}
+                {m.table_expanded_view()}
               </span>
             </>
           )}
@@ -204,7 +203,7 @@ export function TableView({
               preview={preview}
               keyCol={keyCol}
               rowId={rowId}
-              selectedKey={t ? search.key : undefined}
+              selectedKey={search.key}
               onSelect={onSelect}
               onEndReached={onEndReached}
               flagged={t ? warningsByKey(links) : undefined}
@@ -219,6 +218,16 @@ export function TableView({
         )}
       </section>
       {t && search.key !== undefined && drawer?.(t, search.key)}
+      {view && search.key !== undefined && (
+        <ViewRowDrawer
+          key={search.key}
+          view={view}
+          rowKey={search.key}
+          row={viewRow}
+          onClose={() => setSearch({ key: undefined })}
+          onOpenRecord={() => viewRow && onOpenRecord(String(viewRow[keyCol]))}
+        />
+      )}
       {schemaOpen && <SchemaDialog table={table} view={view} path={path} open onOpenChange={setSchemaOpen} />}
     </div>
   );

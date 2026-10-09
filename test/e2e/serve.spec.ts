@@ -89,7 +89,9 @@ test("an UPDATE in the SQL console lists the files it changed", async ({ page })
   await expect.poll(() => file(running, "tasks/a.yaml")).toBe("title: Z\n");
 });
 
-test("an expanded view is listed under its table and opens the record it comes from", async ({ page }) => {
+test("an expanded view is listed under its table, shows its own rows and opens the record they come from", async ({
+  page,
+}) => {
   app = await start(
     {
       "yamlite.yaml": "tables:\n  projects:\n    expand:\n      milestones:\n        expand:\n          tasks: {}\n",
@@ -103,10 +105,17 @@ test("an expanded view is listed under its table and opens the record it comes f
   await sidebar.getByRole("button", { name: "Items of projects" }).click();
   await sidebar.getByRole("link", { name: /^projects__milestones(?!__)/ }).click();
   await expect(page.getByRole("heading", { name: "projects__milestones", exact: true })).toBeVisible();
-  await expect(page.getByText("read-only view")).toBeVisible();
+  await expect(page.getByText("expanded view", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /New record/ })).toHaveCount(0);
   await expect(page.getByRole("row", { name: /Launch/ })).toBeVisible();
   await page.getByRole("row", { name: /Design/ }).click();
+  const viewRow = page.getByRole("complementary", { name: "view row" });
+  await expect(viewRow.getByRole("textbox", { name: "title" })).toHaveValue("Design");
+  await expect(page.getByRole("heading", { name: "projects__milestones", exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(viewRow).toHaveCount(0);
+  await page.getByRole("row", { name: /Design/ }).click();
+  await viewRow.getByRole("button", { name: "Open record in projects" }).click();
   await expect(page.getByRole("complementary", { name: "record" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "projects", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -115,6 +124,35 @@ test("an expanded view is listed under its table and opens the record it comes f
   await page.getByRole("dialog").getByRole("link", { name: "projects__milestones__tasks" }).click();
   await expect(page.getByRole("heading", { name: "projects__milestones__tasks", exact: true })).toBeVisible();
   await expect(page.getByRole("row", { name: /Wireframes/ })).toBeVisible();
+});
+
+test("an edit to a view's row is saved to its element and keeps the file's comments", async ({ page }) => {
+  const content = [
+    "title: Website",
+    "milestones:",
+    "  - title: Design # in review",
+    "    tasks:",
+    "      # first up",
+    "      - title: Wireframes",
+    "      - title: Copy # later",
+    "  - title: Launch",
+    "",
+  ].join("\n");
+  app = await start(
+    {
+      "yamlite.yaml": "tables:\n  projects:\n    expand:\n      milestones:\n        expand:\n          tasks: {}\n",
+      "projects/website.yaml": content,
+    },
+    (r) => (app = r),
+  );
+  await page.goto(`${app.url}#/t/projects__milestones__tasks`);
+  await page.getByRole("row", { name: /Wireframes/ }).click();
+  const drawer = page.getByRole("complementary", { name: "view row" });
+  await drawer.getByRole("textbox", { name: "title" }).fill("Mockups");
+  await drawer.getByRole("button", { name: /Save/ }).click();
+  await expect(drawer.getByRole("status")).toContainText("Reflected to");
+  expect(file(app, "projects/website.yaml")).toBe(content.replace("Wireframes", "Mockups"));
+  await expect(page.getByRole("row", { name: /Mockups/ })).toBeVisible();
 });
 
 test("warnings sit next to the table's name and their messages open from the table", async ({ page }) => {

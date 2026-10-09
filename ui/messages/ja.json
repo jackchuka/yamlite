@@ -86,7 +86,7 @@
   "table_ungroup": "グループなし",
   "common_save": "保存",
   "table_from": "{parent} から",
-  "table_read_only_view": "読み取り専用ビュー",
+  "table_expanded_view": "展開ビュー",
   "table_records": [
     {
       "declarations": ["input count", "local n = count: plural"],
@@ -125,6 +125,10 @@
   "erd_relayout": "再レイアウト",
   "erd_hint_touch": "タップで関連をハイライト · タイトルをタップでテーブルを開く",
   "erd_hint_pointer": "クリックで関連をハイライト · ダブルクリックでテーブルを開く",
+  "view_row_label": "ビューの行",
+  "view_row_open_record": "{table} のレコードを開く",
+  "view_row_missing": "この行は元のレコードにもうありません。",
+  "view_row_stale": "レコードが別の場所で変更されたため、最新の内容を表示しています。もう一度編集してください。",
   "record_label": "レコード",
   "record_resize": "レコードパネルの幅を変更",
   "common_close_lower": "閉じる",
