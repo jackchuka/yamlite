@@ -2,6 +2,7 @@ import { chmodSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { agentTools } from "../../src/agent/tools.ts";
+import { localDriver } from "../../src/git/driver.ts";
 import { commit, git, useGitEnv, withRemote } from "../gitrepo.ts";
 import { dataRoot, read, sql, tmpRoot, waitFor, write } from "../helpers.ts";
 import { type Served, startServe } from "./helpers.ts";
@@ -22,8 +23,15 @@ const call = (t: Served, name: string, args: Record<string, unknown> = {}) =>
 
 test("no git tools outside a repository", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, { gh: null });
-  expect(t.s.context.git).toBeNull();
+  expect(t.s.context.git?.steps).toBeUndefined();
   expect(agentTools(t.s.context, "c1").map((x) => x.name)).not.toContain("git_status");
+});
+
+test("git tools appear once a repository created after start is found", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, { gh: null });
+  withRemote(t.root);
+  expect((await t.api("/api/git")).body.git).not.toBeNull();
+  expect(agentTools(t.s.context, "c1").map((x) => x.name)).toContain("propose_git");
 });
 
 test("git_status and propose_git create a card; applying it pushes the branch", async () => {
@@ -171,3 +179,16 @@ test("a finished git proposal starts an agent turn that reports the result witho
   await waitFor(() => c.events.some((e) => e.type === "text" && /all git steps ran/.test(e.text)));
   expect(c.events.filter((e) => e.type === "user")).toHaveLength(1);
 }, 30_000);
+
+test("a driver without steps offers no git tools and git proposals cannot be applied", async () => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), TASKS);
+  withRemote(root);
+  const { steps: _, ...git } = await localDriver(root, async () => null);
+  t = await startServe({}, undefined, { root, gh: null, git });
+  const names = agentTools(t.s.context, "c1").map((x) => x.name);
+  expect(names.filter((n) => n.startsWith("git_") || n === "propose_git")).toEqual([]);
+  // a card made before the switch (or by an agent with a stale tool list) must not run
+  const p = t.s.context.proposals.forGit("c1", "x", [{ kind: "create_branch", name: "edit-a" }], "main");
+  expect((await t.api(`/api/agent/proposals/${p.id}/apply`, { method: "POST" })).status).toBe(404);
+});

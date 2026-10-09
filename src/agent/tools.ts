@@ -1,7 +1,7 @@
 import { check } from "../check.ts";
 import { guide } from "../guide.ts";
 import { DIFF_LIMIT, LOG_LIMIT, gitBranches, gitDiff, gitLog, gitStatus } from "../git/repo.ts";
-import { STEP_KINDS, validateSteps } from "../git/steps.ts";
+import { STEP_KINDS } from "../git/steps.ts";
 import type { ApiContext } from "../serve/context.ts";
 import { readRecord } from "../serve/records.ts";
 import { validateNewTable } from "../serve/routes/tables.ts";
@@ -211,11 +211,10 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
 }
 
 function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
-  const git = ctx.git;
-  if (!git) return [];
-  const { repo } = git;
+  const repo = ctx.git?.steps?.repo;
+  if (!repo) return [];
   const paths = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
-  return [
+  const tools: McpTool[] = [
     {
       name: "git_status",
       description:
@@ -263,10 +262,14 @@ function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
         required: ["title", "steps"],
       },
       call: async (a) => {
-        const { steps, startBranch } = await validateSteps(repo, a.steps);
+        // an agent may still hold a tool list from before git steps were turned off
+        const runner = ctx.git?.steps;
+        if (!runner) throw new Error("git steps are not available here");
+        const { steps, startBranch } = await runner.validate(a.steps);
         const p = ctx.proposals.forGit(conversationId, str(a.title, "title"), steps, startBranch);
         return `Proposal ${p.id} created: ${steps.length} git step${steps.length === 1 ? "" : "s"}. Nothing runs until the user applies it. The proposal appears as a card in this same chat panel; tell the user to review the card above and press its button, and do not say the steps ran.`;
       },
     },
   ];
+  return tools;
 }

@@ -37,3 +37,15 @@ export async function openPr(
   if (!remote) throw new GitError("origin is not a GitHub repository; push worked, open the pull request on your host");
   return { url: compareUrl(remote, o.base, o.head, o.title, o.body), created: false };
 }
+
+// the open pull request for a branch, if gh can tell
+export async function findOpenPr(repo: Repo, branch: string, gh: string | null): Promise<string | null> {
+  if (!gh) return null;
+  try {
+    const out = await runGit(repo.top, ["pr", "view", branch, "--json", "url,state"], { cmd: gh, timeoutMs: SLOW_MS });
+    const pr = JSON.parse(out) as { url?: unknown; state?: unknown };
+    return pr.state === "OPEN" && typeof pr.url === "string" && pr.url.startsWith("https://") ? pr.url : null;
+  } catch {
+    return null;
+  }
+}

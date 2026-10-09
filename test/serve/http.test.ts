@@ -164,3 +164,15 @@ test("the login redirect cannot point at another site", async () => {
   expect(login.status).toBe(302);
   expect(login.headers.location).toBe("/evil.example/");
 });
+
+test("JSON API responses carry a content-length, and an oversized body gets 413", async () => {
+  t = await startServe();
+  const ok = await raw(t.s.port, { path: "/api/health", headers: { cookie: t.cookie } });
+  expect(Number(ok.headers["content-length"])).toBe(Buffer.byteLength(ok.body));
+  const big = await fetch(`${t.base}/api/sql`, {
+    method: "POST",
+    headers: { cookie: t.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ sql: "x".repeat(1_100_000) }),
+  });
+  expect(big.status).toBe(413);
+});

@@ -33,9 +33,16 @@ const edit = (t: Served, key: string, from: string, to: string) =>
 
 const gitOf = async (t: Served) => (await t.api("/api/git")).body.git;
 
-test("GET /api/git is null outside a repository", async () => {
+test("GET /api/git is null outside a repository, and the other git routes answer 404", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, { gh: null });
   expect(await gitOf(t)).toBeNull();
+  const noRepo = { error: "the data folder is not in a git repository" };
+  const diff = await t.api("/api/git/diff?path=tasks/a.yaml");
+  expect([diff.status, diff.body]).toEqual([404, noRepo]);
+  const back = await t.api("/api/git/revert", { method: "POST", body: { records: [{ table: "tasks", key: "a" }] } });
+  expect([back.status, back.body]).toEqual([404, noRepo]);
+  const review = await t.api("/api/git/review", { method: "POST", body: { title: "T", paths: ["tasks/a.yaml"] } });
+  expect(review.status).toBe(404);
 });
 
 test("GET /api/git is null without an origin remote", async () => {

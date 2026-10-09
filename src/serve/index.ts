@@ -1,28 +1,14 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { detectAgents, type AgentInfo, which } from "../agent/detect.ts";
-import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
-import { ProposalStore } from "../agent/proposals.ts";
-import { configPath, resolveConfig } from "../config.ts";
-import { findRepo, ghReady } from "../git/repo.ts";
-import { runSteps } from "../git/steps.ts";
-
-import { open } from "../index.ts";
-import { Store } from "../store.ts";
+import { type AgentInfo, detectAgents } from "../agent/detect.ts";
+import type { GitDriver } from "../git/driver.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
-import { EventHub } from "./events.ts";
-import { PageSql } from "./pagesql.ts";
-import { PageWatch } from "./pagewatch.ts";
-import { createHandler, Router } from "./http.ts";
-import { mcpEndpoint } from "./routes/agent.ts";
-import { ROUTES } from "./routes/index.ts";
-import { createTable } from "./routes/tables.ts";
-import { assertSynced } from "./write.ts";
+import { createHandler } from "./http.ts";
 import { type AccessPolicy, isLoopback, loopbackHosts } from "./security.ts";
+import { createWorkspace } from "./workspace.ts";
 
 export interface ServeOptions {
   root: string;
@@ -35,6 +21,8 @@ export interface ServeOptions {
   agents?: AgentInfo[];
   // skips gh detection; null means no gh
   gh?: string | null;
+  // absent: the local repository (found once it exists); null: no git
+  git?: GitDriver | null;
 }
 
 export interface Server {
@@ -62,143 +50,45 @@ function listen(server: HttpServer, port: number, host: string): Promise<number>
 
 export async function serve(opts: ServeOptions): Promise<Server> {
   const host = opts.host ?? "127.0.0.1";
-  const config = resolveConfig({ root: opts.root, db: opts.db });
-  const configFile = configPath(opts.root);
-  if (configFile === null) throw new Error(`no yamlite.yaml in ${opts.root}; run yamlite init first`);
-  const y = await open({ root: opts.root, db: opts.db });
-  let store: Store | undefined;
-  let dry: Store | undefined;
-  let pageSql: PageSql | undefined;
-  let pageWatch: PageWatch | undefined;
+  let port = 0;
+  let mcpHost = "127.0.0.1";
+  const w = await createWorkspace({
+    root: opts.root,
+    db: opts.db,
+    watch: opts.watch,
+    agents: opts.agent === false ? [] : (opts.agents ?? detectAgents()),
+    mcpUrl: () => `http://${mcpHost}:${port}/mcp`,
+    gh: opts.gh,
+    git: opts.git,
+  });
   try {
-    const hub = new EventHub();
-    pageWatch = new PageWatch((pages) => hub.pagesChanged(pages), opts.watch?.debounceMs);
-    const pages = pageWatch;
-    const watcher = y.watch(
-      {
-        ...hub.handlers,
-        onReload: (tables) => {
-          hub.handlers.onReload?.(tables);
-          void pages.update(y.pages);
-        },
-      },
-      opts.watch,
-    );
-    await watcher.ready;
-    await pages.update(y.pages);
-    store = new Store(config.db);
-    pageSql = new PageSql(config.db);
-    dry = new Store(config.db);
-    const repo = await findRepo(opts.root);
-    const agents = opts.agent === false ? [] : (opts.agents ?? detectAgents());
-    let probed: Promise<string | null> | undefined;
-    const gh = () =>
-      (probed ??= opts.gh !== undefined ? Promise.resolve(opts.gh) : ghReady().then((ok) => (ok ? which("gh") : null)));
-    const gitCtx = repo ? { repo, gh } : null;
-    const proposals = new ProposalStore(
-      {
-        store,
-        dry,
-        tables: () => y.tables,
-        createTable: (t) => {
-          createTable(ctx, { ...t });
-        },
-        runGit: gitCtx
-          ? async (steps, startBranch, onProgress) => {
-              // UI edits reach the files before git reads them
-              assertSynced(await y.sync(), "could not write the latest edits to files for", "; nothing was run");
-              return runSteps(gitCtx.repo, steps, {
-                gh: await gitCtx.gh(),
-                expectBranch: startBranch,
-                // git wrote these files, so a branch with fewer records is not a wipe
-                afterTreeChange: async () =>
-                  assertSynced(await y.sync({ force: true }), "the database could not follow the files for"),
-                onProgress,
-              });
-            }
-          : undefined,
-      },
-      (p) => {
-        ctx.agent?.publish(p.conversationId, { type: "proposal", proposal: p });
-        if (p.git && (p.status === "applied" || p.status === "failed")) ctx.agent?.notify(p.conversationId, GIT_DONE);
-      },
-    );
-    const ctx: ApiContext = {
-      y,
-      store,
-      pageSql,
-      root: resolve(opts.root),
-      stateDir: config.stateDir,
-      configFile,
-      dbPath: config.db,
-      hub,
-      proposals,
-      agent: null,
-      git: gitCtx,
-    };
-    const router = new Router();
-    for (const routes of ROUTES) routes(router, ctx);
     const token = randomBytes(24).toString("hex");
     let policy: AccessPolicy = { token, allowedHosts: new Set() };
-    let port = 0;
-    let mcpHost = "127.0.0.1";
-    if (agents.length > 0) {
-      ctx.agent = new AgentHost({
-        root: ctx.root,
-        agents,
-        mcpUrl: () => `http://${mcpHost}:${port}/mcp`,
-        notes: gitCtx ? [GIT_NOTE] : [],
-        feedback: (id) => ctx.proposals.takeFeedback(id),
-      });
-    }
-    const http = createServer(createHandler(router, () => policy, opts.uiDir ?? DEFAULT_UI, mcpEndpoint(ctx)));
+    const http = createServer(createHandler(w.router, () => policy, opts.uiDir ?? DEFAULT_UI, w.mcp));
     port = await listen(http, opts.port ?? 4610, host);
     const bound = (http.address() as AddressInfo).address;
     mcpHost = bound === "0.0.0.0" || bound === "::" ? "127.0.0.1" : urlHostOf(bound);
     policy = { token, allowedHosts: isLoopback(host) ? loopbackHosts(port) : null };
-    const urlHost = urlHostOf(host);
-    const ui = store;
-    const pq = pageSql;
-    const dr = dry;
     let closing: Promise<void> | undefined;
     return {
-      url: `http://${urlHost}:${port}/?token=${token}`,
+      url: `http://${urlHostOf(host)}:${port}/?token=${token}`,
       port,
       token,
-      context: ctx,
+      context: w.context,
       close() {
         closing ??= (async () => {
           try {
-            await ctx.agent?.close();
-            await pages.close();
-            hub.close();
             http.closeAllConnections();
             await new Promise<void>((done) => http.close(() => done()));
           } finally {
-            try {
-              try {
-                pq.close();
-              } finally {
-                try {
-                  dr.close();
-                } finally {
-                  ui.close();
-                }
-              }
-            } finally {
-              await y.close();
-            }
+            await w.close();
           }
         })();
         return closing;
       },
     };
   } catch (e) {
-    await pageWatch?.close();
-    pageSql?.close();
-    dry?.close();
-    store?.close();
-    await y.close();
+    await w.close();
     throw e;
   }
 }

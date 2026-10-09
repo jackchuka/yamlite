@@ -1,9 +1,29 @@
 import { request } from "node:http";
 import { join } from "node:path";
+import { afterEach } from "vitest";
+import { createWorkspace, type Workspace } from "../../src/serve/workspace.ts";
 import { type ServeOptions, serve } from "../../src/serve/index.ts";
 import { dataRoot, tmpRoot, write } from "../helpers.ts";
 
 export const fast = { pollMs: 50, debounceMs: 50 };
+
+const open: Workspace[] = [];
+afterEach(async () => {
+  for (const w of open.splice(0)) await w.close();
+});
+
+export async function tasksWorkspace(
+  opts: Partial<Parameters<typeof createWorkspace>[0]> = {},
+  setup?: (root: string) => void,
+) {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns:\n      title: TEXT\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  setup?.(root);
+  const w = await createWorkspace({ root, watch: fast, agents: [], mcpUrl: () => "", gh: null, ...opts });
+  open.push(w);
+  return { w, root };
+}
 
 export async function startServe(
   files: Record<string, string> = {},

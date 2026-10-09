@@ -220,7 +220,8 @@ const extractFrom = (extract: Extract, content: string | null): Extracted =>
 
 type Described = Pick<HistoryEntry, "event" | "unreadable" | "changes" | "record">;
 
-function describe(before: Extracted, after: Extracted): Described | null {
+// what one version of a record changed against the previous one; null when neither has it
+export function describeChange(before: Extracted, after: Extracted): Described | null {
   if (before === "unreadable" || after === "unreadable") {
     return { unreadable: true, changes: [], record: after === "unreadable" ? null : after };
   }
@@ -230,14 +231,15 @@ function describe(before: Extracted, after: Extracted): Described | null {
   return { changes: fieldChanges(before, after), record: after };
 }
 
-const worthShowing = (d: Described): boolean => d.changes.length > 0 || d.event !== undefined || d.unreadable === true;
+export const worthShowing = (d: Described): boolean =>
+  d.changes.length > 0 || d.event !== undefined || d.unreadable === true;
 
 async function working(repo: Repo, file: string, extract: Extract): Promise<HistoryEntry | null> {
   if (!existsSync(file)) return null;
   const content = readFileSync(file, "utf8");
   const [committed = null] = await readBlobs(repo.top, [`HEAD:${repo.path}`]);
   if (committed === content) return null;
-  const d = describe(extractFrom(extract, committed), extract(content));
+  const d = describeChange(extractFrom(extract, committed), extract(content));
   if (!d || !worthShowing(d)) return null;
   return {
     kind: "wip",
@@ -291,7 +293,7 @@ export async function recordHistory(
     page.forEach((c, i) => {
       const after = c.status === "D" ? null : extractFrom(extract, blobs[2 * i] ?? null);
       const before = c.status === "A" ? null : extractFrom(extract, blobs[2 * i + 1] ?? null);
-      const d = describe(before, after);
+      const d = describeChange(before, after);
       if (!d || (!worthShowing(d) && c.from === null)) return;
       entries.push({
         kind: "commit",

@@ -16,7 +16,7 @@ async function setup() {
   const repo = (await findRepo(root))!;
   return { root, bare, repo };
 }
-const noop = { gh: null, expectBranch: "main", afterTreeChange: async () => {} };
+const noop = { gh: async () => null, expectBranch: "main", afterTreeChange: async () => {} };
 
 test("branch → commit → push → switch back", async () => {
   const { root, bare, repo } = await setup();

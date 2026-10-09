@@ -21,7 +21,7 @@ export function Shell() {
   const agents = useAgents();
   const agentOpen = useAgentPanelOpen() && agents.length > 0;
   return (
-    <div className="grid h-dvh grid-cols-1 grid-rows-[auto_1fr_auto]">
+    <div className="grid h-[var(--y-shell-h,100dvh)] grid-cols-1 grid-rows-[auto_1fr_auto]">
       <div>
         <SessionBanner />
         {configError && (

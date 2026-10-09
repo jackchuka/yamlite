@@ -10,6 +10,7 @@ import type {
   SqlResult,
   TableSchema,
 } from "./types";
+import { transport } from "./transport";
 
 export class ApiError extends Error {
   constructor(
@@ -47,7 +48,7 @@ export async function request<T>(
   body?: unknown,
   opts: { fetcher?: typeof fetch; retryDelayMs?: number } = {},
 ): Promise<T> {
-  const fetcher = opts.fetcher ?? fetch;
+  const fetcher = opts.fetcher ?? transport().fetch;
   const delay = opts.retryDelayMs ?? 200;
   for (let attempt = 0; ; attempt++) {
     const res = await fetcher(path, {

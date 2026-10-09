@@ -11,3 +11,4 @@ ui/src/paraglide/
 .idea/
 test-results/
 playwright-report/
+.vitest/

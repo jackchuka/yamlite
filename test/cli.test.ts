@@ -12,7 +12,8 @@ beforeAll(() => {
   execFileSync("pnpm", ["build"], { cwd: repo, stdio: "ignore" });
 }, 120_000);
 
-test("status then sync", () => {
+// the built cli writes a WAL database, which the node VFS under sqlite-wasm cannot open
+test.skipIf(process.env.YAMLITE_SQLITE === "wasm")("status then sync", () => {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   const status = run("status", root);

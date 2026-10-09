@@ -143,7 +143,7 @@ export async function validateSteps(
   return { steps, startBranch };
 }
 
-async function runOne(repo: Repo, s: GitStep, gh: string | null): Promise<StepResult> {
+async function runOne(repo: Repo, s: GitStep, gh: () => Promise<string | null>): Promise<StepResult> {
   const g = (args: string[], slow = false) => runGit(repo.top, args, slow ? { timeoutMs: SLOW_MS } : {});
   switch (s.kind) {
     case "create_branch":
@@ -173,22 +173,24 @@ async function runOne(repo: Repo, s: GitStep, gh: string | null): Promise<StepRe
       const head = await currentBranch(repo);
       const base = s.base ?? (await defaultBranch(repo));
       if (!head || !base) throw new GitError("cannot tell the branch or the base branch for the PR");
-      const pr = await openPr(repo, { base, head, title: s.title, body: s.body, gh });
+      const pr = await openPr(repo, { base, head, title: s.title, body: s.body, gh: await gh() });
       return { status: "done", url: pr.url, created: pr.created };
     }
   }
   return { status: "done" };
 }
 
+export interface RunOptions {
+  // the branch checked out when the steps were validated; nothing runs if it changed since
+  expectBranch: string | null;
+  afterTreeChange: () => Promise<void>;
+  onProgress?: (r: StepResult[]) => void;
+}
+
 export async function runSteps(
   repo: Repo,
   steps: GitStep[],
-  o: {
-    gh: string | null;
-    expectBranch: string | null;
-    afterTreeChange: () => Promise<void>;
-    onProgress?: (r: StepResult[]) => void;
-  },
+  o: RunOptions & { gh: () => Promise<string | null> },
 ): Promise<StepResult[]> {
   const results: StepResult[] = steps.map(() => ({ status: "skipped" }));
   const now = await currentBranch(repo);
