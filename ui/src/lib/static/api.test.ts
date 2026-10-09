@@ -93,6 +93,7 @@ const snapshot: Snapshot = {
         table: "tasks",
         parent: "tasks",
         depth: 1,
+        path: ["tags"],
         columns: { tasks_id: "TEXT", idx: "INTEGER", value: "TEXT" },
         identity: ["tasks_id", "idx"],
         declared: {},

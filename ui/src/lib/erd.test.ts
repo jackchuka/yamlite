@@ -36,6 +36,7 @@ const view = (
   table: "tasks",
   parent,
   depth: parent === "tasks" ? 1 : 2,
+  path: name.split("__").slice(1),
   columns,
   identity,
   declared: {},

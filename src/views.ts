@@ -17,18 +17,21 @@ export interface DeclaredView {
   parent: string;
   // 1 for a view of the table itself
   depth: number;
+  // the fields from the table's record down to the expanded one
+  path: string[];
 }
 
 // parents before their children
 export function declaredViews(table: TableSpec): DeclaredView[] {
   const out: DeclaredView[] = [];
-  const walk = (list: ExpandSpec[], parent: string, depth: number) => {
+  const walk = (list: ExpandSpec[], parent: string, path: string[]) => {
     for (const spec of list) {
-      out.push({ spec, parent, depth });
-      walk(spec.expand, spec.name, depth + 1);
+      const next = [...path, spec.field];
+      out.push({ spec, parent, depth: next.length, path: next });
+      walk(spec.expand, spec.name, next);
     }
   };
-  walk(table.expand, table.name, 1);
+  walk(table.expand, table.name, []);
   return out;
 }
 

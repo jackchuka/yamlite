@@ -89,7 +89,7 @@
   "table_ungroup": "No group",
   "common_save": "Save",
   "table_from": "from {parent}",
-  "table_read_only_view": "read-only view",
+  "table_expanded_view": "expanded view",
   "table_records": [
     {
       "declarations": ["input count", "local n = count: plural"],
@@ -131,6 +131,10 @@
   "erd_relayout": "Re-layout",
   "erd_hint_touch": "Tap to highlight relations · tap a title to open the table",
   "erd_hint_pointer": "Click to highlight relations · double-click to open the table",
+  "view_row_label": "view row",
+  "view_row_open_record": "Open record in {table}",
+  "view_row_missing": "This row is no longer in its record.",
+  "view_row_stale": "The record changed elsewhere; the form now shows the latest. Make the edit again.",
   "record_label": "record",
   "record_resize": "Resize record panel",
   "common_close_lower": "close",

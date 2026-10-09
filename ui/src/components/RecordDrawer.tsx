@@ -38,11 +38,39 @@ const columnBound = (bounds: Record<string, Bound>, field: string): Bound | unde
   Object.hasOwn(bounds, field) ? bounds[field] : undefined;
 
 // laid over the table, so opening a record does not reflow the page under it; a phone gives it the whole screen
-const panel =
+export const panel =
   "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl max-md:fixed max-md:inset-0 max-md:z-40 max-md:h-dvh max-md:border-l-0 max-md:shadow-none max-md:animate-[y-slide-up_160ms_ease-out]";
 const tabTrigger = "max-md:flex-1 max-md:text-[14px]";
 
 const isDark = () => document.documentElement.dataset.theme === "dark";
+
+// Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
+export function useDismiss(close: () => void, enabled = true) {
+  useEffect(() => {
+    if (!enabled) return;
+    // dialogs, menus and toasts render in portals outside the drawer, and a row opens its own record
+    const keepers =
+      'aside[data-record-drawer], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]';
+    // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away;
+    // the path is fixed at dispatch, so a clicked element that removed itself still counts as inside
+    const onClick = (e: MouseEvent) => {
+      const path = e.composedPath();
+      if (path.length === 0 || !(path[0] instanceof Element)) return;
+      if (!path.some((node) => node instanceof Element && node.matches(keepers))) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // Escape belongs to an open dialog, menu or popover first
+      const layer = '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]';
+      if (e.key === "Escape" && !document.querySelector(layer)) close();
+    };
+    document.addEventListener("click", onClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("click", onClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  });
+}
 
 export function RecordDrawer({
   table,
@@ -153,31 +181,7 @@ export function RecordDrawer({
       ? onClose()
       : void navigate({ to: "/t/$table", params: { table: table.name }, search: (p) => ({ ...p, key: undefined }) });
 
-  // Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
-  useEffect(() => {
-    if (dirty) return;
-    // dialogs, menus and toasts render in portals outside the drawer, and a row opens its own record
-    const keepers =
-      'aside[data-record-drawer], [role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [role="row"][data-key]';
-    // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away;
-    // the path is fixed at dispatch, so a clicked element that removed itself still counts as inside
-    const onClick = (e: MouseEvent) => {
-      const path = e.composedPath();
-      if (path.length === 0 || !(path[0] instanceof Element)) return;
-      if (!path.some((node) => node instanceof Element && node.matches(keepers))) close();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      // Escape belongs to an open dialog, menu or popover first
-      const layer = '[role="dialog"], [role="alertdialog"], [data-radix-popper-content-wrapper]';
-      if (e.key === "Escape" && !document.querySelector(layer)) close();
-    };
-    document.addEventListener("click", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("click", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  });
+  useDismiss(close, !dirty);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -73,6 +73,7 @@ const meta: Snapshot["meta"] = {
       table: "people",
       parent: "people",
       depth: 1,
+      path: ["roles"],
       columns: {},
       identity: [],
       declared: {},

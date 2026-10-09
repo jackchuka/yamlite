@@ -45,6 +45,8 @@ export interface ViewMeta {
   table: string;
   parent: string;
   depth: number;
+  // the fields from the table's record down to the expanded one
+  path: string[];
   columns: Record<string, ColumnType>;
   identity: string[];
   declared: Record<string, ColumnType>;
