@@ -13,14 +13,16 @@ import { fromWire, toWire } from "../wire.ts";
 import { objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
 
-export function recordFile(spec: TableSpec, key: string): string {
-  if (spec.mode === "list") return spec.path;
+// the files a record may live in, the one a new record gets first
+export function recordFiles(spec: TableSpec, key: string): string[] {
+  if (spec.mode === "list") return [spec.path];
   const exts = spec.codec === "markdown" ? [markdownExt(spec.glob) ?? ".md"] : [".yaml", ".yml"];
-  for (const ext of exts) {
-    const path = join(spec.path, `${key}${ext}`);
-    if (existsSync(path)) return path;
-  }
-  return join(spec.path, `${key}${exts[0]}`);
+  return exts.map((ext) => join(spec.path, `${key}${ext}`));
+}
+
+export function recordFile(spec: TableSpec, key: string): string {
+  const files = recordFiles(spec, key);
+  return files.find((f) => existsSync(f)) ?? (files[0] as string);
 }
 
 // a key is never a path, but a record file must stay inside its table directory regardless

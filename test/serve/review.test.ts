@@ -234,6 +234,23 @@ test("revert brings a deleted file back as committed, comments and styles includ
   expect((await t.api("/api/conflicts")).body.conflicts).toEqual([]);
 });
 
+test("revert brings a deleted .yml file back under its own name", async () => {
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), CONFIG);
+  write(join(root, "tasks/a.yml"), "# task\ntitle: A\n");
+  write(join(root, "people.yaml"), "- id: 1\n  name: Alice\n");
+  withRemote(root);
+  t = await startServe({}, undefined, { root, gh: null });
+  commit(root, "config");
+  await t.api("/api/tables/tasks/rows/a", { method: "DELETE" });
+  await waitFor(() => !existsSync(join(t!.root, "tasks/a.yml")));
+  expect((await revert(t, [{ table: "tasks", key: "a" }])).status).toBe(200);
+  await waitFor(() => existsSync(join(t!.root, "tasks/a.yml")));
+  expect(read(join(t.root, "tasks/a.yml"))).toBe("# task\ntitle: A\n");
+  expect(existsSync(join(t.root, "tasks/a.yaml"))).toBe(false);
+  expect((await gitOf(t)).changes).toEqual([]);
+});
+
 test("revert refuses unknown tables, unchanged records and an empty list, and writes nothing then", async () => {
   ({ t } = await repoServe());
   write(join(t.root, "tasks/a.yaml"), "title: A2\n");
