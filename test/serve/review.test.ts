@@ -251,6 +251,22 @@ test("revert brings a deleted .yml file back under its own name", async () => {
   expect((await gitOf(t)).changes).toEqual([]);
 });
 
+test("revert brings a deleted Markdown page back as committed", async () => {
+  const page = "---\n# draft\ntitle: Guide\ntags: [a, b]\n---\n\n# Guide\n\nBody text.\n";
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), 'tables:\n  docs:\n    files: "docs/**/*.mdx"\n');
+  write(join(root, "docs/guide.mdx"), page);
+  withRemote(root);
+  t = await startServe({}, undefined, { root, gh: null });
+  commit(root, "config");
+  await t.api("/api/tables/docs/rows/guide", { method: "DELETE" });
+  await waitFor(() => !existsSync(join(t!.root, "docs/guide.mdx")));
+  expect((await revert(t, [{ table: "docs", key: "guide" }])).status).toBe(200);
+  await waitFor(() => existsSync(join(t!.root, "docs/guide.mdx")));
+  expect(read(join(t.root, "docs/guide.mdx"))).toBe(page);
+  expect((await gitOf(t)).changes).toEqual([]);
+});
+
 test("revert refuses unknown tables, unchanged records and an empty list, and writes nothing then", async () => {
   ({ t } = await repoServe());
   write(join(t.root, "tasks/a.yaml"), "title: A2\n");
