@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { isLongText } from "@/lib/textdiff";
+import { isLongText, pair } from "@/lib/textdiff";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { cn } from "@/lib/utils";
-import { TextDiff } from "./TextDiff";
+import { Marked, TextDiff } from "./TextDiff";
 
 export interface DiffRow {
   field: string;
@@ -15,6 +15,15 @@ const asText = (v: unknown) => (typeof v === "string" ? v : v === null || v === 
 // side by side, a long text is unreadable: its line breaks collapse and the second column runs off
 const isTextChange = (r: DiffRow) => !r.dim && r.a !== r.b && (isLongText(r.a) || isLongText(r.b));
 
+// a changed short text keeps its columns, with the words that differ marked as in the line diff
+function cells(r: DiffRow, format: (v: unknown) => string): { a: ReactNode; b: ReactNode } {
+  const a = format(r.a);
+  const b = format(r.b);
+  if (r.dim || typeof r.a !== "string" || typeof r.b !== "string" || r.a === r.b) return { a, b };
+  const [del, add] = pair(a, b);
+  return { a: <Marked line={del} />, b: <Marked line={add} /> };
+}
+
 function Columns({
   labels,
   rows,
@@ -22,7 +31,7 @@ function Columns({
   className,
 }: {
   labels: [ReactNode, ReactNode];
-  rows: { field: string; a: string; b: string; dim?: boolean }[];
+  rows: { field: string; a: ReactNode; b: ReactNode; dim?: boolean }[];
   note?: ReactNode;
   className?: string;
 }) {
@@ -98,7 +107,7 @@ export function FieldDiff({
           labels={labels}
           note={note}
           className={className}
-          rows={columns.map((r) => ({ field: r.field, a: format(r.a), b: format(r.b), dim: r.dim }))}
+          rows={columns.map((r) => ({ field: r.field, ...cells(r, format), dim: r.dim }))}
         />
       )}
       {texts.map((r) => (

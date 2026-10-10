@@ -19,7 +19,7 @@ const splitLines = (s: string) => s.replace(/\n$/, "").split("\n");
 const plain = (kind: DiffLine["kind"], text: string): DiffLine => ({ kind, segments: [{ text, mark: false }] });
 
 // a removed line and the added line that replaced it: mark only the words that differ
-function pair(before: string, after: string): [DiffLine, DiffLine] {
+export function pair(before: string, after: string): [DiffLine, DiffLine] {
   const parts = diffWords(before, after, { intlSegmenter: segmenter });
   return [
     { kind: "del", segments: parts.filter((p) => !p.added).map((p) => ({ text: p.value, mark: p.removed })) },
