@@ -7,7 +7,7 @@ import { claims } from "../source/files.ts";
 import { PARSE_OPTIONS } from "../source/yamldoc.ts";
 import { own, type Rec, type TableSpec } from "../types.ts";
 import { extractor } from "./routes/history.ts";
-import { recordFile } from "./routes/rows.ts";
+import { recordFile, recordFiles } from "./routes/rows.ts";
 
 export type RecordKind = "added" | "modified" | "deleted";
 
@@ -107,12 +107,28 @@ export async function headRecord(
   spec: TableSpec,
   key: string,
 ): Promise<{ values: Rec; file: string; content: string } | null> {
-  const file = recordFile(spec, key);
-  const content = await git.baseContent(relative(root, file));
-  if (content === null) return null;
+  const head = await headFile(git, root, spec, key);
+  if (head === null) return null;
+  const { file, content } = head;
   const found = extractor(spec, key)(content);
   if (found === null) return null;
   if (found === "unreadable") throw new Error(`${relative(root, file)} cannot be read at HEAD`);
   const { [spec.key]: _, ...values } = found;
   return { values, file, content };
+}
+
+// the record's file now, or when it is gone the one HEAD has: a deleted "a.yml" is not where a new record would go
+async function headFile(
+  git: GitDriver,
+  root: string,
+  spec: TableSpec,
+  key: string,
+): Promise<{ file: string; content: string } | null> {
+  const now = recordFile(spec, key);
+  const files = existsSync(now) ? [now] : recordFiles(spec, key);
+  for (const file of files) {
+    const content = await git.baseContent(relative(root, file));
+    if (content !== null) return { file, content };
+  }
+  return null;
 }
