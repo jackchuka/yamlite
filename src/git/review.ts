@@ -1,11 +1,13 @@
 import { type ReviewOutcome, ReviewRefused, type StepRunner } from "./driver.ts";
 import { defaultBranch, gitStatus } from "./repo.ts";
-import type { GitStep } from "./steps.ts";
+import { type GitStep, localBranchExists } from "./steps.ts";
 
 export interface ReviewRequest {
   title: string;
   body: string;
   paths: string[];
+  // the new branch's name when sent from the default branch; the time-based name when absent
+  branch?: string;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -23,7 +25,7 @@ export function reviewSteps(
   o: { branch: string; defaultBranch: string; now: Date; openPr: boolean },
 ): GitStep[] {
   const steps: GitStep[] = [];
-  const branch = o.branch === o.defaultBranch ? reviewBranch(o.now) : o.branch;
+  const branch = o.branch === o.defaultBranch ? (r.branch ?? reviewBranch(o.now)) : o.branch;
   if (branch !== o.branch) steps.push({ kind: "create_branch", name: branch });
   steps.push({ kind: "commit", message: r.title, paths: r.paths }, { kind: "push", branch });
   if (o.openPr) steps.push({ kind: "open_pr", title: r.title, body: r.body });
@@ -41,6 +43,10 @@ export async function localReview(
   if (branch === null) throw new ReviewRefused(409, "check out a branch first; HEAD is detached");
   const base = await defaultBranch(repo);
   if (base === null) throw new ReviewRefused(409, "cannot tell the remote default branch of origin");
+  if (req.branch !== undefined) {
+    if (branch !== base) throw new ReviewRefused(400, `already on ${branch}; a branch name is only for a new branch`);
+    if (await localBranchExists(repo, req.branch)) throw new ReviewRefused(400, `branch ${req.branch} already exists`);
+  }
   const existing = branch === base ? null : await o.findOpenPr(branch);
   const planned = reviewSteps(req, { branch, defaultBranch: base, now: new Date(), openPr: existing === null });
   let steps;

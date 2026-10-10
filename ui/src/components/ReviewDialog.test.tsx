@@ -85,8 +85,9 @@ test("expanding a file shows its fields as committed and now", async () => {
   const diff = await screen.findByTestId("field-diff");
   expect(gitApi.diff).toHaveBeenCalledWith("tasks/a.yaml");
   expect(within(diff).getByText("Committed")).toBeTruthy();
-  expect(within(diff).getByText("Buy milk")).toBeTruthy();
-  expect(within(diff).getByText("Buy oat milk")).toBeTruthy();
+  expect(diff.textContent).toContain("Buy milk");
+  expect(diff.textContent).toContain("Buy oat milk");
+  expect([...diff.querySelectorAll("mark")].map((m) => m.textContent)).toEqual(["oat "]);
 });
 
 test("a record goes back as committed, and the toast's undo writes the previous values back", async () => {
@@ -173,4 +174,24 @@ test("the dialog closes once nothing is left to send", () => {
   const onOpenChange = vi.fn();
   renderDialog({ ...git, changes: [] }, onOpenChange);
   expect(onOpenChange).toHaveBeenCalledWith(false);
+});
+
+test("a branch name is sent from the default branch, and the field is hidden elsewhere", async () => {
+  vi.mocked(gitApi.review).mockResolvedValue({
+    branch: "fix/tasks",
+    steps: [],
+    results: [],
+    url: null,
+    created: false,
+  });
+  const { unmount } = renderDialog();
+  fireEvent.change(screen.getByRole("textbox", { name: /^Branch name/ }), { target: { value: " fix/tasks " } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Title" }), { target: { value: "Update" } });
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() =>
+    expect(gitApi.review).toHaveBeenCalledWith(expect.objectContaining({ title: "Update", branch: "fix/tasks" })),
+  );
+  unmount();
+  renderDialog({ ...git, branch: "work" });
+  expect(screen.queryByRole("textbox", { name: /^Branch name/ })).toBeNull();
 });

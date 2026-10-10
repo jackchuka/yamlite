@@ -1,4 +1,5 @@
 import { NoRepository, ReviewRefused } from "../../git/driver.ts";
+import type { ReviewRequest } from "../../git/review.ts";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { writeAtomic } from "../../fsutil.ts";
@@ -12,7 +13,7 @@ import { HttpError } from "../http.ts";
 import { assertSynced, objectBody, writeTx } from "../write.ts";
 import type { Routes } from "./index.ts";
 
-function reviewBody(body: unknown): { title: string; body: string; paths: string[] } {
+function reviewBody(body: unknown): ReviewRequest {
   const b = objectBody(body, "body");
   if (typeof b.title !== "string" || b.title.trim() === "")
     throw new HttpError(400, "title is required", { field: "title" });
@@ -20,7 +21,10 @@ function reviewBody(body: unknown): { title: string; body: string; paths: string
     throw new HttpError(400, "body must be text", { field: "body" });
   if (!Array.isArray(b.paths) || b.paths.length === 0 || b.paths.some((p) => typeof p !== "string"))
     throw new HttpError(400, "choose at least one file", { field: "paths" });
-  return { title: b.title.trim(), body: b.body ?? "", paths: b.paths as string[] };
+  if (b.branch !== undefined && typeof b.branch !== "string")
+    throw new HttpError(400, "branch must be text", { field: "branch" });
+  const branch = b.branch?.trim();
+  return { title: b.title.trim(), body: b.body ?? "", paths: b.paths as string[], ...(branch ? { branch } : {}) };
 }
 
 export const gitRoutes: Routes = (router, ctx) => {

@@ -476,6 +476,7 @@
   ],
   "review_other_files": "その他のファイル",
   "review_pr_title": "タイトル",
+  "review_branch": "ブランチ名（任意。空欄なら日時から自動で付けます）",
   "review_pr_body": "説明（任意）",
   "review_send": "送信",
   "review_sending": "送信中…",

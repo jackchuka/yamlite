@@ -16,7 +16,7 @@ test("one block per field on a phone", () => {
   render(<FieldDiff labels={["Current value", "Your edit"]} rows={rows} format={String} />);
   const block = screen.getByRole("group", { name: "title" });
   expect(within(block).getByText("Current value")).toBeTruthy();
-  expect(within(block).getByText('"B"')).toBeTruthy();
+  expect(block.textContent).toContain('"B"');
 });
 
 test("a changed long text gets a line diff under the short values", () => {
@@ -47,4 +47,16 @@ test("an unchanged long text stays a dimmed row", () => {
   );
   expect(screen.queryByRole("group", { name: "body" })).toBeNull();
   expect(screen.getByTestId("field-diff").textContent).toContain("body");
+});
+
+test("a changed short text marks the words that differ in both columns", () => {
+  render(
+    <FieldDiff
+      labels={["Committed", "Now"]}
+      format={String}
+      rows={[{ field: "description", a: "alpha gamma epsilon zeta", b: "alpha gamma epafafasilon zeta" }]}
+    />,
+  );
+  const marks = [...screen.getByTestId("field-diff").querySelectorAll("mark")].map((m) => m.textContent);
+  expect(marks).toEqual(["epsilon", "epafafasilon"]);
 });

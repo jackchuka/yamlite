@@ -5,6 +5,18 @@ import { m } from "@/paraglide/messages.js";
 
 const SIGN = { same: " ", add: "+", del: "-" } as const;
 
+export function Marked({ line }: { line: DiffLine }) {
+  return line.segments.map((s, i) =>
+    s.mark ? (
+      <mark key={i} className={cn("rounded-sm text-inherit", line.kind === "add" ? "bg-ok/30" : "bg-err/25")}>
+        {s.text}
+      </mark>
+    ) : (
+      s.text
+    ),
+  );
+}
+
 function Line({ line }: { line: DiffLine }) {
   return (
     <div
@@ -22,15 +34,7 @@ function Line({ line }: { line: DiffLine }) {
         {SIGN[line.kind]}
       </span>
       <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">
-        {line.segments.map((s, i) =>
-          s.mark ? (
-            <mark key={i} className={cn("rounded-sm text-inherit", line.kind === "add" ? "bg-ok/30" : "bg-err/25")}>
-              {s.text}
-            </mark>
-          ) : (
-            s.text
-          ),
-        )}
+        <Marked line={line} />
         {line.segments.every((s) => s.text === "") && " "}
       </span>
     </div>
