@@ -216,6 +216,24 @@ test("revert brings a deleted record back, and deletes an added one only when as
   expect(read(join(t.root, "tasks/b.yaml"))).toBe("title: B\n");
 });
 
+test("revert brings a deleted file back as committed, comments and styles included", async () => {
+  const committed = `# task\ntitle: T\ntags: [x, y]\nnotes: |\n  ${"word ".repeat(20).trim()}\n  second line\n`;
+  const root = dataRoot();
+  write(join(root, "yamlite.yaml"), CONFIG);
+  write(join(root, "tasks/a.yaml"), committed);
+  write(join(root, "people.yaml"), "- id: 1\n  name: Alice\n");
+  withRemote(root);
+  t = await startServe({}, undefined, { root, gh: null });
+  commit(root, "config");
+  await t.api("/api/tables/tasks/rows/a", { method: "DELETE" });
+  await waitFor(() => !existsSync(join(t!.root, "tasks/a.yaml")));
+  expect((await revert(t, [{ table: "tasks", key: "a" }])).status).toBe(200);
+  await waitFor(() => existsSync(join(t!.root, "tasks/a.yaml")));
+  expect(read(join(t.root, "tasks/a.yaml"))).toBe(committed);
+  expect((await gitOf(t)).changes).toEqual([]);
+  expect((await t.api("/api/conflicts")).body.conflicts).toEqual([]);
+});
+
 test("revert refuses unknown tables, unchanged records and an empty list, and writes nothing then", async () => {
   ({ t } = await repoServe());
   write(join(t.root, "tasks/a.yaml"), "title: A2\n");
