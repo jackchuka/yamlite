@@ -100,8 +100,13 @@ export async function recordChanges(
   return { table: spec.name, records: c ? [c] : [] };
 }
 
-// the record as HEAD has it, without its key; null when HEAD does not have it
-export async function headRecord(git: GitDriver, root: string, spec: TableSpec, key: string): Promise<Rec | null> {
+// the record as HEAD has it, without its key, and the file it was read from; null when HEAD does not have it
+export async function headRecord(
+  git: GitDriver,
+  root: string,
+  spec: TableSpec,
+  key: string,
+): Promise<{ values: Rec; file: string; content: string } | null> {
   const file = recordFile(spec, key);
   const content = await git.baseContent(relative(root, file));
   if (content === null) return null;
@@ -109,5 +114,5 @@ export async function headRecord(git: GitDriver, root: string, spec: TableSpec, 
   if (found === null) return null;
   if (found === "unreadable") throw new Error(`${relative(root, file)} cannot be read at HEAD`);
   const { [spec.key]: _, ...values } = found;
-  return values;
+  return { values, file, content };
 }

@@ -1,5 +1,7 @@
 import { NoRepository, ReviewRefused } from "../../git/driver.ts";
-import { isAbsolute, relative, resolve } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { writeAtomic } from "../../fsutil.ts";
 import { canonical } from "../../hash.ts";
 import { own, type Rec } from "../../types.ts";
 import { tableSpec } from "../context.ts";
@@ -110,7 +112,7 @@ export const gitRoutes: Routes = (router, ctx) => {
         const head = await headRecord(git, ctx.root, spec, key).catch(notFound);
         const now = readRecord(ctx.store, spec, key);
         const before = now ? withoutKey(now, spec.key) : null;
-        const after = head ? (wireValue(head) as Rec) : null;
+        const after = head ? (wireValue(head.values) as Rec) : null;
         if (before === null && after === null) throw new HttpError(400, `${spec.name}/${key} has no changes`);
         if (before !== null && after !== null && canonical(before) === canonical(after))
           throw new HttpError(400, `${spec.name}/${key} has no changes`);
@@ -120,7 +122,10 @@ export const gitRoutes: Routes = (router, ctx) => {
         // fields the commit does not have are cleared
         const values =
           after && before ? { ...Object.fromEntries(Object.keys(before).map((f) => [f, null])), ...after } : after;
-        return { spec, key, before, after: values };
+        // a file of its own that is gone is written back as committed; the sync would write it fresh,
+        // losing its comments and styles
+        const restore = before === null && head && spec.mode === "files" && !existsSync(head.file) ? head : undefined;
+        return { spec, key, before, after: values, restore };
       }),
     );
     ctx.proposals.assertIdle();
@@ -131,6 +136,11 @@ export const gitRoutes: Routes = (router, ctx) => {
         else updateRecord(ctx.store, p.spec, p.key, p.after);
       }
     });
+    for (const p of plan) {
+      if (!p.restore || existsSync(p.restore.file)) continue;
+      mkdirSync(dirname(p.restore.file), { recursive: true });
+      writeAtomic(p.restore.file, p.restore.content);
+    }
     return { reverted: plan.map((p) => ({ table: p.spec.name, key: p.key, before: p.before, after: p.after })) };
   });
 };
