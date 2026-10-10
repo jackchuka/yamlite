@@ -131,6 +131,34 @@ test("review on a pushed branch adds a commit without a new branch", async () =>
   expect(git(bare, "show", "work:tasks/a.yaml")).toBe("title: A2\n");
 });
 
+test("review from the default branch uses the given branch name", async () => {
+  let bare: string;
+  ({ t, bare } = await repoServe());
+  await edit(t, "a", "A", "A2");
+  const r = await t.api("/api/git/review", {
+    method: "POST",
+    body: { title: "Update a", paths: ["tasks/a.yaml"], branch: " fix/tasks " },
+  });
+  expect(r.status).toBe(200);
+  expect(r.body.branch).toBe("fix/tasks");
+  expect(git(bare, "show", "fix/tasks:tasks/a.yaml")).toBe("title: A2\n");
+});
+
+test("review refuses a branch name that exists, is invalid, or is given off the default branch", async () => {
+  ({ t } = await repoServe());
+  await edit(t, "a", "A", "A2");
+  const send = (branch: string) =>
+    t!.api("/api/git/review", { method: "POST", body: { title: "x", paths: ["tasks/a.yaml"], branch } });
+  git(t.root, "branch", "taken");
+  expect(await send("taken")).toMatchObject({ status: 400, body: { error: "branch taken already exists" } });
+  expect((await send("bad..name")).status).toBe(400);
+  git(t.root, "switch", "-q", "taken");
+  expect(await send("other")).toMatchObject({
+    status: 400,
+    body: { error: "already on taken; a branch name is only for a new branch" },
+  });
+});
+
 test("review refuses paths outside the data root and empty selections", async () => {
   ({ t } = await repoServe());
   const outside = await t.api("/api/git/review", { method: "POST", body: { title: "x", paths: ["../x.yaml"] } });

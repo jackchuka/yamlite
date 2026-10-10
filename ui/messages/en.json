@@ -491,6 +491,7 @@
   ],
   "review_other_files": "Other files",
   "review_pr_title": "Title",
+  "review_branch": "Branch name (optional; named after the time when blank)",
   "review_pr_body": "Description (optional)",
   "review_send": "Send",
   "review_sending": "Sending…",

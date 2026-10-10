@@ -198,7 +198,7 @@ The UI is available in English and Japanese. It follows your browser language on
 
 When the data folder is in a git repository with an `origin` remote, the bottom of the sidebar shows the current branch and how many files under the data folder changed. **Send for review** lists the changed files by table and record, asks for a title and an optional description, and sends the files you keep checked:
 
-- On the default branch, it creates a branch named `yamlite/review-<date>-<time>`, commits the files there, pushes it and opens a draft pull request. The UI stays on the new branch, so later edits go to the same pull request.
+- On the default branch, it creates a branch with the name you enter, or `yamlite/review-<date>-<time>` when you leave it blank, commits the files there, pushes it and opens a draft pull request. The UI stays on the new branch, so later edits go to the same pull request.
 - On any other branch, it commits and pushes to that branch. If the branch already has an open pull request, it links to it; otherwise it opens a draft pull request.
 - With [`gh`](https://cli.github.com) installed and logged in, the pull request is created for you. Without it, you get a GitHub link that opens the pull request form already filled in. For other hosts the branch is pushed and you open the pull request there.
 - Only files under the data folder are committed. Git runs without prompts, so pushing needs credentials that already work without asking.

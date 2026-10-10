@@ -52,7 +52,7 @@ async function commitPath(repo: Repo, v: unknown, i: number): Promise<string> {
   }
 }
 
-async function localBranchExists(repo: Repo, branch: string): Promise<boolean> {
+export async function localBranchExists(repo: Repo, branch: string): Promise<boolean> {
   try {
     await runGit(repo.top, ["rev-parse", "--verify", "-q", `refs/heads/${branch}`]);
     return true;

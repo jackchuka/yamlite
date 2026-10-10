@@ -58,7 +58,7 @@ export const GIT_KEY = ["git"];
 
 export const gitApi = {
   state: () => request<{ git: GitState | null }>("GET", "/api/git").then((r) => r.git),
-  review: (body: { title: string; body: string; paths: string[] }) =>
+  review: (body: { title: string; body: string; paths: string[]; branch?: string }) =>
     request<ReviewResult>("POST", "/api/git/review", body),
   diff: (path: string) =>
     request<{ records: Array<{ key: string; kind: ChangeKind; fields: FieldValues[] }> }>(

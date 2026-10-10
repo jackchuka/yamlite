@@ -237,11 +237,19 @@ export function ReviewDialog({
   const { data: meta } = useMeta();
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [branch, setBranch] = useState("");
   const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
   const paths = git.changes.map((c) => c.path).filter((p) => !unchecked.has(p));
+  const onDefault = git.branch === git.defaultBranch;
   const refresh = () => void client.invalidateQueries({ queryKey: GIT_KEY });
   const send = useMutation({
-    mutationFn: () => gitApi.review({ title: title.trim(), body, paths }),
+    mutationFn: () =>
+      gitApi.review({
+        title: title.trim(),
+        body,
+        paths,
+        ...(onDefault && branch.trim() ? { branch: branch.trim() } : {}),
+      }),
     onSettled: refresh,
   });
   const undo = (items: Reverted[]) =>
@@ -271,6 +279,7 @@ export function ReviewDialog({
       revert.reset();
       setTitle("");
       setBody("");
+      setBranch("");
       setUnchecked(new Set());
     }
   };
@@ -279,7 +288,6 @@ export function ReviewDialog({
     if (empty && !send.data) onOpenChange(false);
   }, [empty, send.data, onOpenChange]);
   const listTables = new Set(meta?.tables.filter((t) => t.mode === "list").map((t) => t.name));
-  const onDefault = git.branch === git.defaultBranch;
   const result = send.data;
   const failure = send.error ?? revert.error;
   const error = failure instanceof Error ? failure.message : (result?.error ?? null);
@@ -340,6 +348,15 @@ export function ReviewDialog({
                 </div>
               ))}
             </fieldset>
+            {onDefault && (
+              <Input
+                aria-label={m.review_branch()}
+                placeholder={m.review_branch()}
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                className="font-mono text-[15px]"
+              />
+            )}
             <Input
               aria-label={m.review_pr_title()}
               placeholder={m.review_pr_title()}

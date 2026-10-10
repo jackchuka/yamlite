@@ -23,3 +23,9 @@ test("on another branch with an open PR, the changes are only committed and push
     { kind: "push", branch: "work" },
   ]);
 });
+
+test("from the default branch, a given branch name replaces the time-based one", () => {
+  expect(
+    reviewSteps({ ...req, branch: "fix/tasks" }, { branch: "main", defaultBranch: "main", now, openPr: true })[0],
+  ).toEqual({ kind: "create_branch", name: "fix/tasks" });
+});
