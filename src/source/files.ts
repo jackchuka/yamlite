@@ -132,6 +132,7 @@ export class FilesSource implements Source {
         continue;
       }
       this.paths.set(key, path);
+      res.paths.set(key, path);
       const content = readFileSync(path, "utf8");
       res.stamps.set(path, { mtimeMs, contentHash: hashContent(content) });
       const parsed = this.codec.read(content);

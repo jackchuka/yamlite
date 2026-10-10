@@ -9,6 +9,8 @@ export interface SourceRead {
   tableError: string | null;
   warnings: string[];
   stamps: Map<string, FileStamp | null>;
+  // a files table's file of each record
+  paths: Map<string, string>;
 }
 
 export type FileOp = { kind: "put"; key: string; record: Rec } | { kind: "delete"; key: string };
@@ -32,6 +34,7 @@ export function emptyRead(): SourceRead {
     tableError: null,
     warnings: [],
     stamps: new Map(),
+    paths: new Map(),
   };
 }
 

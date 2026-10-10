@@ -1,20 +1,53 @@
-import { rmSync } from "node:fs";
-import { encode, rowToRecord } from "../../codec.ts";
-import { saveConflict } from "../../conflicts.ts";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
+import { crossEqual, encode, rowToRecord } from "../../codec.ts";
+import { type ConflictSource, saveConflict } from "../../conflicts.ts";
+import { writeAtomic } from "../../fsutil.ts";
 import { canonical } from "../../hash.ts";
-import type { DbRow } from "../../types.ts";
-import { dismissConflict, listConflicts, readConflict } from "../conflicts.ts";
-import { tableSpec } from "../context.ts";
+import type { ColumnType, DbRow, Rec, TableSpec } from "../../types.ts";
+import { dismissConflict, listConflicts, type ReadSource, readConflict } from "../conflicts.ts";
+import { type ApiContext, tableSpec } from "../context.ts";
 import { HttpError } from "../http.ts";
 import { fromWire, toWire, wireValue } from "../wire.ts";
 import { ensureColumns, writeTx } from "../write.ts";
+import { extractor } from "./history.ts";
 import type { Routes } from "./index.ts";
+import { recordFile, recordFiles } from "./rows.ts";
+
+const sourceReader =
+  (ctx: ApiContext): ReadSource =>
+  (table, key, text) => {
+    const spec = ctx.y.tables.find((t) => t.name === table);
+    const found = spec ? extractor(spec, key)(text) : null;
+    if (!spec || found === null || found === "unreadable") return null;
+    const { [spec.key]: _, ...record } = found;
+    return record;
+  };
+
+// the record's file as it is, so the swap backup can bring back its comments and styles;
+// none when the file does not hold the database's values yet
+function currentSource(
+  spec: TableSpec,
+  key: string,
+  current: Rec,
+  types: Map<string, ColumnType>,
+): ConflictSource | undefined {
+  if (spec.mode !== "files") return undefined;
+  const file = recordFile(spec, key);
+  if (!existsSync(file)) return undefined;
+  const text = readFileSync(file, "utf8");
+  const found = extractor(spec, key)(text);
+  if (found === null || found === "unreadable") return undefined;
+  const { [spec.key]: _, ...record } = found;
+  if (!crossEqual(record, current, types)) return undefined;
+  return { file: relative(spec.path, file).split(sep).join("/"), text };
+}
 
 export const conflictRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/conflicts", () => ({ conflicts: listConflicts(ctx.stateDir) }));
 
   router.add("GET", "/api/conflicts/:id", ({ params }) => {
-    const backup = readConflict(ctx.stateDir, params.id as string);
+    const backup = readConflict(ctx.stateDir, params.id as string, sourceReader(ctx));
     const spec = ctx.y.tables.find((t) => t.name === backup.entry.table);
     const key = backup.entry.key;
     const row =
@@ -35,7 +68,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
   router.add("POST", "/api/conflicts/:id/restore", ({ params, body }) => {
     ctx.proposals.assertIdle();
     const id = params.id as string;
-    const backup = readConflict(ctx.stateDir, id);
+    const backup = readConflict(ctx.stateDir, id, sourceReader(ctx));
     const { entry } = backup;
     if (!entry.restorable || entry.key === null) {
       throw new HttpError(400, "this backup has no yamlite header, so its key is unknown; restore it by hand");
@@ -60,7 +93,9 @@ export const conflictRoutes: Routes = (router, ctx) => {
         // same shape as the engine's backup of a database side
         const current = row ? rowToRecord(row, before, spec.mode === "files" ? spec.key : undefined) : null;
         // the restored side wins now, so the saved version belongs to the side that won the original conflict
-        swapPath = saveConflict(ctx.stateDir, spec.name, key, current, entry.winner === "db" ? "file" : "db");
+        swapPath = saveConflict(ctx.stateDir, spec.name, key, current, entry.winner === "db" ? "file" : "db", {
+          source: current ? currentSource(spec, key, current, before) : undefined,
+        });
         if (backup.record === null) {
           if (exists) store.delete(spec.name, spec.key, keyValue);
           return;
@@ -78,6 +113,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
       if (swapPath) rmSync(swapPath, { force: true });
       throw e;
     }
+    restoreSource(spec, key, backup.source);
     dismissConflict(ctx.stateDir, id);
     return { ok: true };
   });
@@ -88,3 +124,13 @@ export const conflictRoutes: Routes = (router, ctx) => {
     return { ok: true };
   });
 };
+
+// a record whose file is gone gets its saved file back as it was; the sync would write it fresh, losing its comments
+// and styles. Only one of the file names the record may have is written, so a backup never writes elsewhere.
+function restoreSource(spec: TableSpec, key: string, source: ConflictSource | null): void {
+  if (!source || spec.mode !== "files" || existsSync(recordFile(spec, key))) return;
+  const file = join(spec.path, source.file);
+  if (!recordFiles(spec, key).includes(file)) return;
+  mkdirSync(dirname(file), { recursive: true });
+  writeAtomic(file, source.text);
+}
