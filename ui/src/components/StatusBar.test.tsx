@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
+import { setEmbedded } from "@/lib/embedded";
 import { StatusBar } from "./StatusBar";
 
 let warnings: Record<string, string[]> = {};
@@ -28,4 +29,16 @@ test("Japanese has one form", () => {
   render(<StatusBar />);
   expect(screen.getByText("⚠ 警告 1 件")).toBeTruthy();
   expect(screen.getByText("/data を監視中")).toBeTruthy();
+});
+
+afterEach(() => setEmbedded(false));
+
+test("embedded in another product, the bar shows no local path or address", () => {
+  localStorage.removeItem("yamlite-locale");
+  warnings = {};
+  setEmbedded(true);
+  render(<StatusBar />);
+  expect(screen.queryByText(/watching/)).toBeNull();
+  expect(screen.queryByText(location.host)).toBeNull();
+  expect(screen.getByText("connected")).toBeTruthy();
 });

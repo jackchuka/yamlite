@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { isEmbedded } from "@/lib/embedded";
 import { staticSnapshot } from "@/lib/mode";
 import { useEvents, useMeta } from "@/lib/providers";
 import { formatAgo } from "@/lib/format";
@@ -39,16 +40,20 @@ export function StatusBar() {
           <span className="flex items-center gap-1.5" aria-live="polite">
             <span className={`size-[7px] rounded-full ${connected ? "bg-ok" : "bg-err"}`} />
             {connected ? (
-              <>
-                <span className="max-md:hidden">{m.status_watching({ root: meta?.root ?? "" })}</span>
-                <span className="md:hidden">{m.status_connected()}</span>
-              </>
+              isEmbedded() ? (
+                m.status_connected()
+              ) : (
+                <>
+                  <span className="max-md:hidden">{m.status_watching({ root: meta?.root ?? "" })}</span>
+                  <span className="md:hidden">{m.status_connected()}</span>
+                </>
+              )
             ) : (
               m.status_disconnected()
             )}
           </span>
           <span className="max-md:hidden">{m.status_last_sync({ ago: formatAgo(lastSyncAt, now) })}</span>
-          <span className="max-md:hidden">{location.host}</span>
+          {!isEmbedded() && <span className="max-md:hidden">{location.host}</span>}
         </>
       )}
       <span className="ml-auto flex items-center gap-3.5">

@@ -20,6 +20,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { agentPanel, useAgents } from "@/lib/agent";
 import { warningLinks } from "@/lib/activity";
+import { isEmbedded } from "@/lib/embedded";
 import { openCommandMenu } from "@/lib/commandMenu";
 import { useGit } from "@/lib/git";
 import { groupTables, useCollapsedGroups, useExpandedTables } from "@/lib/groups";
@@ -170,9 +171,13 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
   return (
     <aside className="flex h-full min-h-0 flex-col border-r bg-panel" aria-label={m.nav_sidebar()}>
       <div className="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5 text-base font-bold tracking-tight">
-        <Logo className="size-6" />
-        yamlite
-        <RootInfo />
+        {!isEmbedded() && (
+          <>
+            <Logo className="size-6" />
+            yamlite
+            <RootInfo />
+          </>
+        )}
       </div>
       <div className="mx-2.5 mb-2 flex gap-1.5">
         <button

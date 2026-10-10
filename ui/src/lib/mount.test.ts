@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { isEmbedded } from "./embedded";
 import { isReadOnly } from "./mode";
 import { applyMountOptions } from "./mount";
 
@@ -23,4 +24,12 @@ test("mounting applies the saved theme, or the system's when none is saved", () 
   expect(document.documentElement.dataset.theme).toBe(
     matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
   );
+});
+
+test("embedded is set by the option and cleared when it is left out", () => {
+  const el = document.createElement("div");
+  applyMountOptions(el, { embedded: true });
+  expect(isEmbedded()).toBe(true);
+  applyMountOptions(el, {});
+  expect(isEmbedded()).toBe(false);
 });

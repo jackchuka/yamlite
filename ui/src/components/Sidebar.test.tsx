@@ -2,8 +2,10 @@ import { act, fireEvent, render, renderHook, screen, within } from "@testing-lib
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { agentPanel, useAgentPanelOpen, type AgentMeta } from "@/lib/agent";
 import { api } from "@/lib/api";
+import { setEmbedded } from "@/lib/embedded";
 import { enterStatic } from "@/lib/mode";
 import type { Snapshot, TableMeta } from "@/lib/types";
+import { m } from "@/paraglide/messages.js";
 import { Sidebar } from "./Sidebar";
 
 let here: { table: string; filter?: unknown[] } | null = null;
@@ -96,6 +98,7 @@ beforeEach(() => {
   vi.mocked(api.meta).mockResolvedValue(meta);
 });
 afterEach(() => {
+  setEmbedded(false);
   enterStatic(null);
   here = null;
   agents = [];
@@ -289,4 +292,12 @@ test("a table folded while its item is shown opens again on return and the chevr
   expect(screen.getByText("idea")).toBeTruthy();
   fireEvent.click(toggle);
   expect(screen.queryByText("idea")).toBeNull();
+});
+
+test("embedded in another product, the sidebar has no yamlite logo and no local folder details", async () => {
+  setEmbedded(true);
+  await renderSidebar();
+  const sidebar = screen.getByRole("complementary", { name: "sidebar" });
+  expect(within(sidebar).queryByText("yamlite")).toBeNull();
+  expect(within(sidebar).queryByRole("button", { name: m.nav_root_info() })).toBeNull();
 });
