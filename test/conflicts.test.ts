@@ -10,8 +10,8 @@ const header = (key: string, winner: string) =>
 test("backups never overwrite each other", () => {
   const dir = tmpRoot();
   const now = new Date(0);
-  const p1 = saveConflict(dir, "t", "a b", { x: 1 }, "file", now);
-  const p2 = saveConflict(dir, "t", "a:b", { x: 2 }, "db", now);
+  const p1 = saveConflict(dir, "t", "a b", { x: 1 }, "file", { now });
+  const p2 = saveConflict(dir, "t", "a:b", { x: 2 }, "db", { now });
   expect(p1).not.toBe(p2);
   expect(read(p1)).toBe(`${header("a b", "file")}x: 1\n`);
   expect(read(p2)).toBe(`${header("a:b", "db")}x: 2\n`);
@@ -20,7 +20,7 @@ test("backups never overwrite each other", () => {
 
 test("the header keeps the original key, which the file name cannot", () => {
   const dir = tmpRoot();
-  const p = saveConflict(dir, "t", "automation/CAP-001", { x: 1 }, "file", new Date(0));
+  const p = saveConflict(dir, "t", "automation/CAP-001", { x: 1 }, "file", { now: new Date(0) });
   expect(p).toContain("automation_CAP-001");
   expect(readConflictHeader(read(p))).toEqual({
     table: "t",
@@ -32,7 +32,7 @@ test("the header keeps the original key, which the file name cannot", () => {
 
 test("a deleted side is written after the header", () => {
   const dir = tmpRoot();
-  const p = saveConflict(dir, "t", "a", null, "db", new Date(0));
+  const p = saveConflict(dir, "t", "a", null, "db", { now: new Date(0) });
   expect(read(p)).toBe(`${header("a", "db")}${DELETED_MARKER}\n`);
 });
 

@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
+import { relative, sep } from "node:path";
 import { mismatches, preferFileValues, recordToRow, rowToRecord } from "./codec.ts";
-import { saveConflict } from "./conflicts.ts";
-import { hashRecord } from "./hash.ts";
+import { type ConflictSource, saveConflict } from "./conflicts.ts";
+import { hashContent, hashRecord } from "./hash.ts";
 import { reconcileIndexes, type SchemaChange } from "./indexes.ts";
 import { migrateSchema, type Schema } from "./migrate.ts";
 import { planTable, type Registered, type TablePlan, undeclaredColumns } from "./plan.ts";
@@ -203,7 +205,8 @@ function applyToDb(
     const dbRecord = row ? rowToRecord(row, p.types, p.omit) : null;
     if (decision.conflict) {
       const loser = decision.conflict === "file" ? dbRecord : fileRecord;
-      const savedTo = saveConflict(ctx.stateDir, spec.name, key, loser, decision.conflict);
+      const source = decision.conflict === "db" && fileRecord !== null ? fileSource(spec, files, key) : undefined;
+      const savedTo = saveConflict(ctx.stateDir, spec.name, key, loser, decision.conflict, { source });
       res.conflicts.push({ table: spec.name, key, winner: decision.conflict, savedTo });
     }
     if (decision.action === "toDb") {
@@ -250,6 +253,20 @@ function applyToDb(
     }
   }
   return { fileOps, names };
+}
+
+// the losing file as this sync read it, so a restore can bring back its comments and styles;
+// none when it changed since, as its text would no longer hold the values saved with it
+function fileSource(spec: TableSpec, files: SourceRead, key: string): ConflictSource | undefined {
+  const path = files.paths.get(key);
+  if (path === undefined) return undefined;
+  try {
+    const text = readFileSync(path, "utf8");
+    if (hashContent(text) !== files.stamps.get(path)?.contentHash) return undefined;
+    return { file: relative(spec.path, path).split(sep).join("/"), text };
+  } catch {
+    return undefined;
+  }
 }
 
 function applyToFiles(

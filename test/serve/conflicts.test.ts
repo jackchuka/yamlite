@@ -15,7 +15,7 @@ const idOf = (path: string, table = "tasks") => encodeURIComponent(`${table}/${p
 
 test("a backup is listed with its key and restored over the winner", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\nnote: n\n" });
-  const path = saveConflict(t.stateDir, "tasks", "a", { title: "OLD" }, "file", new Date(1000));
+  const path = saveConflict(t.stateDir, "tasks", "a", { title: "OLD" }, "file", { now: new Date(1000) });
   const list = await t.api("/api/conflicts");
   expect(list.body.conflicts).toEqual([
     {
@@ -123,6 +123,69 @@ test("restoring brings back a record that is gone", async () => {
   await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
   await waitFor(() => existsSync(join(t!.root, "tasks/b.yaml")));
   expect(read(join(t.root, "tasks/b.yaml"))).toBe("title: B\nn: 5\n");
+});
+
+test("restoring a saved file over a record that is gone writes the file back as it was", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  const text = "# mine\ntitle: B\ntags: [x, y]\n";
+  const path = saveConflict(t.stateDir, "tasks", "b", { title: "B", tags: ["x", "y"] }, "db", {
+    source: { file: "b.yml", text },
+  });
+  expect((await t.api(`/api/conflicts/${idOf(path)}`)).body).toMatchObject({ saved: { title: "B", tags: ["x", "y"] } });
+  expect((await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" })).status).toBe(200);
+  await waitFor(() => existsSync(join(t!.root, "tasks/b.yml")));
+  expect(read(join(t.root, "tasks/b.yml"))).toBe(text);
+  expect(existsSync(join(t.root, "tasks/b.yaml"))).toBe(false);
+  await waitFor(() => sql(t!.db, "SELECT title FROM tasks WHERE id = 'b'")[0]?.title === "B");
+  expect((await t.api("/api/conflicts")).body.conflicts).toHaveLength(1);
+});
+
+test("a restore that deletes a file saves it as it was, so restoring back brings it back unchanged", async () => {
+  const text = "# mine\ntitle: A\ntags: [x, y]\n";
+  t = await startServe({ "tasks/a.yaml": text });
+  const path = saveConflict(t.stateDir, "tasks", "a", null, "db");
+  await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
+  await waitFor(() => !existsSync(join(t!.root, "tasks/a.yaml")));
+  const [swap] = (await t.api("/api/conflicts")).body.conflicts;
+  await t.api(`/api/conflicts/${encodeURIComponent(swap.id)}/restore`, { method: "POST" });
+  await waitFor(() => existsSync(join(t!.root, "tasks/a.yaml")));
+  expect(read(join(t.root, "tasks/a.yaml"))).toBe(text);
+});
+
+test("a saved file is written only where the record's own file would be", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  const path = saveConflict(t.stateDir, "tasks", "b", { title: "B" }, "db", {
+    source: { file: "../escape.yaml", text: "title: B\n" },
+  });
+  await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
+  await waitFor(() => existsSync(join(t!.root, "tasks/b.yaml")));
+  expect(existsSync(join(t.root, "escape.yaml"))).toBe(false);
+});
+
+test("the swap backup keeps the file only when it holds the database's values", async () => {
+  t = await startServe({ "tasks/a.yaml": "# mine\ntitle: A\n" }, undefined, {
+    watch: { pollMs: 60_000, debounceMs: 50 },
+  });
+  await waitFor(() => sql(t!.db, "SELECT title FROM tasks")[0]?.title === "A");
+  sql(t.db, "UPDATE tasks SET title = 'DB' WHERE id = 'a'");
+  const path = saveConflict(t.stateDir, "tasks", "a", null, "db");
+  await t.api(`/api/conflicts/${idOf(path)}/restore`, { method: "POST" });
+  const [swap] = (await t.api("/api/conflicts")).body.conflicts;
+  const detail = (await t.api(`/api/conflicts/${encodeURIComponent(swap.id)}`)).body;
+  expect(detail.saved).toEqual({ title: "DB" });
+  expect(detail.text).not.toContain("# mine");
+});
+
+test("a saved file its table can no longer read is listed but cannot be restored", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" });
+  const page = "---\ntitle: Guide\n---\n\n# Guide\n";
+  const path = saveConflict(t.stateDir, "docs", "guide", { title: "Guide" }, "db", {
+    source: { file: "guide.md", text: page },
+  });
+  const detail = await t.api(`/api/conflicts/${idOf(path, "docs")}`);
+  expect(detail.status).toBe(200);
+  expect(detail.body).toMatchObject({ entry: { restorable: false }, saved: null });
+  expect((await t.api(`/api/conflicts/${idOf(path, "docs")}/restore`, { method: "POST" })).status).toBe(400);
 });
 
 test("backups without a header are listed but cannot be restored", async () => {

@@ -20,7 +20,12 @@ export interface ConflictBackup {
   deleted: boolean;
   record: Rec | null;
   text: string;
+  // the record's file as it was, and its path below the table folder
+  source: { file: string; text: string } | null;
 }
+
+// reads a saved file the way its table reads files; null when it cannot
+export type ReadSource = (table: string, key: string, text: string) => Rec | null;
 
 const conflictsDir = (stateDir: string) => join(stateDir, "conflicts");
 
@@ -71,13 +76,21 @@ function locate(stateDir: string, id: string): { table: string; file: string; pa
   return { table, file, path };
 }
 
-export function readConflict(stateDir: string, id: string): ConflictBackup {
+export function readConflict(stateDir: string, id: string, readSource: ReadSource): ConflictBackup {
   const { table, file, path } = locate(stateDir, id);
   const text = readFileSync(path, "utf8");
   const entry = entryFor(table, file, text, statSync(path).mtime);
   const deleted = text.split("\n").includes(DELETED_MARKER);
-  const record = deleted ? null : (((parse(text, { intAsBigInt: true }) as Rec | null) ?? {}) as Rec);
-  return { entry, deleted, record, text };
+  const header = readConflictHeader(text);
+  if (deleted || header?.source === undefined) {
+    const record = deleted ? null : (((parse(text, { intAsBigInt: true }) as Rec | null) ?? {}) as Rec);
+    return { entry, deleted, record, text, source: null };
+  }
+  // a saved file is read the way its table reads files; one it can no longer read is kept for restoring by hand
+  const body = text.slice(text.indexOf("\n") + 1);
+  const record = readSource(table, header.key, body);
+  if (record === null) return { entry: { ...entry, restorable: false }, deleted, record, text, source: null };
+  return { entry, deleted, record, text, source: { file: header.source, text: body } };
 }
 
 export function dismissConflict(stateDir: string, id: string): void {

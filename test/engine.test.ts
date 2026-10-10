@@ -161,6 +161,21 @@ describe("dir mode", () => {
     expect(read(r.conflicts[0]?.savedTo as string)).toMatch(/^# yamlite: .*"winner":"db".*\ntitle: FILE\n$/);
   });
 
+  test("a file that loses a conflict is saved as it was, comments and styles included", () => {
+    const t = setup();
+    write(t.file, "title: A\n");
+    t.sync();
+    const edited = "# mine\ntitle: FILE\ntags: [x, y]\n";
+    write(t.file, edited);
+    sql(t.db, "DELETE FROM tasks WHERE id = 'a'");
+    const r = t.sync();
+    expect(r.conflicts[0]).toMatchObject({ key: "a", winner: "db" });
+    expect(existsSync(t.file)).toBe(false);
+    const saved = read(r.conflicts[0]?.savedTo as string);
+    expect(saved).toMatch(/^# yamlite: .*"source":"a.yaml".*\n/);
+    expect(saved.slice(saved.indexOf("\n") + 1)).toBe(edited);
+  });
+
   test("conflict with an older db time: the newer file wins", () => {
     const t = setup();
     write(t.file, "title: A\n");
