@@ -5,7 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { ArrowLeft, Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +46,12 @@ const isDark = () => document.documentElement.dataset.theme === "dark";
 
 // Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
 export function useDismiss(close: () => void, enabled = true) {
+  // a link that opens the drawer can render it while its click is still bubbling; that click is not outside it.
+  // Taken once per opening: the effect below re-registers on every render, and so do clicks that re-render the parent
+  const opening = useRef<Event | undefined>(undefined);
+  useEffect(() => {
+    if (enabled) opening.current = window.event;
+  }, [enabled]);
   useEffect(() => {
     if (!enabled) return;
     // dialogs, menus and toasts render in portals outside the drawer, and a row opens its own record
@@ -54,6 +60,7 @@ export function useDismiss(close: () => void, enabled = true) {
     // on click, not pointerdown, so that whatever was clicked acts before the drawer goes away;
     // the path is fixed at dispatch, so a clicked element that removed itself still counts as inside
     const onClick = (e: MouseEvent) => {
+      if (e === opening.current) return;
       const path = e.composedPath();
       if (path.length === 0 || !(path[0] instanceof Element)) return;
       if (!path.some((node) => node instanceof Element && node.matches(keepers))) close();
