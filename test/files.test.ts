@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { claims, FilesSource, invalidKey, matchesFiles } from "../src/source/files.ts";
 import { YAML_GLOB } from "../src/source/yamldoc.ts";
-import { read, tmpRoot, write } from "./helpers.ts";
+import { browserFs, read, tmpRoot, write } from "./helpers.ts";
 
 const setup = () => {
   const dir = join(tmpRoot(), "tasks");
@@ -61,7 +61,7 @@ describe("FilesSource.read", () => {
     expect(r.records.get("s")).toEqual({ x: 3n });
   });
 
-  test("symlinked folders are followed and loops are skipped with a warning", () => {
+  test.skipIf(browserFs)("symlinked folders are followed and loops are skipped with a warning", () => {
     const { dir, src } = setup();
     const outside = join(tmpRoot(), "shared");
     write(join(outside, "s.yaml"), "x: 1\n");
@@ -74,7 +74,7 @@ describe("FilesSource.read", () => {
   });
 
   // a dangling link may be an unmounted folder of records, so it is never read as a deletion
-  test("a dangling symlink stops the table, whatever its name", () => {
+  test.skipIf(browserFs)("a dangling symlink stops the table, whatever its name", () => {
     for (const name of ["stale-link", "b.yaml"]) {
       const { dir, src } = setup();
       write(join(dir, "a.yaml"), "x: 1\n");
@@ -83,7 +83,7 @@ describe("FilesSource.read", () => {
     }
   });
 
-  test.skipIf(process.getuid?.() === 0)("an unreadable subfolder stops the table", () => {
+  test.skipIf(process.getuid?.() === 0 || browserFs)("an unreadable subfolder stops the table", () => {
     const { dir, src } = setup();
     write(join(dir, "a.yaml"), "x: 1\n");
     write(join(dir, "locked/b.yaml"), "x: 2\n");

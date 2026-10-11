@@ -1,4 +1,5 @@
-import { existsSync } from "node:fs";
+// "fs", not "node:fs": the real disk, whatever node:fs is aliased to
+import { existsSync } from "fs";
 import { expect, test } from "vitest";
 import { browserAliases } from "../src/browser/aliases.ts";
 

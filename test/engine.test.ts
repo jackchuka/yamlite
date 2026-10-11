@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import { type EngineContext, type SyncOptions, syncTable } from "../src/engine.ts";
 import { Store } from "../src/store.ts";
 import type { Mode, TableSpec } from "../src/types.ts";
-import { read, sql, tmpRoot, write } from "./helpers.ts";
+import { browserFs, read, sql, tmpRoot, write } from "./helpers.ts";
 
 function setup(mode: Mode = "files") {
   const root = tmpRoot();
@@ -49,7 +49,7 @@ const types = (db: string, table: string) =>
   sql(db, `SELECT name, type FROM pragma_table_info('${table}')`).map((r) => `${r.name}:${r.type}`);
 
 describe("dir mode", () => {
-  test.skipIf(process.getuid?.() === 0)(
+  test.skipIf(process.getuid?.() === 0 || browserFs)(
     "a subfolder that cannot be searched fails the table and keeps every row",
     () => {
       const t = setup();
@@ -90,19 +90,22 @@ describe("dir mode", () => {
     expect(existsSync(join(t.path, "g"))).toBe(false);
   });
 
-  test.skipIf(process.getuid?.() === 0)("an unreadable subfolder fails the table and keeps every row", () => {
-    const t = setup();
-    write(join(t.path, "a.yaml"), "n: 1\n");
-    write(join(t.path, "locked/b.yaml"), "n: 2\n");
-    expect(t.sync()).toMatchObject({ ok: true });
-    chmodSync(join(t.path, "locked"), 0o000);
-    try {
-      expect(t.sync()).toMatchObject({ ok: false, error: expect.stringMatching(/EACCES/) });
-      expect(sql(t.db, "SELECT id FROM tasks ORDER BY id")).toEqual([{ id: "a" }, { id: "locked/b" }]);
-    } finally {
-      chmodSync(join(t.path, "locked"), 0o755);
-    }
-  });
+  test.skipIf(process.getuid?.() === 0 || browserFs)(
+    "an unreadable subfolder fails the table and keeps every row",
+    () => {
+      const t = setup();
+      write(join(t.path, "a.yaml"), "n: 1\n");
+      write(join(t.path, "locked/b.yaml"), "n: 2\n");
+      expect(t.sync()).toMatchObject({ ok: true });
+      chmodSync(join(t.path, "locked"), 0o000);
+      try {
+        expect(t.sync()).toMatchObject({ ok: false, error: expect.stringMatching(/EACCES/) });
+        expect(sql(t.db, "SELECT id FROM tasks ORDER BY id")).toEqual([{ id: "a" }, { id: "locked/b" }]);
+      } finally {
+        chmodSync(join(t.path, "locked"), 0o755);
+      }
+    },
+  );
 
   test("file to db with inferred types, then a no-op", () => {
     const t = setup();
@@ -492,7 +495,7 @@ describe("list mode", () => {
     expect(t.sync()).toMatchObject({ ok: true, toDb: 0, toFile: 0 });
   });
 
-  test("a symlinked list file stays a symlink and its target gets the change", () => {
+  test.skipIf(browserFs)("a symlinked list file stays a symlink and its target gets the change", () => {
     const t = setup("list");
     const target = join(dirname(t.path), "data", "real.yaml");
     write(target, "- id: 1\n  name: Ann\n");

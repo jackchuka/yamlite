@@ -5,10 +5,26 @@ import { browserAliases } from "./src/browser/aliases.ts";
 
 // test modes for the browser build:
 // - YAMLITE_SQLITE=wasm runs the node tests on sqlite-wasm instead of node:sqlite
-// - YAMLITE_FS=mem on top of it puts node:fs in memory
+// - YAMLITE_FS=browser on top of it swaps in the browser build's node:fs and chokidar, for the tests of what that
+//   build runs
 // - YAMLITE_BROWSER=1 runs yamlite's core in a worker in Chromium and WebKit, with the database in OPFS
 const wasm = process.env.YAMLITE_SQLITE === "wasm";
-const mem = wasm && process.env.YAMLITE_FS === "mem";
+const browserFs = wasm && process.env.YAMLITE_FS === "browser";
+// what the browser build does not have: git, agents, the CLI, the HTTP server and static export
+const notInBrowser = [
+  "test/agent/**",
+  "test/git/**",
+  "test/githistory.test.ts",
+  "test/cli.test.ts",
+  "test/export.test.ts",
+  "test/guide.test.ts",
+  "test/serve/agent.test.ts",
+  "test/serve/git.test.ts",
+  "test/serve/git-driver.test.ts",
+  "test/serve/history.test.ts",
+  "test/serve/http.test.ts",
+  "test/serve/review.test.ts",
+];
 const browser = process.env.YAMLITE_BROWSER === "1";
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const sqlite = { find: /^node:sqlite$/, replacement: here("./src/browser/sqlite.ts") };
@@ -40,11 +56,19 @@ export default defineConfig({
         ? [
             {
               test: {
-                name: mem ? "wasm+memfs" : "wasm",
+                name: browserFs ? "wasm+browserfs" : "wasm",
                 include: ["test/**/*.test.ts"],
-                exclude: ["test/browser/**"],
+                exclude: ["test/browser/**", ...(browserFs ? notInBrowser : [])],
                 setupFiles: ["test/wasm/setup.ts"],
-                alias: [sqlite, ...(mem ? [{ find: /^node:fs$/, replacement: here("./test/wasm/memfs.ts") }] : [])],
+                alias: [
+                  sqlite,
+                  ...(browserFs
+                    ? [
+                        { find: /^node:fs$/, replacement: here("./test/wasm/browserfs.ts") },
+                        { find: /^chokidar$/, replacement: here("./src/browser/chokidar.ts") },
+                      ]
+                    : []),
+                ],
               },
             },
           ]

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { expandPath, filesOf, resolveConfig } from "../src/config.ts";
 import type { TableSpec } from "../src/types.ts";
-import { dataRoot, tmpRoot, write } from "./helpers.ts";
+import { browserFs, dataRoot, tmpRoot, write } from "./helpers.ts";
 
 test("discovers tables by convention", () => {
   const root = tmpRoot();
@@ -219,7 +219,7 @@ test("rejects table names that are not plain names", () => {
   }
 });
 
-test("discovers symlinked tables", () => {
+test.skipIf(browserFs)("discovers symlinked tables", () => {
   const root = dataRoot();
   const outside = tmpRoot();
   write(join(outside, "tasks", "a.yaml"), "x: 1\n");
