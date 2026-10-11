@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { PageHost } from "@/lib/pages/host";
 import { injectPage } from "@/lib/pages/inject";
+import { pageFrame } from "@/lib/pageFrame";
 import { useEventStore, useMeta } from "@/lib/providers";
 import { useTheme } from "@/lib/theme";
 import type { Meta, PageMeta } from "@/lib/types";
@@ -95,11 +96,15 @@ export function PageView({ name }: { name: string }) {
   if (!meta) return null;
   if (!page) return <div className="p-6 text-muted-foreground">{m.page_not_found()}</div>;
   const table = opened ? meta.tables.find((t) => t.name === opened.table) : undefined;
-  // the first load is the srcdoc itself; any later one means the page navigated its frame somewhere else
+  const frameUrl = pageFrame();
+  // the first load is the srcdoc itself, or the host's frame and then the document posted to it; any later one
+  // means the page navigated its frame somewhere else
   const onLoad = (e: SyntheticEvent<HTMLIFrameElement>) => {
     if (counted.current.el !== e.currentTarget) counted.current = { el: e.currentTarget, n: 0 };
     counted.current.n += 1;
-    if (counted.current.n > 1) setNavigated(true);
+    if (frameUrl !== undefined && counted.current.n === 1)
+      e.currentTarget.contentWindow?.postMessage({ yamlite: 1, document: srcDoc }, "*");
+    if (counted.current.n > (frameUrl === undefined ? 1 : 2)) setNavigated(true);
   };
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
@@ -137,7 +142,7 @@ export function PageView({ name }: { name: string }) {
             ref={frame}
             title={page.title}
             sandbox="allow-scripts"
-            srcDoc={srcDoc}
+            {...(frameUrl === undefined ? { srcDoc } : { src: frameUrl })}
             onLoad={onLoad}
             className="min-h-0 flex-1 border-0 bg-background"
           />
