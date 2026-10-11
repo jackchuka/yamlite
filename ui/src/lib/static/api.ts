@@ -165,6 +165,8 @@ export function createStaticApi(opts: {
     remove: refuse,
     createTable: refuse,
     setGroup: refuse,
+    previewRules: refuse,
+    saveRules: refuse,
     restore: refuse,
     dismiss: refuse,
   };

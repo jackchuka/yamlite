@@ -7,6 +7,10 @@ import type {
   RecordDetail,
   Row,
   RowsPage,
+  RuleTarget,
+  Rules,
+  RulesPreview,
+  SchemaEdit,
   SearchResult,
   SqlResult,
   TableSchema,
@@ -132,6 +136,10 @@ export const httpApi = {
   setGroup: (table: string, group: string | null) =>
     request<{ name: string; group: string | null }>("PATCH", `/api/tables/${enc(table)}`, { group }),
   sql: (sql: string) => request<SqlResult>("POST", "/api/sql", { sql }),
+  previewRules: (target: RuleTarget, rules: Rules, base: string, edit: SchemaEdit = {}) =>
+    request<RulesPreview>("POST", "/api/rules/preview", { target, rules, base, ...edit }),
+  saveRules: (target: RuleTarget, rules: Rules, base: string, edit: SchemaEdit = {}) =>
+    request<RulesPreview & { base: string }>("PUT", "/api/rules", { target, rules, base, ...edit }),
   pageHtml: (name: string) => request<{ html: string }>("GET", `/api/pages/${enc(name)}/html`).then((r) => r.html),
   pageSql: (name: string, sql: string) => request<SqlResult>("POST", "/api/sql", { sql, page: name }),
   conflicts: () => request<{ conflicts: ConflictEntry[] }>("GET", "/api/conflicts"),
@@ -168,6 +176,8 @@ export const api: Api = {
   historyDiff: (table, key, rev) => backend.historyDiff(table, key, rev),
   createTable: (body) => backend.createTable(body),
   setGroup: (table, group) => backend.setGroup(table, group),
+  previewRules: (t, r, b, e) => backend.previewRules(t, r, b, e),
+  saveRules: (t, r, b, e) => backend.saveRules(t, r, b, e),
   sql: (sql) => backend.sql(sql),
   pageHtml: (name) => backend.pageHtml(name),
   pageSql: (name, sql) => backend.pageSql(name, sql),

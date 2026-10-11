@@ -310,6 +310,7 @@
   "rules_unique": "Unique",
   "rules_remove_index": "Remove {index}",
   "rules_add_view": "Add view",
+  "rules_view_column": "JSON column",
   "rules_remove_view": "Remove {view}",
   "rules_remove_view_confirm": "Removing {view} also removes its rules.",
   "rules_index_added": "+ index {index}",

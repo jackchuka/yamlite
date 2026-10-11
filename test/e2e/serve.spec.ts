@@ -426,3 +426,42 @@ test("search finds a record in another table and lists every hit", async ({ page
   await expect(page.getByRole("region", { name: "tasks" })).toContainText("t1");
   await expect(page.getByRole("region", { name: "tasks" })).not.toContainText("t2");
 });
+
+test("rules are edited from the schema and apply at once", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "title: A\n", "tasks/b.yaml": "status: todo\n" }, (r) => (app = r));
+  const running = app;
+  await page.goto(`${running.url}#/t/tasks`);
+  await page.getByRole("button", { name: /Schema/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Edit rules" }).click();
+  await dialog.getByRole("button", { name: /^title/ }).click();
+  await dialog.getByLabel("Required").check();
+  await expect(dialog.getByText(/Saving adds \d+ warnings?/)).toBeVisible();
+  await dialog.getByRole("button", { name: "Save to yamlite.yaml" }).click();
+  await expect(dialog).not.toContainText("Save to yamlite.yaml");
+  expect(file(running, "yamlite.yaml")).toContain("required: [title]");
+  await page.keyboard.press("Escape");
+  await page.getByRole("row", { name: /\bb\b/ }).click();
+  const drawer = page.getByRole("complementary", { name: "record" });
+  await expect(drawer.getByLabel("required")).toHaveCount(1);
+  await expect(drawer.getByLabel("required")).toHaveText("*");
+});
+
+test("an index added in the rule editor is written to yamlite.yaml and created", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "status: todo\n", "tasks/b.yaml": "status: done\n" }, (r) => (app = r));
+  const running = app;
+  await page.goto(`${running.url}#/t/tasks`);
+  await page.getByRole("button", { name: /Schema/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Edit rules" }).click();
+  await dialog.getByRole("button", { name: "+ Add index" }).click();
+  await dialog.getByLabel("Column", { exact: true }).selectOption("status");
+  await dialog.getByRole("button", { name: "Add column" }).click();
+  await dialog.getByRole("button", { name: "Add index", exact: true }).click();
+  await expect(dialog.getByText("+ index (status)")).toBeVisible();
+  await dialog.getByRole("button", { name: "Save to yamlite.yaml" }).click();
+  await expect(dialog).not.toContainText("Save to yamlite.yaml");
+  expect(file(running, "yamlite.yaml")).toMatch(/indexes:\n\s+- \[status\]\n/);
+  const row = dialog.getByRole("row", { name: /\(status\)/ });
+  await expect(row).toContainText("Created");
+});

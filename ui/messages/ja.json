@@ -283,6 +283,7 @@
   "rules_unique": "一意",
   "rules_remove_index": "{index} を削除",
   "rules_add_view": "ビューを追加",
+  "rules_view_column": "JSON 列",
   "rules_remove_view": "{view} を削除",
   "rules_remove_view_confirm": "{view} を削除すると、そのルールも削除されます。",
   "rules_index_added": "+ インデックス {index}",

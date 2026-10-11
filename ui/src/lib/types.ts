@@ -82,6 +82,8 @@ export interface Meta {
 }
 
 export interface TableSchema {
+  // absent in a static export
+  base?: string;
   name: string;
   mode: "files" | "list";
   // files tables: the glob as yamlite.yaml writes it
@@ -243,3 +245,36 @@ export interface SearchHit {
 export interface SearchResult {
   hits: SearchHit[];
 }
+
+export interface RuleTarget {
+  table: string;
+  path: string[];
+}
+
+export interface Rules {
+  required: string[];
+  values: Record<string, AllowedValue[]>;
+  formats: Record<string, ColumnFormat>;
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
+  references: Record<string, string>;
+}
+
+export type IndexEdit = { columns: string[]; unique: boolean } | { expr: string; unique: boolean };
+
+// absent fields are left as yamlite.yaml has them
+export interface SchemaEdit {
+  // the table's complete index list
+  indexes?: IndexEdit[];
+  // the fields expanded directly under the target
+  views?: string[];
+}
+
+export interface RulesPreview {
+  added: string[];
+  removed: string[];
+  changed: boolean;
+  indexes?: { added: string[]; removed: string[] };
+}
+
+export type IndexInfo = TableSchema["indexes"][number];
