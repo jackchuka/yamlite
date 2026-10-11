@@ -1,4 +1,4 @@
-import { ChevronDown, History, Square, X } from "lucide-react";
+import { History, Settings, Square, X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -14,23 +14,23 @@ import {
   type ChatItem,
   type ConversationSummary,
   chat,
-  useAgents,
   useChat,
   useConversations,
   usePendingProposals,
 } from "@/lib/agent";
+import { type AiChoice, currentChoice, saveChoice, useAiProviders } from "@/lib/ai";
 import { ApiError } from "@/lib/api";
 import { usePanelWidth } from "@/lib/panelWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { AiSettings } from "./AiSettings";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { ProposalCard } from "./ProposalCard";
 import { m } from "@/paraglide/messages.js";
 
 const markdownStyle =
   "max-w-none min-w-0 [overflow-wrap:anywhere] [&_a]:underline [&_code]:font-mono [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_pre]:overflow-auto [&_table]:text-[14px] [&_ul]:list-disc [&_ul]:pl-5";
-const TOOL_NAME = /^(?:mcp__yamlite__|mcp\.yamlite\.)(\w+)$/;
 const TOOL_LABEL: Record<string, () => string> = {
   schema: m.agent_tool_schema,
   query: m.agent_tool_query,
@@ -41,10 +41,7 @@ const TOOL_LABEL: Record<string, () => string> = {
   check: m.agent_tool_check,
 };
 
-const toolLabel = (title: string) => {
-  const tool = TOOL_NAME.exec(title)?.[1];
-  return tool ? (TOOL_LABEL[tool]?.() ?? tool) : title;
-};
+const toolLabel = (title: string) => TOOL_LABEL[title]?.() ?? title;
 
 function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefined }) {
   const running = last?.kind === "tool" && last.status === "in_progress" ? toolLabel(last.title) : null;
@@ -69,15 +66,10 @@ function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefin
 }
 
 function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
-  const label = item.status === "denied" ? m.agent_denied({ tool: item.title }) : toolLabel(item.title);
+  const label = toolLabel(item.title);
   const sql = (item.input as { sql?: string } | undefined)?.sql;
   return (
-    <details
-      className={cn(
-        "min-w-0 rounded-md border bg-panel px-2.5 py-1.5 text-[14px] text-muted-foreground",
-        item.status === "denied" && "border-err text-err",
-      )}
-    >
+    <details className="min-w-0 rounded-md border bg-panel px-2.5 py-1.5 text-[14px] text-muted-foreground">
       <summary className="cursor-pointer">
         {label}
         {item.status === "in_progress" && " …"}
@@ -93,17 +85,9 @@ function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
 
 const newConversation = () => chat.reset().catch(() => {});
 
-const STATUS_LABEL: Record<ConversationSummary["status"], (() => string) | null> = {
-  active: null,
-  dormant: m.agent_status_dormant,
-  failed: m.agent_status_failed,
-};
-
 function ConversationMenu({ current, onPick }: { current: string | null; onPick: (c: ConversationSummary) => void }) {
   const [open, setOpen] = useState(false);
   const { conversations, loading } = useConversations(open);
-  const agents = useAgents();
-  const agentName = (id: string) => (agents.length > 1 ? agents.find((a) => a.id === id)?.name : undefined);
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
@@ -118,55 +102,44 @@ function ConversationMenu({ current, onPick }: { current: string | null; onPick:
             {loading ? m.common_loading() : m.agent_no_conversations()}
           </DropdownMenuItem>
         ) : (
-          conversations.map((c) => {
-            const status = STATUS_LABEL[c.status]?.();
-            const name = agentName(c.agent);
-            return (
-              <DropdownMenuItem
-                key={c.id}
-                aria-current={c.id === current ? "true" : undefined}
-                className="flex cursor-pointer flex-col items-stretch gap-0.5 py-2 aria-[current]:bg-panel-2"
-                onSelect={() => onPick(c)}
-              >
-                <span className="truncate text-[15px]">{c.title || m.agent_untitled()}</span>
-                <span className="flex gap-2 text-[14px] text-muted-foreground">
-                  <span>{formatWhen(c.updatedAt)}</span>
-                  {name && <span>{name}</span>}
-                  {status && <span className={cn(c.status === "failed" && "text-err")}>{status}</span>}
-                </span>
-              </DropdownMenuItem>
-            );
-          })
+          conversations.map((c) => (
+            <DropdownMenuItem
+              key={c.id}
+              aria-current={c.id === current ? "true" : undefined}
+              className="flex cursor-pointer flex-col items-stretch gap-0.5 py-2 aria-[current]:bg-panel-2"
+              onSelect={() => onPick(c)}
+            >
+              <span className="truncate text-[15px]">{c.title || m.agent_untitled()}</span>
+              <span className="flex gap-2 text-[14px] text-muted-foreground">
+                <span>{formatWhen(c.updatedAt)}</span>
+                <span>{c.model}</span>
+              </span>
+            </DropdownMenuItem>
+          ))
         )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-function startErrorText(e: unknown, agent: { name: string; login: string }): { text: string; command?: string } {
-  if (e instanceof ApiError && e.body.code === "login")
-    return {
-      text: m.agent_login_required({ agent: agent.name }),
-      command: agent.login,
-    };
-  if (e instanceof ApiError && e.body.code === "spawn")
-    return { text: m.agent_spawn_failed({ agent: agent.name, error: e.message }) };
-  return { text: e instanceof Error ? e.message : String(e) };
+function startErrorText(e: unknown): string {
+  if (e instanceof ApiError && e.body.code === "no_key") return m.agent_key_required();
+  return e instanceof Error ? e.message : String(e);
 }
 
 export function AgentPanel() {
-  const agents = useAgents();
+  const providers = useAiProviders();
   const state = useChat();
   const mobile = useIsMobile();
   const [width, setWidth] = usePanelWidth("yamlite-agent-width", 420);
-  const [agentId, setAgentId] = useState(chat.agentId ?? agents[0]?.id ?? "");
+  const [choice, setChoice] = useState<AiChoice | null>(() => (providers ? currentChoice(providers) : null));
+  const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
-  const [startError, setStartError] = useState<{ text: string; command?: string } | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const inFlight = useRef(false);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
-  const agent = agents.find((a) => a.id === agentId) ?? agents[0];
   const pending = usePendingProposals();
   const inChat = new Set(state.items.flatMap((i) => (i.kind === "proposal" ? [i.proposal.id] : [])));
   const earlier = pending.filter((p) => !inChat.has(p.id));
@@ -192,23 +165,31 @@ export function AgentPanel() {
     log.current?.scrollTo?.({ top: log.current.scrollHeight });
   }, [state.items, state.busy]);
 
-  if (!agent) return null;
+  if (!providers) return null;
+  const last = state.items.at(-1);
+  const keyRejected = last?.kind === "error" && last.code === "auth";
+  const showSettings = editing || choice === null || keyRejected;
 
   const submit = async () => {
     const message = text.trim();
-    if (message === "" || state.busy || state.failed || inFlight.current) return;
+    if (message === "" || state.busy || inFlight.current) return;
+    if (!choice) {
+      setEditing(true);
+      return;
+    }
     inFlight.current = true;
     setSending(true);
     setStartError(null);
     try {
       if (!chat.id || state.closed) {
         await chat.reset();
-        await chat.start(agent.id);
+        await chat.start(choice);
       }
       await chat.send(message);
       setText("");
     } catch (e) {
-      setStartError(startErrorText(e, agent));
+      setStartError(startErrorText(e));
+      if (e instanceof ApiError && e.body.code === "no_key") setEditing(true);
     } finally {
       inFlight.current = false;
       setSending(false);
@@ -233,35 +214,25 @@ export function AgentPanel() {
       {!mobile && <PanelResizeHandle width={width} label="Resize AI panel" onResize={setWidth} />}
       <header className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-1">
-          {agents.length > 1 ? (
-            <label className="relative flex items-center">
-              <span className="sr-only">{m.agent_agent()}</span>
-              <select
-                className="appearance-none rounded-md border bg-panel py-1.5 pr-8 pl-2.5 text-[15px]"
-                value={agent.id}
-                onChange={(e) => {
-                  setAgentId(e.target.value);
-                  setStartError(null);
-                  void newConversation();
-                }}
-              >
-                {agents.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-2 size-4" />
-            </label>
-          ) : (
-            <span className="truncate text-[15px] font-semibold">{agent.name}</span>
-          )}
+          <Button
+            variant="ghost"
+            className="min-w-0 shrink text-[14px]"
+            aria-label={m.agent_settings()}
+            aria-expanded={showSettings}
+            onClick={() => setEditing((v) => !v)}
+          >
+            <Settings className="size-4" />
+            <span className="truncate">
+              {choice
+                ? `${providers.find((p) => p.id === choice.provider)?.name ?? choice.provider} · ${choice.model}`
+                : m.agent_settings()}
+            </span>
+          </Button>
           <ConversationMenu
             current={chat.id}
             onPick={(c) => {
               setStartError(null);
-              if (agents.some((a) => a.id === c.agent)) setAgentId(c.agent);
-              chat.open(c.id, c.agent);
+              chat.open(c.id);
             }}
           />
         </div>
@@ -281,6 +252,19 @@ export function AgentPanel() {
           </Button>
         </div>
       </header>
+      {showSettings && (
+        <AiSettings
+          providers={providers}
+          initial={choice}
+          onSave={(c, remember) => {
+            saveChoice(c, remember);
+            setChoice(c);
+            setEditing(false);
+            setStartError(null);
+            void newConversation();
+          }}
+        />
+      )}
       <div
         ref={log}
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3.5 text-[15px] leading-relaxed [&>*]:shrink-0"
@@ -325,12 +309,10 @@ export function AgentPanel() {
           ),
         )}
         <WorkingStatus busy={state.busy} last={state.items.at(-1)} />
-        {state.failed && <p className="text-muted-foreground">{m.agent_resume_failed()}</p>}
         {state.closed && <p className="text-muted-foreground">{m.agent_closed()}</p>}
         {startError && (
           <div role="alert" className="rounded-md border border-err px-3 py-2 text-err">
-            <p>{startError.text}</p>
-            {startError.command && <code className="mt-1 block font-mono">{startError.command}</code>}
+            <p>{startError}</p>
           </div>
         )}
       </div>
@@ -348,7 +330,6 @@ export function AgentPanel() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={state.failed}
           placeholder={m.agent_placeholder()}
           className="w-full resize-none rounded-lg border bg-panel px-3 py-2.5 text-[16px] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
         />
@@ -359,7 +340,7 @@ export function AgentPanel() {
               <Square className="size-4" /> {m.agent_stop()}
             </Button>
           ) : (
-            <Button type="submit" disabled={sending || state.failed || text.trim() === ""}>
+            <Button type="submit" disabled={sending || text.trim() === ""}>
               {m.agent_send()}
             </Button>
           )}

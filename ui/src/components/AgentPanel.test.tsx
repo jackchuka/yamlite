@@ -8,16 +8,28 @@ const send = vi.hoisted(() => vi.fn());
 const open = vi.hoisted(() => vi.fn());
 const reset = vi.hoisted(() => vi.fn(async () => {}));
 const pending = vi.hoisted(() => ({ list: [] as import("@/lib/agent").Proposal[] }));
+const providers = vi.hoisted(() => ({
+  list: [
+    { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true },
+  ] as import("@/lib/ai").AiProvider[],
+}));
+vi.mock("@/lib/ai", async (orig) => ({
+  ...(await orig<typeof import("@/lib/ai")>()),
+  useAiProviders: () => providers.list,
+}));
 vi.mock("@/lib/agent", async (orig) => {
   const real = await orig<typeof import("@/lib/agent")>();
   return {
     ...real,
-    useAgents: () => [{ id: "claude", name: "Claude Code", login: "claude" }],
     usePendingProposals: () => pending.list,
     chat: Object.assign(Object.create(real.chat), { id: null, start, send, open, stop: vi.fn(), reset }),
   };
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  providers.list = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+});
 
 const renderPanel = () =>
   render(
@@ -38,18 +50,7 @@ test("Enter sends, Shift+Enter and IME composition do not", async () => {
   expect(send).not.toHaveBeenCalled();
   fireEvent.keyDown(box, { key: "Enter" });
   await waitFor(() => expect(send).toHaveBeenCalledWith("にほんご"));
-  expect(start).toHaveBeenCalledWith("claude");
-});
-
-test("a login failure tells the user what to run", async () => {
-  const { ApiError } = await import("@/lib/api");
-  start.mockRejectedValue(new ApiError(502, "auth", { code: "login" }));
-  renderPanel();
-  const box = screen.getByRole("textbox", { name: "Request to the AI" });
-  fireEvent.change(box, { target: { value: "hi" } });
-  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send" })));
-  expect(await screen.findByText(/in a terminal/)).toBeTruthy();
-  expect(screen.getByText("claude")).toBeTruthy();
+  expect(start).toHaveBeenCalledWith({ provider: "anthropic", model: "claude-sonnet-5-5", apiKey: "" });
 });
 
 type AgentModule = typeof import("@/lib/agent");
@@ -72,27 +73,39 @@ test("agent links open in a new tab and images are dropped", async () => {
   expect(document.querySelector("img")).toBeNull();
 });
 
-test("tool lines are labelled for both Claude and Codex names, and denied ones say so", async () => {
+test("tool lines are labelled by tool name", async () => {
   renderPanel();
   await setChat({
     items: [
-      { kind: "tool", id: "1", title: "mcp.yamlite.query", status: "completed" },
-      { kind: "tool", id: "2", title: "mcp__yamlite__schema", status: "completed" },
-      { kind: "tool", id: "3", title: "Bash", status: "denied" },
+      { kind: "tool", id: "1", title: "query", status: "completed" },
+      { kind: "tool", id: "2", title: "schema", status: "completed" },
     ],
   });
   expect(screen.getByText("Searching")).toBeTruthy();
   expect(screen.getByText("Checking the tables")).toBeTruthy();
-  expect(screen.getByText(/Stopped an operation that isn.t allowed \(Bash\)/)).toBeTruthy();
 });
 
-test("a spawn failure shows the reason", async () => {
-  const { ApiError } = await import("@/lib/api");
-  start.mockRejectedValue(new ApiError(502, "no such file", { code: "spawn" }));
+test("without a key the settings form comes first, and saving starts with the chosen model", async () => {
+  providers.list = [{ id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], hasKey: false }];
+  start.mockResolvedValue(undefined);
+  send.mockResolvedValue(undefined);
   renderPanel();
+  const form = screen.getByRole("form", { name: "AI settings" });
+  fireEvent.change(screen.getByLabelText("Model"), { target: { value: "gpt-5-mini" } });
+  fireEvent.change(screen.getByLabelText("API key"), { target: { value: "sk-test" } });
+  await act(async () => fireEvent.submit(form));
+  expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
   fireEvent.change(screen.getByRole("textbox", { name: "Request to the AI" }), { target: { value: "hi" } });
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "Send" })));
-  expect(await screen.findByText(/Couldn.t start .*: no such file/)).toBeTruthy();
+  expect(start).toHaveBeenCalledWith({ provider: "openai", model: "gpt-5-mini", apiKey: "sk-test" });
+  expect(localStorage.getItem("yamlite-ai")).not.toContain("sk-test");
+});
+
+test("an auth error in the chat opens the settings", async () => {
+  renderPanel();
+  expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
+  await setChat({ items: [{ kind: "error", code: "auth", message: "rejected" }] });
+  expect(screen.getByRole("form", { name: "AI settings" })).toBeTruthy();
 });
 
 test("a busy chat shows stop instead of send", async () => {
@@ -147,7 +160,7 @@ test("the status row names the tool that is running", async () => {
   renderPanel();
   await setChat({
     busy: true,
-    items: [{ kind: "tool", id: "1", title: "mcp__yamlite__query", status: "in_progress" }],
+    items: [{ kind: "tool", id: "1", title: "query", status: "in_progress" }],
   });
   expect(screen.getByRole("status").textContent).toContain("Searching…");
 });
@@ -163,34 +176,22 @@ test("the Conversations menu lists conversations and opens the chosen one", asyn
   const { agentApi } = await import("@/lib/agent");
   vi.spyOn(agentApi, "conversations").mockResolvedValue({
     conversations: [
-      { id: "c2", agent: "claude", title: "今週のタスク", updatedAt: ago(1), status: "active" },
-      { id: "c1", agent: "claude", title: "牛乳を完了に", updatedAt: ago(30), status: "dormant" },
-      { id: "c0", agent: "claude", title: "古い会話", updatedAt: ago(60), status: "failed" },
+      { id: "c2", provider: "anthropic", model: "claude-sonnet-5-5", title: "今週のタスク", updatedAt: ago(1) },
+      { id: "c1", provider: "openai", model: "gpt-5", title: "牛乳を完了に", updatedAt: ago(30) },
     ],
   });
   renderPanel();
   fireEvent.keyDown(screen.getByRole("button", { name: "Conversations" }), { key: "Enter" });
   const item = await screen.findByRole("menuitem", { name: /牛乳を完了に/ });
-  expect(item.textContent).toContain("Dormant");
-  expect(screen.getByRole("menuitem", { name: /古い会話/ }).textContent).toContain("Can't resume");
-  expect(screen.getByRole("menuitem", { name: /今週のタスク/ }).textContent).not.toMatch(/Dormant|Can.t resume/);
+  expect(item.textContent).toContain("gpt-5");
   fireEvent.click(item);
-  expect(open).toHaveBeenCalledWith("c1", "claude");
+  expect(open).toHaveBeenCalledWith("c1");
 });
 
 test("New conversation starts a fresh chat without ending the old one", async () => {
   renderPanel();
   fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
   expect(reset).toHaveBeenCalled();
-});
-
-test("a failed conversation keeps its history and disables the input with a note", async () => {
-  renderPanel();
-  await setChat({ failed: true, items: [{ kind: "user", text: "前の依頼" }] });
-  expect(screen.getByText("前の依頼")).toBeTruthy();
-  expect(screen.getByText("This conversation couldn't be resumed. Continue in a new conversation.")).toBeTruthy();
-  expect((screen.getByRole("textbox", { name: "Request to the AI" }) as HTMLTextAreaElement).disabled).toBe(true);
-  expect((screen.getByRole("button", { name: "Send" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
 test("Escape closes the panel", async () => {

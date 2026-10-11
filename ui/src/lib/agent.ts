@@ -1,17 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
+import { type AiChoice, useAiProviders } from "./ai";
 import { request } from "./api";
-import { isReadOnly } from "./mode";
 import { transport } from "./transport";
-import { queryClient, useMeta } from "./providers";
+import { queryClient } from "./providers";
 import type { Row } from "./types";
 import { m } from "@/paraglide/messages.js";
-
-export interface AgentMeta {
-  id: string;
-  name: string;
-  login: string;
-}
 
 export type ProposalStatus = "pending" | "applied" | "discarded" | "stale" | "failed";
 
@@ -60,17 +54,15 @@ export type AgentEvent =
   | { type: "tool"; id: string; title?: string; kind?: string | null; status?: string | null; input?: unknown }
   | { type: "proposal"; proposal: Proposal }
   | { type: "busy"; busy: boolean }
-  | { type: "error"; message: string; code?: "resume_failed"; detail?: string }
+  | { type: "error"; message: string; code?: "auth" }
   | { type: "closed"; message?: string };
-
-export type ConversationStatus = "active" | "dormant" | "failed";
 
 export interface ConversationSummary {
   id: string;
-  agent: string;
+  provider: string;
+  model: string;
   title: string;
   updatedAt: string;
-  status: ConversationStatus;
 }
 
 export type ChatItem =
@@ -78,17 +70,15 @@ export type ChatItem =
   | { kind: "agent"; text: string }
   | { kind: "tool"; id: string; title: string; status: string | null; input?: unknown }
   | { kind: "proposal"; proposal: Proposal }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; code?: "auth" };
 
 export interface ChatState {
   items: ChatItem[];
   busy: boolean;
   closed: boolean;
-  // the agent could not resume this conversation; it can be read but not continued
-  failed: boolean;
 }
 
-export const EMPTY_CHAT: ChatState = { items: [], busy: false, closed: false, failed: false };
+export const EMPTY_CHAT: ChatState = { items: [], busy: false, closed: false };
 
 export function reduceChat(s: ChatState, e: AgentEvent): ChatState {
   const items = s.items;
@@ -130,9 +120,17 @@ export function reduceChat(s: ChatState, e: AgentEvent): ChatState {
     case "busy":
       return { ...s, busy: e.busy };
     case "error":
-      // the panel shows its own note for this
-      if (e.code === "resume_failed") return { ...s, failed: true };
-      return { ...s, items: [...items, { kind: "error", message: e.message }] };
+      return {
+        ...s,
+        items: [
+          ...items,
+          {
+            kind: "error",
+            message: e.code === "auth" ? m.agent_auth_failed() : e.message,
+            ...(e.code ? { code: e.code } : {}),
+          },
+        ],
+      };
     case "closed":
       return { ...s, busy: false, closed: true };
   }
@@ -143,7 +141,12 @@ const conv = (id: string) => `/api/agent/conversations/${enc(id)}`;
 
 export const agentApi = {
   conversations: () => request<{ conversations: ConversationSummary[] }>("GET", "/api/agent/conversations"),
-  start: (agent: string) => request<{ id: string }>("POST", "/api/agent/conversations", { agent }),
+  start: (c: AiChoice) =>
+    request<{ id: string }>("POST", "/api/agent/conversations", {
+      provider: c.provider,
+      model: c.model,
+      ...(c.apiKey ? { apiKey: c.apiKey } : {}),
+    }),
   prompt: (id: string, text: string) => request<{ ok: true }>("POST", `${conv(id)}/prompt`, { text }),
   cancel: (id: string) => request<{ ok: true }>("POST", `${conv(id)}/cancel`),
   proposals: () => request<{ proposals: Proposal[] }>("GET", "/api/agent/proposals"),
@@ -175,7 +178,6 @@ const CONVERSATIONS_KEY = ["agent-conversations"];
 export class Chat {
   state: ChatState = EMPTY_CHAT;
   id: string | null = null;
-  agentId: string | null = null;
   private source: EventSource | null = null;
   private readonly listeners = new Set<() => void>();
 
@@ -186,17 +188,16 @@ export class Chat {
     return () => this.listeners.delete(fn);
   }
 
-  async start(agentId: string): Promise<void> {
-    const { id } = await agentApi.start(agentId);
-    this.open(id, agentId);
+  async start(c: AiChoice): Promise<void> {
+    const { id } = await agentApi.start(c);
+    this.open(id);
   }
 
   // shows a conversation; the server replays its history into the empty log
-  open(id: string, agentId: string): void {
+  open(id: string): void {
     void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY });
     this.source?.close();
     this.id = id;
-    this.agentId = agentId;
     this.set(EMPTY_CHAT);
     const source = this.make(`${conv(id)}/events`);
     this.source = source;
@@ -268,13 +269,8 @@ export const useChat = (): ChatState =>
     () => chat.state,
   );
 
-export function useAgents(): AgentMeta[] {
-  const meta = useMeta();
-  return isReadOnly() ? [] : (meta.data?.agents ?? []);
-}
-
 export function usePendingProposals(): Proposal[] {
-  const enabled = useAgents().length > 0;
+  const enabled = useAiProviders() !== null;
   return useQuery({ queryKey: PROPOSALS_KEY, queryFn: agentApi.proposals, enabled }).data?.proposals ?? [];
 }
 

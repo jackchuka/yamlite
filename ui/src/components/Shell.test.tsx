@@ -1,13 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { agentPanel, type AgentMeta } from "@/lib/agent";
+import { agentPanel } from "@/lib/agent";
 import { Shell } from "./Shell";
 
-let agents: AgentMeta[] = [];
-vi.mock("@/lib/agent", async (orig) => ({
-  ...(await orig<typeof import("@/lib/agent")>()),
-  useAgents: () => agents,
-}));
+let ai: import("@/lib/ai").AiProvider[] | null = null;
+vi.mock("@/lib/ai", async (orig) => ({ ...(await orig<typeof import("@/lib/ai")>()), useAiProviders: () => ai }));
 vi.mock("@tanstack/react-router", () => ({ Outlet: () => <div>outlet</div> }));
 vi.mock("@/lib/providers", () => ({ useEvents: () => ({ configError: null }) }));
 vi.mock("@/lib/useIsMobile", () => ({ useIsMobile: () => false }));
@@ -22,19 +19,19 @@ vi.mock("./StatusBar", () => ({ StatusBar: () => null }));
 vi.mock("./AgentPanel", () => ({ AgentPanel: () => <aside aria-label="Ask AI" /> }));
 
 afterEach(() => {
-  agents = [];
+  ai = null;
   act(() => agentPanel.close());
 });
 
 test("the panel docks beside the screen when open and an agent exists", () => {
-  agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.getByText("outlet")).toBeTruthy();
   expect(screen.getByRole("complementary", { name: "Ask AI" })).toBeTruthy();
 });
 
-test("no panel without agents, even when open", () => {
+test("no panel when Ask AI is off, even when open", () => {
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.queryByRole("complementary", { name: "Ask AI" })).toBeNull();
