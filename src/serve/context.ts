@@ -25,6 +25,8 @@ export interface ApiContext {
   agent: AgentHost | null;
   // reads and writes git for the root; null when there is no git
   git: GitDriver | null;
+  // applies yamlite.yaml now, after a route wrote it
+  reloadConfig: () => void;
 }
 
 // relative to the root when inside it (--db and listed tables may live elsewhere)

@@ -118,6 +118,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
       proposals,
       agent: null,
       git,
+      reloadConfig: () => watcher.reloadConfig(),
     };
     const router = new Router();
     for (const routes of ROUTES) routes(router, ctx);

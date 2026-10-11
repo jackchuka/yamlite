@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { filesOf } from "../../config.ts";
+import { configHash } from "../../configfile.ts";
 import { describeIndex, indexName, MANAGED_PREFIX } from "../../indexes.ts";
 import { checkReferences } from "../../references.ts";
 import { displayPath, findView, tableSpec } from "../context.ts";
@@ -34,6 +36,7 @@ export const schemaRoutes: Routes = (router, ctx) => {
       columns: inDb ? Object.fromEntries(store.columns(spec.name)) : { [spec.key]: "TEXT", ...spec.columns },
       declared: spec.columns,
       values: spec.values,
+      base: configHash(readFileSync(ctx.configFile, "utf8")),
       required: spec.required,
       formats: spec.formats,
       min: spec.min,

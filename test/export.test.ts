@@ -51,7 +51,9 @@ test("the snapshot meta and schemas match what serve answers, with machine paths
     expect(snap.meta.db).toBe("data/db.sqlite");
     expect(snap.meta.configError).toBeNull();
     for (const name of ["projects", "people", "notes", "secret"]) {
-      expect(snap.schemas[name]).toEqual((await t.api(`/api/tables/${name}/schema`)).body);
+      const { base, ...schema } = (await t.api(`/api/tables/${name}/schema`)).body;
+      expect(base).toEqual(expect.any(String));
+      expect(snap.schemas[name]).toStrictEqual(schema);
     }
   } finally {
     await t.s.close();
