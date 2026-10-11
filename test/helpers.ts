@@ -3,6 +3,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
+// the browser build's node:fs has no symlinks, permissions or utimes; tests that need them skip there
+export const browserFs = process.env.YAMLITE_FS === "browser";
+
 export function tmpRoot(): string {
   return mkdtempSync(join(tmpdir(), "yamlite-"));
 }

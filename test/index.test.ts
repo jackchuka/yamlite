@@ -2,7 +2,7 @@ import { rmSync, utimesSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "vitest";
 import { open } from "../src/index.ts";
-import { dataRoot, read, sql, tmpRoot, write } from "./helpers.ts";
+import { browserFs, dataRoot, read, sql, tmpRoot, write } from "./helpers.ts";
 
 const dbOf = (root: string) => join(root, ".yamlite", "db.sqlite");
 
@@ -61,7 +61,7 @@ async function conflictWithFileAge(offsetMs: number) {
   return { root, file, planned, synced };
 }
 
-test("a sync conflict keeps the file when it changed after the database", async () => {
+test.skipIf(browserFs)("a sync conflict keeps the file when it changed after the database", async () => {
   const { root, file, planned, synced } = await conflictWithFileAge(60_000);
   expect(planned?.conflicts).toMatchObject([{ key: "a", winner: "file" }]);
   expect(synced?.conflicts).toMatchObject([{ key: "a", winner: "file" }]);
@@ -70,7 +70,7 @@ test("a sync conflict keeps the file when it changed after the database", async 
   expect(read(synced?.conflicts[0]?.savedTo as string)).toMatch(/\ntitle: DB\n$/);
 });
 
-test("a sync conflict keeps the database when it changed after the file", async () => {
+test.skipIf(browserFs)("a sync conflict keeps the database when it changed after the file", async () => {
   const { file, planned, synced } = await conflictWithFileAge(-60_000);
   expect(planned?.conflicts).toMatchObject([{ key: "a", winner: "db" }]);
   expect(synced?.conflicts).toMatchObject([{ key: "a", winner: "db" }]);

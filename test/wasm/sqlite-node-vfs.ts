@@ -1,18 +1,20 @@
-// A synchronous VFS over node:fs for sqlite-wasm, standing in for the browser's OPFS SAH pool:
-// real files at real paths, rollback journal only (no shared memory, so no WAL), locks kept in this process
+// A synchronous VFS over the real disk for sqlite-wasm, standing in for the browser's OPFS SAH pool: rollback
+// journal only (no shared memory, so no WAL), locks kept in this process. "fs" (not "node:fs") is the real disk
+// whatever node:fs is aliased to; store says where on it a database path's file lives
 import {
   closeSync,
   existsSync,
   fstatSync,
   ftruncateSync,
+  mkdirSync,
   openSync,
   readSync,
   unlinkSync,
   writeSync,
   constants as fsc,
-} from "node:fs";
+} from "fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const NONE = 0;
 const SHARED = 1;
@@ -34,7 +36,7 @@ interface LockState {
 }
 
 // oxlint-disable-next-line typescript/no-explicit-any
-export function installNodeFsVfs(sqlite3: any, name = "nodefs"): void {
+export function installNodeFsVfs(sqlite3: any, name = "nodefs", store = (path: string) => path): void {
   const { capi, wasm } = sqlite3;
   const files = new Map<number, OpenFile>();
   const locks = new Map<string, LockState>();
@@ -138,7 +140,7 @@ export function installNodeFsVfs(sqlite3: any, name = "nodefs"): void {
 
   const vfs = {
     xAccess(_pVfs: number, zName: number, _flags: number, pOut: number) {
-      wasm.poke32(pOut, existsSync(wasm.cstrToJs(zName)) ? 1 : 0);
+      wasm.poke32(pOut, existsSync(store(wasm.cstrToJs(zName))) ? 1 : 0);
       return 0;
     },
     xCurrentTime(_pVfs: number, pOut: number) {
@@ -151,7 +153,7 @@ export function installNodeFsVfs(sqlite3: any, name = "nodefs"): void {
     },
     xDelete(_pVfs: number, zName: number) {
       try {
-        unlinkSync(wasm.cstrToJs(zName));
+        unlinkSync(store(wasm.cstrToJs(zName)));
         return 0;
       } catch {
         return capi.SQLITE_IOERR_DELETE_NOENT;
@@ -168,11 +170,12 @@ export function installNodeFsVfs(sqlite3: any, name = "nodefs"): void {
     xGetLastError: () => 0,
     xOpen(_pVfs: number, zName: number, pFile: number, flags: number, pOutFlags: number) {
       const named = zName && wasm.peek8(zName);
-      const path = named ? wasm.cstrToJs(zName) : join(tmpdir(), `yamlite-wasm-${process.pid}-${tmp++}`);
+      const path = named ? store(wasm.cstrToJs(zName)) : join(tmpdir(), `yamlite-wasm-${process.pid}-${tmp++}`);
       if (!named) flags |= capi.SQLITE_OPEN_DELETEONCLOSE;
       let mode = flags & capi.SQLITE_OPEN_READWRITE ? fsc.O_RDWR : fsc.O_RDONLY;
       if (flags & capi.SQLITE_OPEN_CREATE) mode |= fsc.O_CREAT;
       try {
+        if (flags & capi.SQLITE_OPEN_CREATE) mkdirSync(dirname(path), { recursive: true });
         const fd = openSync(path, mode, 0o644);
         files.set(pFile, { path, fd, flags, level: NONE });
       } catch {

@@ -66,5 +66,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:wasm
+      - run: pnpm test:browserfs
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: pnpm test:browser
