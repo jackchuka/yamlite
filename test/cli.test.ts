@@ -1,4 +1,4 @@
-import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { execFile, execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { beforeAll, expect, test } from "vitest";
@@ -6,55 +6,63 @@ import { sql, dataRoot, tmpRoot, write } from "./helpers.ts";
 
 const repo = resolve(import.meta.dirname, "..");
 const bin = join(repo, "dist", "cli.mjs");
-const run = (...args: string[]) => spawnSync(process.execPath, [bin, ...args], { encoding: "utf8" });
+type Ran = { status: number | null; stdout: string; stderr: string };
+const exec = (file: string, args: string[]) =>
+  new Promise<Ran>((resolve) =>
+    execFile(file, args, (err, stdout, stderr) =>
+      resolve({ status: err ? (typeof err.code === "number" ? err.code : null) : 0, stdout, stderr }),
+    ),
+  );
+// each CLI test spawns its own processes in its own folder, so they run concurrently
+const run = (...args: string[]) => exec(process.execPath, [bin, ...args]);
 
 beforeAll(() => {
   execFileSync("pnpm", ["build"], { cwd: repo, stdio: "ignore" });
 }, 120_000);
 
 // the built cli writes a WAL database, which the node VFS under sqlite-wasm cannot open
-test.skipIf(process.env.YAMLITE_SQLITE === "wasm")("status then sync", () => {
+test.skipIf(process.env.YAMLITE_SQLITE === "wasm").concurrent("status then sync", async () => {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
-  const status = run("status", root);
+  const status = await run("status", root);
   expect(status.status).toBe(0);
   expect(status.stdout).toContain("● tasks   1 → db");
   expect(status.stdout).toContain("1 change · 1 new column pending");
   expect(status.stdout).not.toContain("\u001b[");
-  const synced = run("sync", root, "--json");
+  const synced = await run("sync", root, "--json");
   expect(synced.status).toBe(0);
   expect(JSON.parse(synced.stdout)[0]).toMatchObject({ table: "tasks", ok: true, toDb: 1 });
   expect(sql(join(root, ".yamlite", "db.sqlite"), "SELECT id, title FROM tasks")).toEqual([{ id: "a", title: "A" }]);
 });
 
-test("sync exits 1 when a table fails", () => {
+test.concurrent("sync exits 1 when a table fails", async () => {
   const root = dataRoot();
   write(join(root, "people.yaml"), "- [\n");
-  const r = run("sync", root);
+  const r = await run("sync", root);
   expect(r.status).toBe(1);
   expect(r.stdout).toMatch(/✗ people {3}.*people\.yaml/);
   expect(r.stdout).toContain("1 error");
 });
 
-test("prints the version", () => {
+test.concurrent("prints the version", async () => {
   const { version } = JSON.parse(readFileSync(join(repo, "package.json"), "utf8")) as { version: string };
-  expect(run("--version").stdout.trim()).toBe(version);
+  expect((await run("--version")).stdout.trim()).toBe(version);
 });
 
-test("init creates yamlite.yaml and refuses to overwrite it", () => {
+test.concurrent("init creates yamlite.yaml and refuses to overwrite it", async () => {
   const root = tmpRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
-  expect(run("sync", root).status).toBe(1);
-  const printed = run("init", root, "--print");
+  expect((await run("sync", root)).status).toBe(1);
+  const printed = await run("init", root, "--print");
   expect(printed.stdout).toContain("  tasks:\n    columns:\n      title: TEXT\n");
-  const created = run("init", root);
+  const created = await run("init", root);
   expect(created.status).toBe(0);
   expect(created.stdout).toContain("wrote");
-  expect(run("init", root).stderr).toContain("already exists");
-  expect(run("sync", root).status).toBe(0);
+  expect((await run("init", root)).stderr).toContain("already exists");
+  expect((await run("sync", root)).status).toBe(0);
 });
 
-test("serve prints a URL that answers, and stops on SIGINT", async () => {
+test.concurrent("serve prints a URL that answers, and stops on SIGINT", async () => {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   const child = spawn(process.execPath, [bin, "serve", root, "--port", "0"], { stdio: ["ignore", "pipe", "pipe"] });
@@ -80,17 +88,17 @@ test("serve prints a URL that answers, and stops on SIGINT", async () => {
   expect(code).toBe(0);
 }, 30_000);
 
-test("serve rejects a bad port", () => {
-  const r = run("serve", dataRoot(), "--port", "nope");
+test.concurrent("serve rejects a bad port", async () => {
+  const r = await run("serve", dataRoot(), "--port", "nope");
   expect(r.status).toBe(1);
   expect(r.stderr).toContain("invalid port: nope");
 });
 
-test("export writes a static site and lists what it wrote", () => {
+test.concurrent("export writes a static site and lists what it wrote", async () => {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   const out = join(tmpRoot(), "site");
-  const r = run("export", root, "--out", out);
+  const r = await run("export", root, "--out", out);
   expect(r.status).toBe(0);
   expect(r.stdout).toContain("✓ exported 1 table");
   expect(r.stdout).toContain(out);
@@ -101,18 +109,18 @@ test("export writes a static site and lists what it wrote", () => {
   });
 });
 
-test("check exits 0 without problems and 1 with them, and writes nothing", () => {
+test.concurrent("check exits 0 without problems and 1 with them, and writes nothing", async () => {
   const root = tmpRoot();
   write(
     join(root, "yamlite.yaml"),
     "tables:\n  tasks:\n    columns: { status: TEXT }\n    values: { status: [todo] }\n",
   );
   write(join(root, "tasks/a.yaml"), "status: todo\n");
-  const ok = run("check", root);
+  const ok = await run("check", root);
   expect(ok.status).toBe(0);
   expect(ok.stdout).toContain("✓ no problems");
   write(join(root, "tasks/a.yaml"), "status: doen\n");
-  const bad = run("check", root, "--json");
+  const bad = await run("check", root, "--json");
   expect(bad.status).toBe(1);
   expect(JSON.parse(bad.stdout)).toMatchObject({
     ok: false,
@@ -121,30 +129,30 @@ test("check exits 0 without problems and 1 with them, and writes nothing", () =>
   expect(existsSync(join(root, ".yamlite"))).toBe(false);
 });
 
-test("check does not take --db", () => {
-  const r = run("check", tmpRoot(), "--db", "x.db");
+test.concurrent("check does not take --db", async () => {
+  const r = await run("check", tmpRoot(), "--db", "x.db");
   expect(r.status).not.toBe(0);
   expect(r.stderr).toContain("unknown option '--db'");
 });
 
-test("query prints a table, JSON or CSV, and reports rows and truncation on stderr", () => {
+test.concurrent("query prints a table, JSON or CSV, and reports rows and truncation on stderr", async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
   write(join(root, "tasks/b.yaml"), "title: B\n");
-  const table = run("query", "select id, title from tasks order by id", root);
+  const table = await run("query", "select id, title from tasks order by id", root);
   expect(table.status).toBe(0);
   expect(table.stdout).toBe("id  title\n--  -----\na   A\nb   B\n");
   expect(table.stderr).toContain("2 rows");
-  const json = run("query", "select id from tasks order by id", root, "--format", "json");
+  const json = await run("query", "select id from tasks order by id", root, "--format", "json");
   expect(JSON.parse(json.stdout)).toEqual([{ id: "a" }, { id: "b" }]);
-  const csv = run("query", "select id from tasks order by id", root, "--format", "csv", "--limit", "1");
+  const csv = await run("query", "select id from tasks order by id", root, "--format", "csv", "--limit", "1");
   expect(csv.stdout).toBe("id\na\n");
   expect(csv.stderr).toContain("… truncated at 1 rows (use --limit)");
   expect(existsSync(join(root, ".yamlite"))).toBe(false);
 });
 
-test("query exits 1 with a specific message on a write, an SQL error or a bad option", () => {
+test.concurrent("query exits 1 with a specific message on a write, an SQL error or a bad option", async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables: {}\n");
   const cases: [string[], string][] = [
@@ -155,42 +163,42 @@ test("query exits 1 with a specific message on a write, an SQL error or a bad op
     [["select 1", root, "--limit", "abc"], "--limit must be a whole number"],
   ];
   for (const [args, message] of cases) {
-    const r = run("query", ...args);
+    const r = await run("query", ...args);
     expect(r.status).toBe(1);
     expect(r.stdout).toBe("");
     expect(r.stderr).toContain(message);
   }
 });
 
-test("query --limit 0 does not truncate, and one row is singular", () => {
+test.concurrent("query --limit 0 does not truncate, and one row is singular", async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
   write(join(root, "tasks/b.yaml"), "title: B\n");
-  const all = run("query", "select id from tasks", root, "--limit", "0");
+  const all = await run("query", "select id from tasks", root, "--limit", "0");
   expect(all.stdout).toBe("id\n--\na\nb\n");
   expect(all.stderr).toContain("2 rows");
   expect(all.stderr).not.toContain("truncated");
-  const one = run("query", "select id from tasks where id = 'a'", root);
+  const one = await run("query", "select id from tasks where id = 'a'", root);
   expect(one.stderr).toContain("1 row");
   expect(one.stderr).not.toContain("1 rows");
 });
 
-test("guide prints the guide to writing yamlite.yaml", () => {
-  const r = run("guide");
+test.concurrent("guide prints the guide to writing yamlite.yaml", async () => {
+  const r = await run("guide");
   expect(r.status).toBe(0);
   expect(r.stdout).toBe(readFileSync(join(repo, "src", "guide.md"), "utf8"));
 });
 
-test("guide piped into a reader that stops early prints no error", () => {
-  const r = spawnSync("sh", ["-c", `"${process.execPath}" "${bin}" guide | head -1`], { encoding: "utf8" });
+test.concurrent("guide piped into a reader that stops early prints no error", async () => {
+  const r = await exec("sh", ["-c", `"${process.execPath}" "${bin}" guide | head -1`]);
   expect(r.stdout).toBe("# Writing yamlite.yaml\n");
   expect(r.stderr).toBe("");
 });
 
-test("every command the guide names exists", () => {
-  const help = run("--help").stdout;
-  const named = new Set([...run("guide").stdout.matchAll(/`yamlite (\w+)/g)].map((m) => m[1]!));
+test.concurrent("every command the guide names exists", async () => {
+  const help = (await run("--help")).stdout;
+  const named = new Set([...(await run("guide")).stdout.matchAll(/`yamlite (\w+)/g)].map((m) => m[1]!));
   expect(named.size).toBeGreaterThan(0);
   for (const cmd of named) expect(help, cmd).toMatch(new RegExp(`^\\s+${cmd}\\b`, "m"));
 });
@@ -212,7 +220,7 @@ async function hostWarning(args: string[], env: Record<string, string | undefine
   return err;
 }
 
-test("serve --host warns that environment API keys reach Ask AI users", async () => {
+test.concurrent("serve --host warns that environment API keys reach Ask AI users", async () => {
   expect(await hostWarning([], { ANTHROPIC_API_KEY: "dummy" })).toContain(
     "use Ask AI with the API keys from the environment",
   );

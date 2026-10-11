@@ -25,6 +25,7 @@ const notInBrowser = [
   "test/serve/history.test.ts",
   "test/serve/http.test.ts",
   "test/serve/review.test.ts",
+  "test/serve/revert.test.ts",
 ];
 const browser = process.env.YAMLITE_BROWSER === "1";
 const here = (p: string) => fileURLToPath(new URL(p, import.meta.url));
