@@ -2,6 +2,7 @@ import { cpSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { generateConfig, init, parseIndexSql } from "../src/init.ts";
+import { check } from "../src/check.ts";
 import { open } from "../src/index.ts";
 import { read, sql, tmpRoot, write } from "./helpers.ts";
 
@@ -115,11 +116,70 @@ describe("generateConfig", () => {
     expect(generateConfig({ root })).not.toContain("references:");
   });
 
-  test.each(["a-team", "b-content", "c-tasks", "e-slug"])("writes the expected config for %s", async (name) => {
+  test.each(["a-team", "b-content", "c-tasks", "e-slug", "f-site"])(
+    "writes the expected config for %s",
+    async (name) => {
+      const root = tmpRoot();
+      cpSync(join(import.meta.dirname, "fixtures/init", name), root, { recursive: true });
+      await expect(generateConfig({ root })).toMatchFileSnapshot(`__snapshots__/init/${name}.yaml`);
+    },
+  );
+
+  test("declares a Markdown table at the deepest folder holding a top-level folder's Markdown files", () => {
     const root = tmpRoot();
-    cpSync(join(import.meta.dirname, "fixtures/init", name), root, { recursive: true });
-    await expect(generateConfig({ root })).toMatchFileSnapshot(`__snapshots__/init/${name}.yaml`);
+    write(join(root, "src/content/blog/hello.md"), "---\ntitle: Hello\ndate: 2026-10-01\n---\nHi\n");
+    write(join(root, "src/content/blog/2025/old.md"), "Old post\n");
+    write(join(root, "src/components/Card.astro"), "<div />\n");
+    write(join(root, "README.md"), "# site\n");
+    expect(generateConfig({ root })).toContain(
+      [
+        "  blog:",
+        "    files: src/content/blog/**/*.md",
+        "    columns:",
+        "      body: TEXT",
+        "      title: TEXT",
+        "      date: TEXT",
+        "    formats:",
+        "      date: date",
+        "",
+      ].join("\n"),
+    );
   });
+
+  test("declares Markdown and MDX files of one folder as two tables, and names a clash by its path", () => {
+    const root = tmpRoot();
+    write(join(root, "blog.yaml"), "- id: 1\n");
+    write(join(root, "site/blog/a.md"), "---\ntitle: A\n---\n");
+    write(join(root, "site/blog/b.mdx"), "---\ntitle: B\n---\n");
+    const out = generateConfig({ root });
+    expect(out).toContain(["  site_blog:", "    files: site/blog/**/*.md", ""].join("\n"));
+    expect(out).toContain(["  site_blog_mdx:", "    files: site/blog/**/*.mdx", ""].join("\n"));
+  });
+
+  test("leaves Markdown in a YAML table's folder and at the root alone, and keeps declared Markdown tables", () => {
+    const root = tmpRoot();
+    write(join(root, "tasks/a.yaml"), "title: A\n");
+    write(join(root, "tasks/README.md"), "# tasks\n");
+    write(join(root, "README.md"), "# data\n");
+    write(join(root, "notes/a.md"), "---\ntitle: A\n---\n");
+    write(join(root, "yamlite.yaml"), 'tables:\n  journal:\n    files: "notes/**/*.md"\n');
+    const out = generateConfig({ root, force: true });
+    expect(out).toContain("  journal:\n");
+    expect(out).toContain("  tasks:\n");
+    expect(out.match(/files:/g)).toHaveLength(1);
+  });
+
+  test.each(["a-team", "b-content", "c-tasks", "e-slug", "f-site"])(
+    "the config written for %s passes check",
+    async (name) => {
+      const root = tmpRoot();
+      cpSync(join(import.meta.dirname, "fixtures/init", name), root, { recursive: true });
+      init({ root });
+      const result = await check({ root });
+      expect(result.tables.filter((t) => !t.ok)).toEqual([]);
+      expect(result.ok).toBe(true);
+    },
+  );
 
   test("leaves the key alone when no field names every item once, or when items have ids", () => {
     const root = tmpRoot();
@@ -347,13 +407,13 @@ test("init keeps declared required, in tables and in expand", () => {
   expect(out).toContain("        required:\n          - state\n");
 });
 
-test("writes files: and body: for declared Markdown tables, adds none of its own, and no format for the body", () => {
+test("writes files: and body: for declared Markdown tables, declares other folders of Markdown, and no format for the body", () => {
   const root = tmpRoot();
   write(join(root, "blog/a.md"), "---\ntitle: A\n---\ntext\n");
   write(join(root, "yamlite.yaml"), 'tables:\n  posts:\n    files: "src/**/*.md"\n    body: content\n');
   write(join(root, "src/p.md"), "---\nsummary: s\n---\nx\n");
   const out = generateConfig({ root, force: true });
-  expect(out).not.toContain("blog");
+  expect(out).toContain("  blog:\n    files: blog/**/*.md\n");
   expect(out).toContain("  posts:\n    files: src/**/*.md\n    body: content\n");
   expect(out).not.toContain("formats");
 });
