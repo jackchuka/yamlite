@@ -2,7 +2,8 @@ import { useRouterState } from "@tanstack/react-router";
 import { ArrowUp, Menu, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { agentPanel, useAgents } from "@/lib/agent";
+import { agentPanel } from "@/lib/agent";
+import { useAiProviders } from "@/lib/ai";
 import { openCommandMenu } from "@/lib/commandMenu";
 import { useGit } from "@/lib/git";
 import { useMeta } from "@/lib/providers";
@@ -16,7 +17,7 @@ const button = "grid size-10 shrink-0 place-items-center rounded-md hover:bg-pan
 export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: meta } = useMeta();
-  const agents = useAgents();
+  const ai = useAiProviders();
   const git = useGit();
   const [review, setReview] = useState(false);
   const changes = git?.branch ? git.changes.length : 0;
@@ -30,7 +31,7 @@ export function MobileNav({ onNewTable }: { onNewTable: () => void }) {
       <button type="button" aria-label={m.nav_search()} className={button} onClick={openCommandMenu}>
         <Search className="size-5" />
       </button>
-      {agents.length > 0 && (
+      {ai !== null && (
         <button type="button" aria-label={m.nav_ask_ai()} className={button} onClick={agentPanel.open}>
           <Sparkles className="size-5" />
         </button>

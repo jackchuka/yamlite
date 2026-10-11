@@ -139,13 +139,19 @@ test("the AI panel opens full screen and applies a proposal", async ({ page }) =
     { "tasks/a.yaml": "title: A\ndone: false\n" },
     (r) => (app = r),
     undefined,
-    agentEnv([
-      [
-        {
-          mcp: "propose_changes",
-          args: { title: "A を完了に", changes: [{ table: "tasks", key: "a", op: "update", values: { done: true } }] },
-        },
-      ],
+    await agentEnv([
+      {
+        tools: [
+          {
+            name: "propose_changes",
+            args: {
+              title: "A を完了に",
+              changes: [{ table: "tasks", key: "a", op: "update", values: { done: true } }],
+            },
+          },
+        ],
+      },
+      { say: "" },
     ]),
   );
   await page.goto(app.url);

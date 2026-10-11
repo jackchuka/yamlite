@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Outlet } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
-import { useAgentPanelOpen, useAgents } from "@/lib/agent";
+import { useAgentPanelOpen } from "@/lib/agent";
+import { useAiProviders } from "@/lib/ai";
 import { useEvents } from "@/lib/providers";
 import { SIDEBAR_BOUNDS, usePanelWidth } from "@/lib/panelWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -20,8 +21,8 @@ export function Shell() {
   const { configError } = useEvents();
   const [newTable, setNewTable] = useState(false);
   const mobile = useIsMobile();
-  const agents = useAgents();
-  const agentOpen = useAgentPanelOpen() && agents.length > 0;
+  const ai = useAiProviders();
+  const agentOpen = useAgentPanelOpen() && ai !== null;
   const [sidebarWidth, setSidebarWidth] = usePanelWidth("yamlite-sidebar-width", 220, SIDEBAR_BOUNDS);
   return (
     <div className="grid h-[var(--y-shell-h,100dvh)] grid-cols-1 grid-rows-[auto_1fr_auto]">

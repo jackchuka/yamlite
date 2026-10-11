@@ -3,21 +3,13 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { type FakeReply, fakeAnthropic } from "../fixtures/fake-anthropic.ts";
 
 const bin = resolve(import.meta.dirname, "../../dist/cli.mjs");
 
-export const FAKE_AGENT = resolve(import.meta.dirname, "../fixtures/fake-agent.mjs");
-
-export function agentEnv(turns: unknown[][]): Record<string, string> {
-  const dir = mkdtempSync(join(tmpdir(), "yamlite-agent-"));
-  const scenario = join(dir, "scenario.json");
-  writeFileSync(scenario, JSON.stringify(turns));
-  return {
-    YAMLITE_AGENT_COMMAND: JSON.stringify([process.execPath, FAKE_AGENT]),
-    YAMLITE_AGENT_NAME: "Claude Code",
-    FAKE_AGENT_SCENARIO: scenario,
-    FAKE_AGENT_STATE_DIR: dir,
-  };
+export async function agentEnv(replies: FakeReply[]): Promise<Record<string, string>> {
+  const fake = await fakeAnthropic(replies);
+  return { ANTHROPIC_API_KEY: "test-key", ANTHROPIC_BASE_URL: fake.url, OPENAI_API_KEY: "" };
 }
 
 export interface Running {

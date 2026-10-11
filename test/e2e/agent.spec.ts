@@ -19,11 +19,16 @@ test("ask, preview, apply", async ({ page }) => {
     },
     (r) => (app = r),
     undefined,
-    agentEnv([
-      [
-        { say: "1 件見つかりました。" },
-        { mcp: "propose_sql", args: { title: "牛乳を完了に", sql: "UPDATE tasks SET done = 1 WHERE id = 'buy-milk'" } },
-      ],
+    await agentEnv([
+      {
+        tools: [
+          {
+            name: "propose_sql",
+            args: { title: "牛乳を完了に", sql: "UPDATE tasks SET done = 1 WHERE id = 'buy-milk'" },
+          },
+        ],
+      },
+      { say: "1 件見つかりました。" },
     ]),
   );
   const running = app;
@@ -45,26 +50,37 @@ test("ask, preview, apply", async ({ page }) => {
   await expect(page.locator('[data-key="buy-milk"][data-preview]')).toHaveCount(0);
 });
 
-test("no agent, no button", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r), undefined, { YAMLITE_AGENT_COMMAND: "[]" });
+test("no key: Ask AI opens the settings first", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r), undefined, {
+    ANTHROPIC_API_KEY: "",
+    OPENAI_API_KEY: "",
+  });
   await page.goto(app.url);
-  await expect(page.getByRole("row", { name: /A/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ask AI" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Ask AI" }).click();
+  const panel = page.getByRole("complementary", { name: "Ask AI" });
+  await expect(panel.getByRole("form", { name: "AI settings" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Save" })).toBeDisabled();
 });
 
 test("a proposal card keeps its height and apply button in a long chat", async ({ page }) => {
-  const lines = Array.from({ length: 30 }, (_, i) => ({
-    say: `${i + 1} 行目: タスクの一覧を確認しています。\n\n`.repeat(2),
-  }));
+  const lines = Array.from({ length: 30 }, (_, i) =>
+    `${i + 1} 行目: タスクの一覧を確認しています。\n\n`.repeat(2),
+  ).join("");
   app = await start(
     { "tasks/buy-milk.yaml": "title: 牛乳を買う\ndone: false\n" },
     (r) => (app = r),
     undefined,
-    agentEnv([
-      [
-        ...lines,
-        { mcp: "propose_sql", args: { title: "牛乳を完了に", sql: "UPDATE tasks SET done = 1 WHERE id = 'buy-milk'" } },
-      ],
+    await agentEnv([
+      {
+        say: lines,
+        tools: [
+          {
+            name: "propose_sql",
+            args: { title: "牛乳を完了に", sql: "UPDATE tasks SET done = 1 WHERE id = 'buy-milk'" },
+          },
+        ],
+      },
+      { say: "" },
     ]),
   );
   await page.goto(app.url);
@@ -89,7 +105,7 @@ test("a new conversation keeps the old one, which reopens from the Conversations
     { "tasks/buy-milk.yaml": "title: 牛乳を買う\ndone: false\n" },
     (r) => (app = r),
     undefined,
-    agentEnv([[{ say: "牛乳のタスクが 1 件あります。" }]]),
+    await agentEnv([{ say: "牛乳のタスクが 1 件あります。" }]),
   );
   await page.goto(app.url);
   await page.getByRole("button", { name: "Ask AI" }).click();
@@ -108,7 +124,7 @@ test("a new conversation keeps the old one, which reopens from the Conversations
 });
 
 test("Escape closes the Conversations menu first, then the panel", async ({ page }) => {
-  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r), undefined, agentEnv([[{ say: "ok" }]]));
+  app = await start({ "tasks/a.yaml": "title: A\n" }, (r) => (app = r), undefined, await agentEnv([{ say: "ok" }]));
   await page.goto(app.url);
   await page.getByRole("button", { name: "Ask AI" }).click();
   const panel = page.getByRole("complementary", { name: "Ask AI" });

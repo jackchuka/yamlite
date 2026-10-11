@@ -18,7 +18,8 @@ import {
 } from "lucide-react";
 import { Fragment, useState, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { agentPanel, useAgents } from "@/lib/agent";
+import { agentPanel } from "@/lib/agent";
+import { useAiProviders } from "@/lib/ai";
 import { warningLinks } from "@/lib/activity";
 import { isEmbedded } from "@/lib/embedded";
 import { openCommandMenu } from "@/lib/commandMenu";
@@ -61,7 +62,7 @@ function WarnMark({ count, fallback }: { count: number; fallback: ReactNode }) {
 
 export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onSearch?: () => void }) {
   const { data: meta } = useMeta();
-  const agents = useAgents();
+  const ai = useAiProviders();
   const { warnings, connected } = useEvents();
   const readOnly = isReadOnly();
   const { data: conflicts } = useQuery({ queryKey: ["conflicts"], queryFn: api.conflicts, enabled: !readOnly });
@@ -191,7 +192,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
           <span>{m.nav_search_placeholder()}</span>
           <kbd className="rounded border px-1 font-mono text-[10px] max-md:hidden">⌘K</kbd>
         </button>
-        {agents.length > 0 && (
+        {ai !== null && (
           <button
             type="button"
             aria-label={m.nav_ask_ai()}

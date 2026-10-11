@@ -28,8 +28,6 @@ self.onmessage = async (e: MessageEvent<{ port: MessagePort } | { read: string }
   init({ root: "/data" });
   const ws = await createWorkspace({
     root: "/data",
-    agents: [],
-    mcpUrl: () => "",
     git: null,
     watch: { debounceMs: 10 },
   });

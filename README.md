@@ -207,24 +207,21 @@ When the data folder is in a git repository with an `origin` remote, the bottom 
 
 Click the folder name at the top of the sidebar to see its full path, `yamlite.yaml`, the database file and the address.
 
-### Ask an AI agent
+### Ask AI
 
-If [Claude Code](https://docs.claude.com/en/docs/claude-code) or [Codex](https://developers.openai.com/codex) is on your PATH and logged in, `serve` adds an **Ask AI** button. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the agent searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press **Apply**, and then it is saved like an edit in the form, so comments and the safety checks apply.
+Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before `yamlite serve`, or enter a key in the **Ask AI** panel. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the model searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press **Apply**, and then it is saved like an edit in the form, so comments and the safety checks apply.
 
-- Conversations stay listed under **Conversations** while `serve` runs. An agent left idle for 10 minutes is stopped, and your next message resumes the same conversation; stopping `serve` discards them.
-- yamlite talks to the agent over the [Agent Client Protocol](https://agentclientprotocol.com) through `claude-agent-acp` or `codex-acp`. If the adapter is not on your PATH, yamlite runs it with `npx`, which downloads it the first time.
-- The agent can read your data, read files, and search or fetch the web. It cannot run commands or write files: yamlite refuses shell commands, file edits and tools from other MCP servers. Writes happen only through proposals you apply.
+- Models: the panel suggests the ones checked with yamlite — Anthropic `claude-sonnet-5-5` (default), `claude-haiku-5-5`, `claude-opus-5-5`; OpenAI `gpt-5`, `gpt-5-mini` — and takes any other model id the provider offers. Other models may not use the tools well.
+- A key entered in the panel is kept in the browser only if you tick "Remember the key on this device", and is sent only to your `yamlite serve` and from there to the provider. What you ask, and the data the model reads to answer, go to that provider.
+- The model can only use yamlite's tools: read the schema, run read-only SQL, read records, check rules, read the guide, and create proposals, and, in a git repository, the git tools below. It cannot run commands or write files.
+- A proposal is refused, with nothing written, if a record in it changed after it was made. It holds at most 500 rows. If applying would add rule warnings (required, allowed values, formats, bounds), the proposal shows them; they don't block applying, as with any other edit.
+- With `--host 0.0.0.0`, anyone with the URL's token can use Ask AI, and it spends the API key that `serve` read from the environment.
+- Conversations stay listed under **Conversations** while `serve` runs; conversations and pending proposals are kept in memory, so stopping `serve` discards them.
 - When the folder is in a git repository, the agent can also read its status, diffs, log and branches, and propose git steps: create or switch a branch, commit files it picks, push a branch, fast-forward-only pull, and open a draft pull request. The card lists every step and the files of each commit; nothing runs until you press its button, and the steps stop at the first failure. Branch names must be plain short names (no leading `+` or `-`, no `refs/` or `heads/` prefix, no `@`). Push never forces, and pushing to the default branch is refused, as is pushing when the default branch cannot be determined.
 - While git steps run, edits in the UI and other proposals are refused until they finish.
 - Push and pull use your own git setup (SSH keys or credential helper); yamlite never asks for a password. Pushing and opening a pull request publish your data outside this machine.
 - If [GitHub CLI](https://cli.github.com) is installed and logged in, the pull request is created for you and linked in the chat. Without it, the card links to GitHub's pull request form with the title and body filled in.
 - Switching branches changes the YAML files, and the database follows them, like an edit in your editor, even when many records disappear. If a declared table's folder doesn't exist on the target branch, the switch still happens but the database sync fails, and the card says so.
-- Claude Code runs without your Claude Code settings, permission rules and hooks, and without its shell, edit and sub-agent tools. It reads files under the root without asking; when it asks to read anywhere else, yamlite refuses.
-- Codex runs in its read-only mode. Its sandbox lets it read files anywhere your user can, without asking. Codex also follows "allow" rules in `.codex/rules` (in the data folder and in `~/.codex`): commands they allow run without yamlite being asked, so don't add allow rules you wouldn't want an agent to use, and check `.codex/` in shared data folders.
-- A proposal is refused, with nothing written, if a record in it changed after it was made. It holds at most 500 rows. If applying would add rule warnings (required, allowed values, formats, bounds), the proposal shows them; they don't block applying, as with any other edit.
-- Reads can happen without asking: files under the root for both agents, and files outside it for Codex. Together with web fetching, a page the agent reads could instruct it to read your data or files and send them elsewhere through a later fetch. Keep this in mind with sensitive data, or start `serve --no-agent`.
-- With `--host 0.0.0.0`, anyone with the URL's token can use your agent and its usage limits.
-- Conversations and pending proposals are kept in memory; they are gone when `serve` stops. A conversation that no open panel is showing ends after 10 minutes without a running reply; its pending proposals stay under **Unapplied proposals**.
 
 ## Pages
 

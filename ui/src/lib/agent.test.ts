@@ -83,7 +83,7 @@ async function started() {
     sources.push(s);
     return s as unknown as EventSource;
   });
-  await c.start("x");
+  await c.start({ provider: "anthropic", model: "m", apiKey: "" });
   return { src: sources[0], c, sources };
 }
 
@@ -129,7 +129,7 @@ test("a stale source and malformed frames are ignored", async () => {
   const { src, c, sources } = await started();
   src.handlers.agent(new MessageEvent("agent", { data: "{nope" }));
   expect(c.state.items).toEqual([]);
-  await c.start("x");
+  await c.start({ provider: "anthropic", model: "m", apiKey: "" });
   expect(src.closed).toBe(true);
   expect(sources).toHaveLength(2);
   src.emit({ type: "user", text: "old" });
@@ -142,10 +142,9 @@ test("a stale source and malformed frames are ignored", async () => {
 test("open switches to another conversation and rebuilds its log from the replay", async () => {
   const { src, c, sources } = await started();
   src.emit({ type: "user", text: "old" });
-  c.open("c2", "y");
+  c.open("c2");
   expect(src.closed).toBe(true);
   expect(c.id).toBe("c2");
-  expect(c.agentId).toBe("y");
   expect(c.state).toEqual(EMPTY_CHAT);
   const next = sources[1] as FakeSource;
   next.emit({ type: "user", text: "earlier" });
@@ -168,16 +167,11 @@ test("reset leaves the previous conversation running on the server", async () =>
   expect(c.state).toEqual(EMPTY_CHAT);
 });
 
-test("a resume failure marks the chat failed", () => {
-  const s = run([
-    { type: "user", text: "hi" },
-    { type: "error", code: "resume_failed", message: "no resume" },
-    { type: "busy", busy: false },
+test("an auth error shows the settings hint and keeps its code", () => {
+  const s = reduceChat(EMPTY_CHAT, { type: "error", code: "auth", message: "invalid x-api-key" });
+  expect(s.items).toEqual([
+    { kind: "error", code: "auth", message: "The provider rejected the API key. Check it in the AI settings." },
   ]);
-  expect(s.failed).toBe(true);
-  // the panel shows its own note; the server's reason is not put in the chat
-  expect(s.items).toEqual([{ kind: "user", text: "hi" }]);
-  expect(run([{ type: "error", message: "x" }]).failed).toBe(false);
 });
 
 test("start, open and reset refresh the conversation list", async () => {
@@ -186,7 +180,7 @@ test("start, open and reset refresh the conversation list", async () => {
   const { c } = await started();
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["agent-conversations"] });
   invalidate.mockClear();
-  c.open("c2", "x");
+  c.open("c2");
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["agent-conversations"] });
   invalidate.mockClear();
   await c.reset();

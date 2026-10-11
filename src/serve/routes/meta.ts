@@ -11,7 +11,7 @@ export const metaRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/health", () => ({ ok: true }));
   router.add("GET", "/api/meta", () => ({
     root: ctx.root,
-    agents: ctx.agent?.agents.map(({ id, name, login }) => ({ id, name, login })) ?? [],
+    ai: ctx.agent ? { providers: ctx.agent.providers() } : null,
     db: display(ctx.dbPath),
     configFile: display(ctx.configFile),
     configError: ctx.hub.configError(),

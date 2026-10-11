@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { agentPanel, useAgentPanelOpen, type AgentMeta } from "@/lib/agent";
+import { agentPanel, useAgentPanelOpen } from "@/lib/agent";
 import { api } from "@/lib/api";
 import { openCommandMenu } from "@/lib/commandMenu";
 import { setMobile } from "@/test/media";
@@ -32,13 +32,10 @@ globalThis.ResizeObserver ??= class {
 } as unknown as typeof ResizeObserver;
 Element.prototype.scrollIntoView ??= () => {};
 
-let agents: AgentMeta[] = [];
-vi.mock("@/lib/agent", async (orig) => ({
-  ...(await orig<typeof import("@/lib/agent")>()),
-  useAgents: () => agents,
-}));
+let ai: import("@/lib/ai").AiProvider[] | null = null;
+vi.mock("@/lib/ai", async (orig) => ({ ...(await orig<typeof import("@/lib/ai")>()), useAiProviders: () => ai }));
 afterEach(() => {
-  agents = [];
+  ai = null;
   act(() => agentPanel.close());
 });
 vi.mock("@/lib/providers", () => ({ useMeta: () => ({ data: { tables: [], views: [], pages: [] } }) }));
@@ -52,7 +49,7 @@ test("on a phone the search text keeps clear of the close button and the list fi
 });
 
 test("the AI item shows only when an agent exists and opens the panel", () => {
-  agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
   renderMenu();
   const { result } = renderHook(() => useAgentPanelOpen());
   act(() => openCommandMenu());
@@ -60,7 +57,7 @@ test("the AI item shows only when an agent exists and opens the panel", () => {
   expect(result.current).toBe(true);
 });
 
-test("no AI item without agents", () => {
+test("no AI item when Ask AI is off", () => {
   renderMenu();
   act(() => openCommandMenu());
   expect(screen.queryByRole("option", { name: "Ask AI" })).toBeNull();

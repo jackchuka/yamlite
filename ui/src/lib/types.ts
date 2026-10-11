@@ -78,7 +78,7 @@ export interface Meta {
   views: ViewMeta[];
   pages: PageMeta[];
   // absent in a static export
-  agents?: Array<{ id: string; name: string; login: string }>;
+  ai?: { providers: import("./ai").AiProvider[] } | null;
 }
 
 export interface TableSchema {

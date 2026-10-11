@@ -1,6 +1,6 @@
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
-import { agentPanel, useAgentPanelOpen, type AgentMeta } from "@/lib/agent";
+import { agentPanel, useAgentPanelOpen } from "@/lib/agent";
 import { openCommandMenu } from "@/lib/commandMenu";
 import type { GitState } from "@/lib/git";
 import { MobileNav } from "./MobileNav";
@@ -9,11 +9,8 @@ let pathname = "/t/tasks";
 vi.mock("@tanstack/react-router", () => ({
   useRouterState: ({ select }: { select: (s: unknown) => unknown }) => select({ location: { pathname }, matches: [] }),
 }));
-let agents: AgentMeta[] = [];
-vi.mock("@/lib/agent", async (orig) => ({
-  ...(await orig<typeof import("@/lib/agent")>()),
-  useAgents: () => agents,
-}));
+let ai: import("@/lib/ai").AiProvider[] | null = null;
+vi.mock("@/lib/ai", async (orig) => ({ ...(await orig<typeof import("@/lib/ai")>()), useAiProviders: () => ai }));
 let gitState: GitState | null = null;
 vi.mock("@/lib/git", async (orig) => ({
   ...(await orig<typeof import("@/lib/git")>()),
@@ -23,7 +20,7 @@ vi.mock("./ReviewDialog", () => ({
   ReviewDialog: ({ open }: { open: boolean }) => (open ? <div role="dialog" aria-label="review" /> : null),
 }));
 afterEach(() => {
-  agents = [];
+  ai = null;
   gitState = null;
   act(() => agentPanel.close());
 });
@@ -65,14 +62,14 @@ test("search from the sidebar sheet closes the sheet", () => {
 });
 
 test("the AI button shows only when an agent exists and opens the panel", () => {
-  agents = [{ id: "claude", name: "Claude Code", login: "claude" }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
   render(<MobileNav onNewTable={() => {}} />);
   const { result } = renderHook(() => useAgentPanelOpen());
   fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));
   expect(result.current).toBe(true);
 });
 
-test("no AI button without agents", () => {
+test("no AI button when Ask AI is off", () => {
   render(<MobileNav onNewTable={() => {}} />);
   expect(screen.queryByRole("button", { name: "Ask AI" })).toBeNull();
 });

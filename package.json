@@ -73,7 +73,9 @@
     "prepublishOnly": "pnpm check"
   },
   "dependencies": {
-    "@agentclientprotocol/sdk": "1.7.0",
+    "@ai-sdk/anthropic": "4.0.78",
+    "@ai-sdk/openai": "4.0.91",
+    "ai": "7.0.137",
     "chokidar": "^5.0.0",
     "commander": "^15.0.0",
     "yaml": "^2.9.1",

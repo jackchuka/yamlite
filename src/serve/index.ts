@@ -2,13 +2,13 @@ import { randomBytes } from "node:crypto";
 import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
-import { type AgentInfo, detectAgents } from "../agent/detect.ts";
+import { envKeys } from "../agent/providers.ts";
 import type { GitDriver } from "../git/driver.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
 import { createHandler } from "./http.ts";
 import { type AccessPolicy, isLoopback, loopbackHosts } from "./security.ts";
-import { createWorkspace } from "./workspace.ts";
+import { type AiOptions, createWorkspace } from "./workspace.ts";
 
 export interface ServeOptions {
   root: string;
@@ -18,7 +18,8 @@ export interface ServeOptions {
   uiDir?: string;
   watch?: WatchOptions;
   agent?: boolean;
-  agents?: AgentInfo[];
+  // tests: in place of the keys from the environment
+  ai?: AiOptions;
   // skips gh detection; null means no gh
   gh?: string | null;
   // absent: the local repository (found once it exists); null: no git
@@ -51,23 +52,19 @@ function listen(server: HttpServer, port: number, host: string): Promise<number>
 export async function serve(opts: ServeOptions): Promise<Server> {
   const host = opts.host ?? "127.0.0.1";
   let port = 0;
-  let mcpHost = "127.0.0.1";
   const w = await createWorkspace({
     root: opts.root,
     db: opts.db,
     watch: opts.watch,
-    agents: opts.agent === false ? [] : (opts.agents ?? detectAgents()),
-    mcpUrl: () => `http://${mcpHost}:${port}/mcp`,
+    ai: opts.agent === false ? null : (opts.ai ?? { keys: envKeys(process.env) }),
     gh: opts.gh,
     git: opts.git,
   });
   try {
     const token = randomBytes(24).toString("hex");
     let policy: AccessPolicy = { token, allowedHosts: new Set() };
-    const http = createServer(createHandler(w.router, () => policy, opts.uiDir ?? DEFAULT_UI, w.mcp));
+    const http = createServer(createHandler(w.router, () => policy, opts.uiDir ?? DEFAULT_UI));
     port = await listen(http, opts.port ?? 4610, host);
-    const bound = (http.address() as AddressInfo).address;
-    mcpHost = bound === "0.0.0.0" || bound === "::" ? "127.0.0.1" : urlHostOf(bound);
     policy = { token, allowedHosts: isLoopback(host) ? loopbackHosts(port) : null };
     let closing: Promise<void> | undefined;
     return {

@@ -194,3 +194,28 @@ test("every command the guide names exists", () => {
   expect(named.size).toBeGreaterThan(0);
   for (const cmd of named) expect(help, cmd).toMatch(new RegExp(`^\\s+${cmd}\\b`, "m"));
 });
+
+async function hostWarning(args: string[], env: Record<string, string | undefined>): Promise<string> {
+  const child = spawn(process.execPath, [bin, "serve", dataRoot(), "--port", "0", "--host", "0.0.0.0", ...args], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ANTHROPIC_API_KEY: "", OPENAI_API_KEY: "", ...env },
+  });
+  let err = "";
+  child.stderr.setEncoding("utf8");
+  child.stderr.on("data", (c: string) => (err += c));
+  await new Promise<void>((resolve, reject) => {
+    child.stdout.on("data", () => resolve());
+    child.once("exit", (code) => reject(new Error(`serve exited with ${code}: ${err}`)));
+  });
+  child.kill("SIGINT");
+  await new Promise((resolve) => child.once("exit", resolve));
+  return err;
+}
+
+test("serve --host warns that environment API keys reach Ask AI users", async () => {
+  expect(await hostWarning([], { ANTHROPIC_API_KEY: "dummy" })).toContain(
+    "use Ask AI with the API keys from the environment",
+  );
+  expect(await hostWarning(["--no-agent"], { ANTHROPIC_API_KEY: "dummy" })).not.toContain("Ask AI");
+  expect(await hostWarning([], {})).not.toContain("Ask AI");
+}, 60_000);

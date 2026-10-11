@@ -11,7 +11,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { agentPanel, useAgents } from "@/lib/agent";
+import { agentPanel } from "@/lib/agent";
+import { useAiProviders } from "@/lib/ai";
 import { setCommandMenuOpen, useCommandMenuOpen } from "@/lib/commandMenu";
 import { isReadOnly } from "@/lib/mode";
 import { useMeta } from "@/lib/providers";
@@ -31,7 +32,7 @@ export function CommandMenu() {
   const open = useCommandMenuOpen();
   const navigate = useNavigate();
   const { data: meta } = useMeta();
-  const agents = useAgents();
+  const ai = useAiProviders();
   const [text, setText] = useState("");
   useEffect(() => {
     if (!open) setText("");
@@ -184,7 +185,7 @@ export function CommandMenu() {
           {!isReadOnly() && (
             <CommandItem onSelect={() => go(() => navigate({ to: "/sync" }))}>{m.nav_sync()}</CommandItem>
           )}
-          {agents.length > 0 && <CommandItem onSelect={() => go(agentPanel.open)}>{m.nav_ask_ai()}</CommandItem>}
+          {ai !== null && <CommandItem onSelect={() => go(agentPanel.open)}>{m.nav_ask_ai()}</CommandItem>}
         </CommandGroup>
       </CommandList>
       <div className="flex gap-4 border-t px-3.5 py-2 text-xs text-muted-foreground max-md:hidden">

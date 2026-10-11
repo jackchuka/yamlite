@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { isAbsolute, posix, relative, resolve, sep } from "node:path";
-import { which } from "../agent/detect.ts";
+import { which } from "../which.ts";
 
 export const FAST_MS = 10_000;
 export const SLOW_MS = 60_000;

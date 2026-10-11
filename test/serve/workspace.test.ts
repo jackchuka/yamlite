@@ -20,12 +20,12 @@ async function workspace(title: string) {
   const root = dataRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns:\n      title: TEXT\n");
   write(join(root, "tasks/a.yaml"), `title: ${title}\n`);
-  const w = await createWorkspace({ root, watch: fast, agents: [], mcpUrl: () => "", gh: null });
+  const w = await createWorkspace({ root, watch: fast, gh: null });
   open.push(w);
   const uiDir = tmpRoot();
   write(join(uiDir, "index.html"), "<!doctype html>");
   const policy = { token: TOKEN, allowedHosts: null, origin: null };
-  const http = createServer(createHandler(w.router, () => policy, uiDir, w.mcp));
+  const http = createServer(createHandler(w.router, () => policy, uiDir));
   servers.push(http);
   await new Promise<void>((r) => http.listen(0, "127.0.0.1", () => r()));
   const base = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;
@@ -55,7 +55,7 @@ test("closing a workspace releases its lock so the root can be opened again", as
   const a = await workspace("A");
   await a.w.close();
   open.splice(open.indexOf(a.w), 1);
-  const again = await createWorkspace({ root: a.root, watch: fast, agents: [], mcpUrl: () => "", gh: null });
+  const again = await createWorkspace({ root: a.root, watch: fast, gh: null });
   open.push(again);
   expect(again.context.root).toBe(a.root);
 });

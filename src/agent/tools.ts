@@ -9,8 +9,28 @@ import { isPageStatement, statementCount } from "../serve/sqltext.ts";
 import { toWire } from "../serve/wire.ts";
 import { declaredViews } from "../views.ts";
 import { COLUMN_TYPES } from "../types.ts";
-import type { McpTool } from "./mcp.ts";
 import type { NewTable, Proposal, RecordChange } from "./proposals.ts";
+
+export interface AgentTool {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+  call(args: Record<string, unknown>): unknown | Promise<unknown>;
+}
+
+export const toolText = (out: unknown): string => {
+  if (typeof out === "string") return out;
+  const result = JSON.stringify(out, (_, v) => {
+    if (v instanceof Uint8Array) return Buffer.from(v).toString("base64");
+    if (typeof v === "bigint") {
+      const n = BigInt(v);
+      const safe = BigInt(Number.MAX_SAFE_INTEGER);
+      return n > -safe && n < safe ? Number(n) : n.toString();
+    }
+    return v;
+  });
+  return result ?? "null";
+};
 
 const QUERY_ROWS = 200;
 const RECORDS = 100;
@@ -36,7 +56,7 @@ function summary(p: Proposal): string {
   return `Proposal ${p.id} created: ${tables.join(", ")}. Nothing is saved until the user applies it. The proposal appears as a card in this same chat panel; tell the user to review the card above and press its apply button, and do not send them elsewhere in the UI. Do not say the data was changed.${warn}`;
 }
 
-export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
+export function agentTools(ctx: ApiContext, conversationId: string): AgentTool[] {
   const views = () =>
     ctx.y.tables.flatMap((t) => declaredViews(t).map(({ spec, parent }) => ({ name: spec.name, parent })));
   const spec = (name: unknown) => {
@@ -44,7 +64,7 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
     if (!s) throw new Error(`unknown table: ${String(name)}`);
     return s;
   };
-  const tools: McpTool[] = [
+  const tools: AgentTool[] = [
     {
       name: "schema",
       description:
@@ -210,11 +230,11 @@ export function agentTools(ctx: ApiContext, conversationId: string): McpTool[] {
   return [...tools, ...gitTools(ctx, conversationId)];
 }
 
-function gitTools(ctx: ApiContext, conversationId: string): McpTool[] {
+function gitTools(ctx: ApiContext, conversationId: string): AgentTool[] {
   const repo = ctx.git?.steps?.repo;
   if (!repo) return [];
   const paths = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
-  const tools: McpTool[] = [
+  const tools: AgentTool[] = [
     {
       name: "git_status",
       description:

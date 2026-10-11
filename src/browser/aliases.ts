@@ -12,7 +12,7 @@ export function browserAliases(): { find: RegExp; replacement: string }[] {
     { find: /^node:os$/, replacement: here("os") },
     { find: /^node:crypto$/, replacement: here("crypto") },
     {
-      find: /^(node:url|node:child_process|node:stream|node:http|node:util|node:module|@agentclientprotocol\/sdk)$/,
+      find: /^(node:url|node:child_process|node:stream|node:http|node:util|node:module)$/,
       replacement: here("unavailable"),
     },
     { find: /^chokidar$/, replacement: here("chokidar") },
