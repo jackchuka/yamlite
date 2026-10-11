@@ -15,6 +15,10 @@ export default defineConfig({
   build: {
     outDir: here("../dist/ui-embed"),
     emptyOutDir: true,
-    lib: { entry: here("./src/embed.tsx"), formats: ["es"], fileName: "embed", cssFileName: "style" },
+    lib: {
+      entry: { embed: here("./src/embed.tsx"), "page-frame": here("./src/page-frame.ts") },
+      formats: ["es"],
+      cssFileName: "style",
+    },
   },
 });

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
 import { enterStatic } from "@/lib/mode";
+import { setPageFrame } from "@/lib/pageFrame";
 import type { Snapshot } from "@/lib/types";
 import { PageView } from "./PageView";
 
@@ -41,7 +42,10 @@ beforeEach(() => {
   vi.mocked(api.meta).mockResolvedValue(snapshot.meta);
   vi.mocked(api.pageHtml).mockResolvedValue("<p>hello page</p>");
 });
-afterEach(() => enterStatic(null));
+afterEach(() => {
+  enterStatic(null);
+  setPageFrame(undefined);
+});
 
 async function show(name: string) {
   const { Providers } = await import("@/lib/providers");
@@ -82,6 +86,24 @@ test("a frame that loads a second time has navigated away and is cut off", async
   fireEvent.load(frame);
   await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("moved to another URL"));
   expect(screen.queryByTitle("Board")).toBeNull();
+});
+
+test("with a host's page frame, the document is posted to it once it loads, and a third load is a navigation", async () => {
+  setPageFrame("/page-frame.html");
+  await show("board");
+  const frame = (await screen.findByTitle("Board")) as HTMLIFrameElement;
+  expect(frame.getAttribute("src")).toBe("/page-frame.html");
+  expect(frame.hasAttribute("srcdoc")).toBe(false);
+  const post = vi.spyOn(frame.contentWindow as Window, "postMessage");
+  fireEvent.load(frame);
+  expect(post).toHaveBeenCalledWith({ yamlite: 1, document: expect.stringContaining("<p>hello page</p>") }, "*");
+  const [posted] = post.mock.calls[0] as [{ document: string }];
+  expect(posted.document).toMatch(/^<meta http-equiv="Content-Security-Policy"/);
+  fireEvent.load(frame);
+  expect(post).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.load(frame);
+  await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("moved to another URL"));
 });
 
 test("a refetch that returns the same html keeps the frame", async () => {

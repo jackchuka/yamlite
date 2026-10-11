@@ -50,6 +50,7 @@
     "./ui": {
       "import": "./dist/ui-embed/embed.js"
     },
+    "./ui/page-frame": "./dist/ui-embed/page-frame.js",
     "./ui/style.css": "./dist/ui-embed/style.css"
   },
   "publishConfig": {
