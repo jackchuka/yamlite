@@ -96,7 +96,7 @@ npx @jackchuka/yamlite status ./notes
      team: sales
    ```
 
-2. **Create the schema.** `yamlite init` infers tables and column types from your files (or an existing database) and writes `notes/yamlite.yaml`. Review it and commit it with your data.
+2. **Create the schema.** `yamlite init` infers tables and column types from your files (or an existing database), plus keys, expanded lists and references where the data makes them clear, and writes `notes/yamlite.yaml`. Review it and commit it with your data.
 
    ```bash
    yamlite init notes

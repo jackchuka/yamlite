@@ -1,0 +1,7 @@
+title: Post 3
+slug: post-3
+author: ken
+published_at: 2025-03-10
+draft: false
+tags: [news, biz]
+seo: { description: "desc 3", image: "/img/3.png" }

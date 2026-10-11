@@ -1,0 +1,3 @@
+- { id: u1, name: Ann, zip: "01234" }
+- { id: u2, name: Ben, zip: "98765" }
+- { id: u3, name: Cy, zip: "55555" }

@@ -1,3 +1,4 @@
+import { cpSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { generateConfig, init, parseIndexSql } from "../src/init.ts";
@@ -11,6 +12,124 @@ const HEADER = [
 ];
 
 describe("generateConfig", () => {
+  test("keys a list file without ids by a field that names every item once", () => {
+    const root = tmpRoot();
+    write(join(root, "labels.yaml"), "- slug: bug\n  name: Bug\n- slug: docs\n  name: Docs\n");
+    const out = generateConfig({ root });
+    expect(out).toContain(
+      ["  labels:", "    key: slug", "    columns:", "      slug: TEXT", "      name: TEXT", ""].join("\n"),
+    );
+  });
+
+  test("prefers slug, key, code and name, then the first field that names every item once", () => {
+    const root = tmpRoot();
+    write(join(root, "a.yaml"), "- title: A\n  name: x\n- title: B\n  name: y\n");
+    write(join(root, "b.yaml"), "- title: A\n  n: 1\n- title: B\n  n: 2\n");
+    const out = generateConfig({ root });
+    expect(out).toContain(["  a:", "    key: name", ""].join("\n"));
+    expect(out).toContain(["  b:", "    key: title", ""].join("\n"));
+  });
+
+  test("expands lists of maps and maps of maps, and the lists of maps inside them", () => {
+    const root = tmpRoot();
+    write(
+      join(root, "projects/web.yaml"),
+      "milestones:\n  - title: Design\n    tasks:\n      - title: Sketch\ntranslations:\n  en: { title: Web }\n",
+    );
+    write(join(root, "projects/app.yaml"), "milestones: []\ntranslations: null\n");
+    expect(generateConfig({ root })).toContain(
+      ["    expand:", "      milestones:", "        expand:", "          tasks: {}", "      translations: {}", ""].join(
+        "\n",
+      ),
+    );
+  });
+
+  test("does not expand lists of scalars, mixed lists or maps of scalars", () => {
+    const root = tmpRoot();
+    write(
+      join(root, "posts/a.yaml"),
+      "tags: [a, b]\nmixed:\n  - { title: A }\n  - plain\nseo: { title: A, description: B }\n",
+    );
+    expect(generateConfig({ root })).not.toContain("expand:");
+  });
+
+  test("references a table its column is named after when its values are all keys", () => {
+    const root = tmpRoot();
+    write(join(root, "teams/platform.yaml"), "name: Platform\n");
+    write(join(root, "teams/sales.yaml"), "name: Sales\n");
+    write(join(root, "people/alice.yaml"), "team: platform\nmanager: null\n");
+    write(join(root, "people/bob.yaml"), "team: sales\nmanager: alice\n");
+    write(join(root, "people/carol.yaml"), "team: platform\nmanager: alice\n");
+    write(join(root, "people/dan.yaml"), "team: platform\nmanager: bob\n");
+    write(join(root, "people/erin.yaml"), "team: platform\nmanager: bob\n");
+    const out = generateConfig({ root });
+    expect(out).toContain(["    references:", "      team: teams", "      manager: people", ""].join("\n"));
+  });
+
+  test("references the one table that holds every value of a list or of an expanded item's field", () => {
+    const root = tmpRoot();
+    write(join(root, "users.yaml"), "- id: u1\n- id: u2\n- id: u3\n");
+    write(
+      join(root, "projects/web.yaml"),
+      "members: [u1, u2]\nmilestones:\n  - title: Design\n    owner: u3\n  - title: Build\n    owner: u1\n",
+    );
+    const out = generateConfig({ root });
+    expect(out).toContain(["    references:", "      members: users", ""].join("\n"));
+    expect(out).toContain(
+      ["    expand:", "      milestones:", "        references:", "          owner: users", ""].join("\n"),
+    );
+  });
+
+  test("does not reference a table when any value is missing from its keys, so check passes right away", () => {
+    const root = tmpRoot();
+    write(join(root, "teams.yaml"), "- id: a\n- id: b\n- id: c\n- id: d\n");
+    write(
+      join(root, "people.yaml"),
+      "- { id: p1, team: a }\n- { id: p2, team: b }\n- { id: p3, team: c }\n- { id: p4, team: d }\n- { id: p5, team: z }\n",
+    );
+    expect(generateConfig({ root })).not.toContain("references:");
+  });
+
+  test("does not reference a field that repeats each record's own key", () => {
+    const root = tmpRoot();
+    write(join(root, "pages/about.yaml"), "slug: about\n");
+    write(join(root, "pages/contact.yaml"), "slug: contact\n");
+    expect(generateConfig({ root })).not.toContain("references:");
+  });
+
+  test("references nothing on weak evidence", () => {
+    const root = tmpRoot();
+    write(join(root, "teams.yaml"), "- id: a\n- id: b\n- id: c\n- id: d\n- id: e\n");
+    write(join(root, "groups.yaml"), "- id: a\n- id: b\n");
+    write(join(root, "numbers.yaml"), "- id: 1\n- id: 2\n- id: 3\n");
+    write(
+      join(root, "people.yaml"),
+      [
+        "- { id: p1, team: a, group: x, label: a, rank: 1, single: c }",
+        "- { id: p2, team: b, group: y, label: b, rank: 2, single: c }",
+        "- { id: p3, team: z, group: z, label: a, rank: 3, single: c }",
+        "- { id: p4, team: y, group: w, label: b, rank: 1, single: c }",
+        "",
+      ].join("\n"),
+    );
+    expect(generateConfig({ root })).not.toContain("references:");
+  });
+
+  test.each(["a-team", "b-content", "c-tasks", "e-slug"])("writes the expected config for %s", async (name) => {
+    const root = tmpRoot();
+    cpSync(join(import.meta.dirname, "fixtures/init", name), root, { recursive: true });
+    await expect(generateConfig({ root })).toMatchFileSnapshot(`__snapshots__/init/${name}.yaml`);
+  });
+
+  test("leaves the key alone when no field names every item once, or when items have ids", () => {
+    const root = tmpRoot();
+    write(join(root, "dupes.yaml"), "- name: x\n- name: x\n");
+    write(join(root, "gaps.yaml"), "- name: x\n- other: y\n");
+    write(join(root, "lists.yaml"), "- tags: [a]\n- tags: [b]\n");
+    write(join(root, "ids.yaml"), "- id: 1\n  slug: a\n- slug: b\n");
+    expect(generateConfig({ root })).not.toContain("key:");
+  });
+
   test("infers date and datetime formats for TEXT columns that only hold them", () => {
     const root = tmpRoot();
     write(join(root, "tasks/a.yaml"), "due: 2026-10-06\nat: 2026-10-06T09:00+09:00\nmixed: 2026-10-06\nnote: hi\n");

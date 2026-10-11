@@ -1,0 +1,44 @@
+# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;
+# edit types, keys and indexes to change the database.
+
+tables:
+  people:
+    columns:
+      name: TEXT
+      team: TEXT
+      role: TEXT
+      email: TEXT
+      joined: TEXT
+      skills: JSON
+      manager: TEXT
+    formats:
+      joined: date
+    references:
+      team: teams
+      manager: people
+  projects:
+    columns:
+      id: INTEGER
+      name: TEXT
+      owner: TEXT
+      team: TEXT
+      status: TEXT
+      priority: INTEGER
+      started_at: TEXT
+      members: JSON
+      milestones: JSON
+    formats:
+      started_at: datetime
+    references:
+      owner: people
+      team: teams
+      members: people
+    expand:
+      milestones: {}
+  teams:
+    columns:
+      name: TEXT
+      lead: TEXT
+      founded: TEXT
+    formats:
+      founded: date

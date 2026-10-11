@@ -1,0 +1,7 @@
+name: Bob
+team: sales
+role: member
+email: bob@example.com
+joined: 2023-01-15
+skills: [crm]
+manager: alice

@@ -663,3 +663,10 @@ test("a date column cannot have values", () => {
   const config = bounded("tables:\n  tasks:\n    formats: { due: date }\n    values: { due: [2026-01-01] }\n");
   expect(config).toThrow('table "tasks": values.due: a date column cannot have values');
 });
+
+test("rejects an unknown key under a table", () => {
+  const root = tmpRoot();
+  write(join(root, "faqs.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), "tables:\n  faqs:\n    extends: users\n");
+  expect(() => resolveConfig({ root })).toThrow(/table "faqs" has an unknown key "extends"/);
+});

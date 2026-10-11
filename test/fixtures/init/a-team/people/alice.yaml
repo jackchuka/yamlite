@@ -1,0 +1,6 @@
+name: Alice
+team: platform
+role: lead
+email: alice@example.com
+joined: 2022-04-01
+skills: [go, sql]

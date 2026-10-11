@@ -1,11 +1,12 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { Document, type YAMLSeq } from "yaml";
+import { Document, parse, type YAMLSeq } from "yaml";
 import { configPath, expandToRaw, filesOf, isConventional, referenceToRaw, resolveConfig } from "./config.ts";
 import { isDate, isDatetime } from "./datetime.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
+import { expandToConfig, inferExpand, inferReferences, type KeyedTable } from "./infer.ts";
 import { checkShapes, inferColumns, logicalType } from "./schema.ts";
 import { STRINGIFY_OPTIONS } from "./source/yamldoc.ts";
 import { q } from "./store.ts";
@@ -111,10 +112,35 @@ function dbIndexes(db: DatabaseSync | null, table: string): FoundIndex[] {
   return found;
 }
 
+const PREFERRED_KEYS = ["slug", "key", "code", "name"];
+
+const isScalar = (v: unknown) => typeof v === "string" || typeof v === "number";
+
+// a list file whose items have no id is keyed by a field that every item has, once each; without one, every item
+// would be ignored
+function inferKey(spec: TableSpec): string | null {
+  if (spec.mode !== "list" || spec.key !== "id" || !existsSync(spec.path)) return null;
+  let items: unknown;
+  try {
+    items = parse(readFileSync(spec.path, "utf8"));
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(items)) return null;
+  const maps = items.filter((i): i is Rec => i !== null && typeof i === "object" && !Array.isArray(i));
+  if (maps.length === 0 || maps.some((m) => Object.hasOwn(m, "id"))) return null;
+  const fields = [...new Set(maps.flatMap((m) => Object.keys(m)))];
+  const keys = fields.filter((f) => {
+    const values = maps.map((m) => m[f]);
+    return values.every(isScalar) && new Set(values.map(String)).size === values.length;
+  });
+  return PREFERRED_KEYS.find((k) => keys.includes(k)) ?? keys[0] ?? null;
+}
+
 function columnsFor(
   spec: TableSpec,
   existing: Map<string, ColumnType> | null,
-): { columns: Map<string, ColumnType>; records: Iterable<Rec> } {
+): { columns: Map<string, ColumnType>; records: Rec[]; keys: Set<string> } {
   const files = makeSource(spec).read();
   if (files.tableError) throw new Error(`${spec.name}: ${files.tableError}`);
   const shapes = checkShapes(files.records, existing ?? new Map(), spec.columns);
@@ -125,7 +151,7 @@ function columnsFor(
   }
   for (const [column, type] of Object.entries(spec.columns)) if (!existing?.has(column)) columns.set(column, type);
   if (spec.mode === "files") columns.delete(spec.key);
-  return { columns, records: files.records.values() };
+  return { columns, records: [...files.records.values()], keys: new Set(files.records.keys()) };
 }
 
 // TEXT columns that hold only dates (or dates and datetimes) get that format, so the UI offers a picker
@@ -170,7 +196,16 @@ export function generateConfig(opts: InitOptions): string {
     const doc = new Document({ tables: {} });
     doc.commentBefore = HEADER;
     const tables = doc.get("tables", true) as unknown as { set: (k: string, v: unknown) => void };
-    for (const spec of [...config.tables].sort((a, b) => a.name.localeCompare(b.name))) {
+    const scanned = [...config.tables]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((found) => {
+        const key = inferKey(found);
+        const spec = key === null ? found : { ...found, key };
+        return { spec, ...columnsFor(spec, dbColumns(db, spec.name)) };
+      });
+    // references are found by comparing values with every table's keys, so all tables are read first
+    const keyed: KeyedTable[] = scanned.map(({ spec, keys }) => ({ name: spec.name, keys }));
+    for (const { spec, columns, records, keys } of scanned) {
       const entry: Record<string, unknown> = {};
       if (!isConventional(root, spec)) {
         if (spec.mode === "files") entry.files = filesOf(root, spec);
@@ -178,7 +213,6 @@ export function generateConfig(opts: InitOptions): string {
       }
       if (spec.body !== null && spec.body !== "body") entry.body = spec.body;
       if (spec.key !== "id") entry.key = spec.key;
-      const { columns, records } = columnsFor(spec, dbColumns(db, spec.name));
       if (columns.size > 0) entry.columns = Object.fromEntries(columns);
       // the body column's markdown format comes with body:, so it is not written out
       const formats = {
@@ -190,12 +224,19 @@ export function generateConfig(opts: InitOptions): string {
       if (Object.keys(formats).length > 0) entry.formats = formats;
       if (spec.references.length > 0) {
         entry.references = Object.fromEntries(spec.references.map((r) => [r.column, referenceToRaw(r)]));
+      } else {
+        const references = inferReferences(records, keyed, [...keys]);
+        if (Object.keys(references).length > 0) entry.references = references;
       }
       if (Object.keys(spec.values).length > 0) entry.values = { ...spec.values };
       if (spec.required.length > 0) entry.required = [...spec.required];
       if (Object.keys(spec.min).length > 0) entry.min = { ...spec.min };
       if (Object.keys(spec.max).length > 0) entry.max = { ...spec.max };
       if (spec.expand.length > 0) entry.expand = expandToRaw(spec.expand);
+      else {
+        const expanded = inferExpand(records, (field) => columns.get(field) === "JSON");
+        if (expanded.length > 0) entry.expand = expandToConfig(expanded, (e) => inferReferences(e.items, keyed));
+      }
       const node = doc.createNode(entry);
       const found = dbIndexes(db, spec.name);
       const declared: FoundIndex[] = found.length > 0 ? found : spec.indexes.map((s) => ({ spec: s }));

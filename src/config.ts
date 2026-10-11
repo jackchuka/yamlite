@@ -221,6 +221,24 @@ export function listedTables(path: string): Record<string, unknown> {
   return raw?.tables ?? {};
 }
 
+const TABLE_KEYS = [
+  "path",
+  "files",
+  "key",
+  "body",
+  "columns",
+  "formats",
+  "indexes",
+  "references",
+  "values",
+  "required",
+  "min",
+  "max",
+  "expand",
+  "group",
+  "split",
+];
+
 function readRootConfig(root: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
   const path = configPath(root);
   if (path === null) return { tables: [], pages: undefined };
@@ -231,7 +249,12 @@ function readRootConfig(root: string): { tables: Array<{ name: string } & RawTab
     const first = (e instanceof Error ? e.message : String(e)).split("\n")[0];
     throw new Error(`invalid ${path}: ${first}`);
   }
-  return { tables: Object.entries(raw?.tables ?? {}).map(([name, t]) => ({ name, ...t })), pages: raw?.pages };
+  const tables = Object.entries(raw?.tables ?? {}).map(([name, t]) => {
+    const unknown = Object.keys(t ?? {}).find((k) => !TABLE_KEYS.includes(k));
+    if (unknown !== undefined) throw new Error(`table "${name}" has an unknown key "${unknown}"`);
+    return { name, ...t };
+  });
+  return { tables, pages: raw?.pages };
 }
 
 function toSpec(t: Located, persisted: boolean): TableSpec {
