@@ -45,6 +45,15 @@ const isNamed = (v: unknown): v is Record<string, unknown> =>
 
 const finalizer = new FinalizationRegistry<() => void>((fn) => fn());
 
+// oxlint-disable-next-line typescript/no-explicit-any
+function finalize(stmt: any): void {
+  try {
+    if (stmt.pointer) stmt.finalize();
+  } catch {}
+}
+
+const finalized = () => Object.assign(new Error("statement has been finalized"), { code: "ERR_INVALID_STATE" });
+
 export class StatementSync {
   private bigInts = false;
   private arrays = false;
@@ -54,11 +63,13 @@ export class StatementSync {
     private readonly db: any,
     // oxlint-disable-next-line typescript/no-explicit-any
     private readonly stmt: any,
+    // oxlint-disable-next-line typescript/no-explicit-any
+    open: Set<any>,
   ) {
+    open.add(stmt);
     finalizer.register(this, () => {
-      try {
-        if (stmt.pointer) stmt.finalize();
-      } catch {}
+      finalize(stmt);
+      open.delete(stmt);
     });
   }
 
@@ -72,6 +83,7 @@ export class StatementSync {
 
   columns() {
     const p = this.stmt.pointer;
+    if (!p) throw finalized();
     const n = capi.sqlite3_column_count(p);
     return Array.from({ length: n }, (_, i) =>
       Object.assign(Object.create(null), {
@@ -87,6 +99,7 @@ export class StatementSync {
   private bind(params: unknown[]): void {
     const s = this.stmt;
     const p = s.pointer;
+    if (!p) throw finalized();
     s.reset();
     s.clearBindings();
     const count = capi.sqlite3_bind_parameter_count(p);
@@ -198,6 +211,8 @@ export class StatementSync {
 export class DatabaseSync {
   // oxlint-disable-next-line typescript/no-explicit-any
   private readonly db: any;
+  // oxlint-disable-next-line typescript/no-explicit-any
+  private readonly stmts = new Set<any>();
 
   constructor(path: string, opts: { readOnly?: boolean } = {}) {
     try {
@@ -234,7 +249,7 @@ export class DatabaseSync {
 
   prepare(sql: string): StatementSync {
     try {
-      return new StatementSync(this.db, this.db.prepare(sql));
+      return new StatementSync(this.db, this.db.prepare(sql), this.stmts);
     } catch (e) {
       throw sqliteError(this.db, e);
     }
@@ -249,6 +264,11 @@ export class DatabaseSync {
 
   close(): void {
     if (!this.db.pointer) throw Object.assign(new Error("database is not open"), { code: "ERR_INVALID_STATE" });
+    // as node:sqlite does. oo1's close() means to finalize the statements too but passes forEach's index where it
+    // wants the statement, so none is; sqlite3_close_v2 then keeps the connection, and its files open, until the
+    // garbage collector finalizes the last one, and an OPFS pool cannot be paused or its files removed meanwhile
+    for (const s of this.stmts) finalize(s);
+    this.stmts.clear();
     this.db.close();
   }
 }
