@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { expandPath, filesOf, resolveConfig } from "../src/config.ts";
 import type { TableSpec } from "../src/types.ts";
-import { browserFs, dataRoot, tmpRoot, write } from "./helpers.ts";
+import { browserFs, dataRoot, read, tmpRoot, write } from "./helpers.ts";
 
 test("discovers tables by convention", () => {
   const root = tmpRoot();
@@ -669,4 +669,14 @@ test("rejects an unknown key under a table", () => {
   write(join(root, "faqs.yaml"), "[]\n");
   write(join(root, "yamlite.yaml"), "tables:\n  faqs:\n    extends: users\n");
   expect(() => resolveConfig({ root })).toThrow(/table "faqs" has an unknown key "extends"/);
+});
+
+test("a candidate config text is parsed instead of the file", () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks: {}\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  const next = resolveConfig({ root, configText: "tables:\n  tasks:\n    required: [title]\n" });
+  expect(next.tables.find((t) => t.name === "tasks")?.required).toEqual(["title"]);
+  expect(read(join(root, "yamlite.yaml"))).toBe("tables:\n  tasks: {}\n");
+  expect(() => resolveConfig({ root, configText: "tables:\n  tasks:\n    max: { title: 3 }\n" })).toThrow();
 });

@@ -54,6 +54,8 @@ export interface OpenOptions {
   tables?: TableInput[];
   stateDir?: string;
   persistConfig?: boolean;
+  // parsed instead of reading yamlite.yaml (a candidate the UI previews)
+  configText?: string;
 }
 
 export interface ResolvedConfig {
@@ -239,12 +241,12 @@ const TABLE_KEYS = [
   "split",
 ];
 
-function readRootConfig(root: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
-  const path = configPath(root);
+function readRootConfig(root: string, text?: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
+  const path = configPath(root) ?? (text === undefined ? null : "yamlite.yaml");
   if (path === null) return { tables: [], pages: undefined };
   let raw: { tables?: Record<string, RawTable | null>; pages?: unknown } | null;
   try {
-    raw = parse(readFileSync(path, "utf8"));
+    raw = parse(text ?? readFileSync(path, "utf8"));
   } catch (e) {
     const first = (e instanceof Error ? e.message : String(e)).split("\n")[0];
     throw new Error(`invalid ${path}: ${first}`);
@@ -583,7 +585,7 @@ const isStringList = (v: unknown): v is string[] =>
   Array.isArray(v) && v.length > 0 && v.every((c) => typeof c === "string" && c !== "");
 
 // accepts `[a, b]`, `{ columns: [a, b] | a, unique? }` or `{ expr: "...", unique? }`
-function toIndex(table: string, raw: unknown, i: number): IndexSpec {
+export function toIndex(table: string, raw: unknown, i: number): IndexSpec {
   const invalid = () =>
     new Error(`table "${table}": index #${i + 1} must be a list of columns, { columns, unique? } or { expr, unique? }`);
   if (isStringList(raw)) return { columns: raw, unique: false };
@@ -607,7 +609,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
     const scanned = scanRoot(root);
-    const raw = readRootConfig(root);
+    const raw = readRootConfig(root, opts.configText);
     const declared = new Map<string, Located>();
     const pathErrors: string[] = [];
     for (const o of raw.tables) {
