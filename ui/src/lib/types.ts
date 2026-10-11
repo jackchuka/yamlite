@@ -229,3 +229,17 @@ export interface YamlMap {
   files: Record<string, string>;
   keys: Record<string, string>;
 }
+
+export interface SearchHit {
+  table: string;
+  key: string;
+  label: string | null;
+  column: string;
+  value: string;
+  rank: number;
+  total: number;
+}
+
+export interface SearchResult {
+  hits: SearchHit[];
+}

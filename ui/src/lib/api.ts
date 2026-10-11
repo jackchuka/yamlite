@@ -7,6 +7,7 @@ import type {
   RecordDetail,
   Row,
   RowsPage,
+  SearchResult,
   SqlResult,
   TableSchema,
 } from "./types";
@@ -89,6 +90,10 @@ export interface RowsParams {
   search?: string;
 }
 
+export function searchQuery(needle: string, per: number): URLSearchParams {
+  return new URLSearchParams({ q: needle, per: String(per) });
+}
+
 export function rowsQuery(p: RowsParams): URLSearchParams {
   const qs = new URLSearchParams({ limit: String(p.limit), offset: String(p.offset) });
   if (p.sort) qs.set("sort", p.sort);
@@ -100,6 +105,7 @@ export function rowsQuery(p: RowsParams): URLSearchParams {
 export const httpApi = {
   meta: () => request<Meta>("GET", "/api/meta"),
   rows: (table: string, p: RowsParams) => request<RowsPage>("GET", `${rowsPath(table)}?${rowsQuery(p)}`),
+  search: (needle: string, per: number) => request<SearchResult>("GET", `/api/search?${searchQuery(needle, per)}`),
   schema: (table: string) => request<TableSchema>("GET", `/api/tables/${enc(table)}/schema`),
   record: (table: string, key: string) => request<RecordDetail>("GET", rowPath(table, key)),
   create: (table: string, key: string, values: Row) =>
@@ -151,6 +157,7 @@ export function setBackend(b: Api): void {
 export const api: Api = {
   meta: () => backend.meta(),
   rows: (table, p) => backend.rows(table, p),
+  search: (needle, per) => backend.search(needle, per),
   schema: (table) => backend.schema(table),
   record: (table, key) => backend.record(table, key),
   create: (table, key, values) => backend.create(table, key, values),

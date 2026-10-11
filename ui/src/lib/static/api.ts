@@ -2,10 +2,11 @@ import type { BindParams, Database, SqlValue } from "sql.js";
 import { q } from "../../../../src/ident.ts";
 import { HttpError } from "../../../../src/serve/errors.ts";
 import { buildWhere, orderBy, parseRowQuery } from "../../../../src/serve/query.ts";
+import { buildSearchSql, parseSearchQuery, toSearchHit } from "../../../../src/serve/search.ts";
 import { isPageStatement, isRead, statementCount } from "../../../../src/serve/sqltext.ts";
 import { toWire } from "../../../../src/serve/wire.ts";
 import type { ColumnType, DbRow, DbValue } from "../../../../src/types.ts";
-import { type Api, ApiError, rowsQuery } from "../api";
+import { type Api, ApiError, rowsQuery, searchQuery } from "../api";
 import type { ConflictDetail, RecordDetail, RowsPage, Snapshot, SqlResult, TableSchema, YamlMap } from "../types";
 
 export const READ_ONLY_MESSAGE = "read-only snapshot: only SELECT, EXPLAIN and VALUES run here";
@@ -104,6 +105,15 @@ export function createStaticApi(opts: {
         const t = tableOf(table);
         if (!t.inDb) return { rows: [], total: 0 };
         return page(t.name, new Map(Object.entries(t.columns)), [t.key], rowsQuery(p));
+      }),
+    search: (needle, per) =>
+      guard(() => {
+        const parsed = parseSearchQuery(searchQuery(needle, per));
+        const tables = meta.tables
+          .filter((t) => t.inDb)
+          .map((t) => ({ name: t.name, key: t.key, columns: new Map(Object.entries(t.columns)) }));
+        const built = buildSearchSql(tables, parsed.needle, parsed.per);
+        return { hits: built ? all(built.sql, built.params).rows.map(toSearchHit) : [] };
       }),
     schema: (table) =>
       guard(() => {
