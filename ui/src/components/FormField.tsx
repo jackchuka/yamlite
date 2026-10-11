@@ -2,9 +2,10 @@ import { json } from "@codemirror/lang-json";
 import { useQuery } from "@tanstack/react-query";
 import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
-import { ArrowUpRight, Calendar, Clock, Type, X } from "lucide-react";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Calendar, Clock, RotateCcw, Type, X } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { parseDatetime } from "../../../src/datetime.ts";
+import { fieldLabel, fieldWidth, selectControl } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +14,7 @@ import { fromPicker, localOffset, pickerBound, toPicker } from "@/lib/datetime";
 import { emptyValueFor, fieldKind, fieldProblem } from "@/lib/form";
 import { useTheme } from "@/lib/theme";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, Reference } from "@/lib/types";
+import { ChipsInput } from "./ChipsInput";
 import { RefLink } from "./RefLink";
 import { m } from "@/paraglide/messages.js";
 
@@ -35,73 +37,14 @@ export interface FieldProps {
   onRemove?: () => void;
   onValidity?: (path: string, ok: boolean) => void;
   readOnly?: boolean;
+  // the field's label: shown in a row that can also hold the field's own controls
+  label?: ReactNode;
 }
 
 const label = (path: Array<string | number>) => path.join(".");
 
 // the markdown parsers are large; load them only when a markdown field shows up
 const MarkdownField = lazy(() => import("./MarkdownField"));
-
-function ChipsInput({
-  path,
-  value,
-  onChange,
-}: {
-  path: Array<string | number>;
-  value: string[];
-  onChange: (v: string[]) => void;
-}) {
-  const [text, setText] = useState("");
-  const add = () => {
-    const t = text.trim();
-    if (t !== "") onChange([...value, t]);
-    setText("");
-  };
-  return (
-    <div className="flex flex-wrap gap-1 rounded-md border bg-background px-1.5 py-1">
-      {value.map((chip, i) => (
-        <span
-          key={`${i}-${chip}`}
-          className="inline-flex items-center rounded-full bg-chip pl-2 pr-1 text-[11.5px] text-chip-foreground max-md:py-0.5 max-md:text-[13px]"
-        >
-          {chip}
-          <button
-            type="button"
-            aria-label={m.form_remove({ item: chip })}
-            className="ml-1 opacity-60 max-md:grid max-md:size-7 max-md:place-items-center"
-            onClick={() => onChange(value.filter((_, j) => j !== i))}
-          >
-            <X className="size-3" />
-          </button>
-        </span>
-      ))}
-      <input
-        aria-label={label(path)}
-        className="min-w-16 flex-1 bg-transparent px-1 outline-none"
-        placeholder={m.form_add_placeholder()}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            add();
-          }
-        }}
-        onBlur={add}
-      />
-      <button
-        type="button"
-        aria-label={m.form_add_to({ field: label(path) })}
-        className="rounded-md px-2 text-[13px] text-muted-foreground md:hidden"
-        // keeps focus in the input, so its blur does not add the chip first
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={add}
-      >
-        {m.form_add()}
-      </button>
-    </div>
-  );
-}
 
 function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) {
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
@@ -162,7 +105,7 @@ function ValuesField({ path, value, allowed, onChange, readOnly }: FieldProps & 
       aria-label={label(path)}
       aria-invalid={outside || undefined}
       disabled={readOnly}
-      className={`h-9 w-full rounded-md border bg-background px-2 text-sm ${outside ? "border-warn text-warn" : ""}`}
+      className={`${selectControl} w-full ${outside ? "border-warn text-warn" : ""}`}
       value={current}
       onChange={(e) => {
         const next = e.target.value;
@@ -238,6 +181,7 @@ function MapField(props: FieldProps) {
             min={undefined}
             max={undefined}
             reference={undefined}
+            label={undefined}
             onChange={(next) => onChange({ ...(value as object), [k]: next })}
           />
           <button
@@ -288,7 +232,7 @@ function DateField({ path, value, min, max, problem, onChange }: FieldProps) {
     <Input
       type="date"
       aria-label={label(path)}
-      className={`w-44 font-mono max-md:w-full ${warnBorder(problem)}`}
+      className={`${fieldWidth} font-mono ${warnBorder(problem)}`}
       value={typeof value === "string" ? value : ""}
       min={typeof min === "string" ? min : undefined}
       max={typeof max === "string" ? max : undefined}
@@ -371,7 +315,7 @@ function Widget(props: FieldProps) {
         <Input
           aria-label={label(path)}
           inputMode={type === "REAL" ? "decimal" : "numeric"}
-          className={`w-40 font-mono max-md:w-full ${warnBorder(problem)}`}
+          className={`${fieldWidth} font-mono ${warnBorder(problem)}`}
           value={numText}
           onChange={(e) => {
             const raw = e.target.value;
@@ -433,7 +377,7 @@ function Widget(props: FieldProps) {
     case "ref":
       return <RefField {...props} />;
     case "chips":
-      return <ChipsInput path={path} value={value as string[]} onChange={onChange} />;
+      return <ChipsInput label={label(path)} value={value as string[]} onChange={onChange} />;
     case "map":
       return <MapField {...props} />;
     case "json":
@@ -474,11 +418,39 @@ function Widget(props: FieldProps) {
   }
 }
 
+const isEmpty = (v: unknown) =>
+  v == null || (Array.isArray(v) ? v.length === 0 : typeof v === "object" && Object.keys(v).length === 0);
+
 export function FormField(props: FieldProps) {
-  const problem = fieldProblem(props.value, props.format, props.min, props.max);
+  const { label: title, value, type, readOnly, onChange } = props;
+  const problem = fieldProblem(value, props.format, props.min, props.max);
+  // a JSON field left unset when the form opened: its chosen type can be taken back
+  const [chosen] = useState(() => type === "JSON" && value == null);
+  const [epoch, setEpoch] = useState(0);
+  const changeType = () => {
+    if (!isEmpty(value) && !window.confirm(m.form_change_type_confirm())) return;
+    onChange(null);
+    setEpoch((e) => e + 1);
+  };
   return (
     <div data-problem={problem ?? undefined}>
-      <Widget {...props} problem={problem !== null} />
+      {title !== undefined && (
+        <div className="mb-1 flex items-center gap-2">
+          {title}
+          {chosen && !readOnly && value != null && (
+            <button
+              type="button"
+              aria-label={m.form_change_type_of({ field: label(props.path) })}
+              className={`inline-flex shrink-0 items-center gap-1 rounded px-1 ${fieldLabel} font-medium hover:text-foreground`}
+              onClick={changeType}
+            >
+              <RotateCcw className="size-3" />
+              {m.form_change_type()}
+            </button>
+          )}
+        </div>
+      )}
+      <Widget key={epoch} {...props} problem={problem !== null} />
       {problem && <p className="mt-1 text-[11px] text-warn">{problem}</p>}
     </div>
   );

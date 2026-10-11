@@ -411,3 +411,17 @@ test("a chip can be added with a button on a phone", () => {
   fireEvent.click(screen.getByRole("button", { name: "add to tags" }));
   expect(onChange).toHaveBeenCalledWith(["a", "b"]);
 });
+
+test("Backspace on an empty chip input removes the last chip", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={["a", "b"]} type="JSON" onChange={onChange} />));
+  fireEvent.keyDown(screen.getByLabelText("tags"), { key: "Backspace" });
+  expect(onChange).toHaveBeenLastCalledWith(["a"]);
+});
+
+test("holding Backspace in an empty chip input removes only one chip", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={["a", "b"]} type="JSON" onChange={onChange} />));
+  fireEvent.keyDown(screen.getByLabelText("tags"), { key: "Backspace", repeat: true });
+  expect(onChange).not.toHaveBeenCalled();
+});

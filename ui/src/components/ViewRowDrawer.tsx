@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { fieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api";
 import { usePanelWidth } from "@/lib/panelWidth";
@@ -193,19 +194,21 @@ export function ViewRowDrawer({
               const required = view.required.includes(f);
               return (
                 <div key={f} className="mb-3.5">
-                  <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground max-md:text-[13px]">
-                    <span className={required && draft[f] == null ? "text-warn" : undefined}>
-                      {f}
-                      {required && <span aria-label={m.record_required()}> *</span>}
-                    </span>
-                    <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
-                      {reference ? `→ ${reference.table}` : (format ?? type)}
-                    </span>
-                  </div>
                   <FormField
                     key={`${f}:${version}`}
                     readOnly={!editable}
                     path={[f]}
+                    label={
+                      <div className={`flex flex-1 justify-between ${fieldLabel}`}>
+                        <span className={required && draft[f] == null ? "text-warn" : undefined}>
+                          {f}
+                          {required && <span aria-label={m.record_required()}> *</span>}
+                        </span>
+                        <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
+                          {reference ? `→ ${reference.table}` : (format ?? type)}
+                        </span>
+                      </div>
+                    }
                     value={draft[f]}
                     type={type}
                     format={format}
