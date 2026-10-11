@@ -1,0 +1,7 @@
+title: about
+slug: about
+author: jane
+published_at: 2024-12-01
+draft: false
+seo: { description: "page about" }
+nav_order: 1

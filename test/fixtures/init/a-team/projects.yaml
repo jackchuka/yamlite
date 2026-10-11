@@ -1,0 +1,27 @@
+- id: 1
+  name: Billing
+  owner: alice
+  team: platform
+  status: active
+  priority: 2
+  started_at: 2025-01-10T09:00:00Z
+  members: [alice, carol]
+- id: 2
+  name: Outreach
+  owner: bob
+  team: sales
+  status: paused
+  priority: 3
+  started_at: 2025-03-02T10:30:00+09:00
+  members: [bob]
+- id: 3
+  name: Rebrand
+  owner: dan
+  team: design
+  status: active
+  priority: 1
+  started_at: 2025-06-01T00:00:00Z
+  members: [dan, carol]
+  milestones:
+    - { title: draft, due: 2025-07-01, state: open }
+    - { title: final, due: 2025-09-01, state: closed }

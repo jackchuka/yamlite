@@ -1,0 +1,7 @@
+title: Post 1
+slug: post-1
+author: jane
+published_at: 2025-01-10
+draft: false
+tags: [news, eng]
+seo: { description: "desc 1", image: "/img/1.png" }

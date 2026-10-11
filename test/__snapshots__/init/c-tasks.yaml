@@ -1,0 +1,19 @@
+# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;
+# edit types, keys and indexes to change the database.
+
+tables:
+  tasks:
+    columns:
+      title: TEXT
+      status: TEXT
+      priority: INTEGER
+      assignee: TEXT
+      due: TEXT
+      estimate: REAL
+    formats:
+      due: date
+  users:
+    columns:
+      id: TEXT
+      name: TEXT
+      zip: TEXT

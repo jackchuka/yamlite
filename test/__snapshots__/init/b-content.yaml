@@ -1,0 +1,34 @@
+# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;
+# edit types, keys and indexes to change the database.
+
+tables:
+  authors:
+    columns:
+      display_name: TEXT
+      bio: TEXT
+  pages:
+    columns:
+      title: TEXT
+      slug: TEXT
+      author: TEXT
+      published_at: TEXT
+      draft: BOOLEAN
+      seo: JSON
+      nav_order: INTEGER
+    formats:
+      published_at: date
+    references:
+      author: authors
+  posts:
+    columns:
+      title: TEXT
+      slug: TEXT
+      author: TEXT
+      published_at: TEXT
+      draft: BOOLEAN
+      tags: JSON
+      seo: JSON
+    formats:
+      published_at: date
+    references:
+      author: authors
