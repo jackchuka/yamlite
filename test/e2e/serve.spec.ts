@@ -401,3 +401,28 @@ function titleOf(app: Running, key: string): string | null {
     db.close();
   }
 }
+
+test("search finds a record in another table and lists every hit", async ({ page }) => {
+  app = await start(
+    {
+      "projects/alpha.yaml": "title: Alpha site\n",
+      "tasks/t1.yaml": "title: Write about alpha\n",
+      "tasks/t2.yaml": "title: Unrelated\n",
+    },
+    (r) => (app = r),
+  );
+  await page.goto(app.url);
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("alpha");
+  await page.getByRole("option", { name: /t1/ }).click();
+  await expect(page).toHaveURL(/#\/t\/tasks\?key=t1/);
+  await expect(page.getByRole("complementary", { name: "record" })).toBeVisible();
+  await page.keyboard.press("Escape");
+
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.type("alpha");
+  await page.getByRole("option", { name: /^See all \d+ results/ }).click();
+  await expect(page.getByRole("region", { name: "projects" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "tasks" })).toContainText("t1");
+  await expect(page.getByRole("region", { name: "tasks" })).not.toContainText("t2");
+});

@@ -25,3 +25,15 @@ export const sqlRoute = createRoute({ getParentRoute: () => rootRoute, path: "/s
 export const syncRoute = createRoute({ getParentRoute: () => rootRoute, path: "/sync" });
 export const erdRoute = createRoute({ getParentRoute: () => rootRoute, path: "/erd" });
 export const pageRoute = createRoute({ getParentRoute: () => rootRoute, path: "/p/$page" });
+
+export interface SearchPageSearch {
+  q?: string;
+}
+
+export const searchRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/search",
+  validateSearch: (s: Record<string, unknown>): SearchPageSearch => ({
+    q: typeof s.q === "string" ? s.q : undefined,
+  }),
+});

@@ -151,3 +151,13 @@ test("an exported kanban page shows the cards and does not let them move", async
   await expect(card).toBeVisible();
   await expect(card).toHaveAttribute("draggable", "false");
 });
+
+test("an export searches every table", async ({ page }) => {
+  const url = await host(exportFixture());
+  await page.goto(`${url}#/search?q=web`);
+  await page
+    .getByRole("region", { name: "projects" })
+    .getByRole("link", { name: /website/ })
+    .click();
+  await expect(page.getByRole("complementary", { name: "record" })).toBeVisible();
+});

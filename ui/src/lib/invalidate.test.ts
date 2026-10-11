@@ -26,6 +26,7 @@ test("a sync with changes refetches that table's rows and records and the counts
     ["meta"],
     ["git"],
     ["gitdiff"],
+    ["search"],
   ]);
   expect(invalidationsFor(sync({ schema: [{}] }))).toContainEqual(["meta"]);
 });

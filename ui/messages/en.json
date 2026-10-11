@@ -253,9 +253,49 @@
   "schema_unmanaged_index": "Not managed by yamlite (created with SQL or similar)",
   "schema_not_created_hint": "Why an index wasn't created is shown in the warnings on the Sync screen.",
   "schema_expanded_views": "Expanded views",
-  "cmd_placeholder": "Search tables and screens…",
+  "cmd_placeholder": "Search tables, screens and records…",
   "cmd_empty": "Nothing found",
   "cmd_views": "Views",
+  "cmd_records": "Records",
+  "cmd_all_results": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "See the result",
+        "n=other": "See all {count} results"
+      }
+    }
+  ],
+  "cmd_searching": "Searching…",
+  "cmd_hint_move": "move",
+  "cmd_hint_open": "open",
+  "cmd_hint_all": "all results",
+  "search_tables": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} table",
+        "n=other": "{count} tables"
+      }
+    }
+  ],
+  "search_title": "Search",
+  "search_placeholder": "Search every table…",
+  "search_hint": "Type at least 2 characters.",
+  "search_empty": "No records match.",
+  "search_hits": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "{count} match",
+        "n=other": "{count} matches"
+      }
+    }
+  ],
+  "search_show_all": "Show all {count} in this table",
   "sql_history": "History",
   "sql_run_shortcut": "Run ⌘↵",
   "sql_run": "Run",
