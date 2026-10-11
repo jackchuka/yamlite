@@ -1,14 +1,9 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import pkg from "../../../package.json" with { type: "json" };
-import { AgentStartError, type Conversation } from "../../agent/host.ts";
-import { handleMcp } from "../../agent/mcp.ts";
-import { agentTools } from "../../agent/tools.ts";
+import type { Conversation } from "../../agent/host.ts";
 import type { ApiContext } from "../context.ts";
-import { HttpError, readJson, Reply, sendJson } from "../http.ts";
+import { HttpError, Reply } from "../http.ts";
 import { objectBody } from "../write.ts";
 import type { Routes } from "./index.ts";
 
-const { version } = pkg;
 const KEEPALIVE_MS = 15_000;
 
 const encoder = new TextEncoder();
@@ -51,16 +46,10 @@ const host = (ctx: ApiContext) => {
 };
 
 export const agentRoutes: Routes = (router, ctx) => {
-  router.add("POST", "/api/agent/conversations", async ({ body }) => {
-    const agent = objectBody(body, "body").agent;
-    if (typeof agent !== "string") throw new HttpError(400, "agent is required");
-    try {
-      const c = await host(ctx).start(agent);
-      return new Reply(201, { id: c.id });
-    } catch (e) {
-      if (e instanceof AgentStartError) throw new HttpError(502, e.message, { code: e.code });
-      throw e;
-    }
+  router.add("POST", "/api/agent/conversations", ({ body }) => {
+    const { provider, model, apiKey } = objectBody(body, "body");
+    const c = host(ctx).start({ provider, model, apiKey });
+    return new Reply(201, { id: c.id });
   });
 
   router.add("GET", "/api/agent/conversations", () => ({ conversations: host(ctx).list() }));
@@ -85,13 +74,13 @@ export const agentRoutes: Routes = (router, ctx) => {
     return new Reply(202, { ok: true });
   });
 
-  router.add("POST", "/api/agent/conversations/:id/cancel", async ({ params }) => {
-    await host(ctx).cancel(params.id as string);
+  router.add("POST", "/api/agent/conversations/:id/cancel", ({ params }) => {
+    host(ctx).cancel(params.id as string);
     return { ok: true };
   });
 
-  router.add("DELETE", "/api/agent/conversations/:id", async ({ params }) => {
-    await host(ctx).end(params.id as string);
+  router.add("DELETE", "/api/agent/conversations/:id", ({ params }) => {
+    host(ctx).end(params.id as string);
     return { ok: true };
   });
 
@@ -104,32 +93,3 @@ export const agentRoutes: Routes = (router, ctx) => {
   });
   router.add("POST", "/api/agent/proposals/:id/discard", ({ params }) => ctx.proposals.discard(params.id as string));
 };
-
-// the agent's door into yamlite: authenticated by its conversation's token, not the UI's
-export function mcpEndpoint(ctx: ApiContext) {
-  return async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    if (req.method !== "POST") {
-      res.writeHead(405, { allow: "POST" });
-      res.end();
-      return;
-    }
-    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1];
-    const c = bearer ? ctx.agent?.byToken(bearer) : undefined;
-    if (!c) {
-      sendJson(res, 401, { error: "unknown or ended conversation" });
-      return;
-    }
-    let body: unknown;
-    try {
-      body = await readJson(req);
-    } catch (e) {
-      sendJson(res, e instanceof HttpError ? e.status : 400, { error: e instanceof Error ? e.message : String(e) });
-      return;
-    }
-    const out = await handleMcp(body, agentTools(ctx, c.id), version);
-    if (out === null) {
-      res.writeHead(202);
-      res.end();
-    } else sendJson(res, 200, out);
-  };
-}

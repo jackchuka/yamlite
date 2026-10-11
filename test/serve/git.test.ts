@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { agentTools } from "../../src/agent/tools.ts";
 import { localDriver } from "../../src/git/driver.ts";
+import { scripted } from "../agent/model.ts";
 import { commit, git, useGitEnv, withRemote } from "../gitrepo.ts";
 import { dataRoot, read, sql, tmpRoot, waitFor, write } from "../helpers.ts";
 import { type Served, startServe } from "./helpers.ts";
@@ -151,27 +152,28 @@ test("gh is not probed when the agent is off", async () => {
 });
 
 test("a finished git proposal starts an agent turn that reports the result without a user message", async () => {
-  const scenario = join(tmpRoot(), "scenario.json");
-  write(
-    scenario,
-    JSON.stringify([
-      [{ mcp: "propose_git", args: { title: "branch", steps: [{ kind: "create_branch", name: "edit-a" }] } }],
-      [{ echo: true }],
-    ]),
-  );
-  vi.stubEnv("FAKE_AGENT_SCENARIO", scenario);
   const root = dataRoot();
   write(join(root, "yamlite.yaml"), TASKS);
   write(join(root, "tasks/a.yaml"), "title: A\n");
   withRemote(root);
-  const fake = join(import.meta.dirname, "../fixtures/fake-agent.mjs");
   t = await startServe({}, undefined, {
     root,
     gh: null,
-    agents: [{ id: "test", name: "Test agent", command: process.execPath, args: [fake], login: "login" }],
+    ai: {
+      keys: { anthropic: "k" },
+      createModel: () =>
+        scripted([
+          {
+            tools: [
+              { name: "propose_git", args: { title: "branch", steps: [{ kind: "create_branch", name: "edit-a" }] } },
+            ],
+          },
+          { say: "all git steps ran" },
+        ]),
+    },
   });
   const host = t.s.context.agent!;
-  const c = await host.start("test");
+  const c = await host.start({ provider: "anthropic" });
   host.prompt(c.id, "make a branch");
   await waitFor(() => !c.busy && c.events.some((e) => e.type === "proposal"));
   const [p] = t.s.context.proposals.pending();

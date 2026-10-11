@@ -6,6 +6,7 @@ import { Command } from "commander";
 import { checkReport, displayPath, painter, reloadLine, report, watchEvents, watchHeader } from "./format.ts";
 import { guide } from "./guide.ts";
 import { check, exportSite, formatCsv, formatJson, formatTable, generateConfig, init, open, query } from "./index.ts";
+import { envKeys } from "./agent/providers.ts";
 import { serve } from "./serve/index.ts";
 import { isLoopback } from "./serve/security.ts";
 
@@ -176,16 +177,17 @@ withRoot(program.command("serve").description("open the web UI and sync continuo
   .option("--port <number>", "port to listen on", "4610")
   .option("--host <address>", "address to listen on", "127.0.0.1")
   .option("--open", "open the UI in the browser")
-  .option("--no-agent", "do not offer AI agents in the web UI")
+  .option("--no-agent", "do not offer Ask AI in the web UI")
   .action(async (root: string, o: { db?: string; port: string; host: string; open?: boolean; agent: boolean }) => {
     const port = Number(o.port);
     if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`invalid port: ${o.port}`);
     const s = await serve({ root, db: o.db, port, host: o.host, agent: o.agent });
     if (!isLoopback(o.host)) {
+      const askAi = o.agent && Object.keys(envKeys(process.env)).length > 0;
       console.error(
         painter(process.stderr)(
           "yellow",
-          `warning: listening on ${o.host}; anyone who can reach it and has the token can read and change the data`,
+          `warning: listening on ${o.host}; anyone who can reach it and has the token can read and change the data${askAi ? " and use Ask AI with the API keys from the environment" : ""}`,
         ),
       );
     }

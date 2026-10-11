@@ -18,6 +18,7 @@ const notInBrowser = [
   "test/cli.test.ts",
   "test/export.test.ts",
   "test/guide.test.ts",
+  "test/which.test.ts",
   "test/serve/agent.test.ts",
   "test/serve/git.test.ts",
   "test/serve/git-driver.test.ts",
@@ -31,7 +32,11 @@ const sqlite = { find: /^node:sqlite$/, replacement: here("./src/browser/sqlite.
 
 const browserProject = {
   resolve: { alias: browserAliases() },
-  optimizeDeps: { exclude: ["@sqlite.org/sqlite-wasm"] },
+  optimizeDeps: {
+    exclude: ["@sqlite.org/sqlite-wasm"],
+    // found only while the tests run otherwise, and Vite reloads the page when it finds them
+    include: ["ai", "@ai-sdk/anthropic", "@ai-sdk/openai"],
+  },
   worker: { format: "es" as const },
   test: {
     name: "browser",

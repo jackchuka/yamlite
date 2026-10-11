@@ -20,7 +20,7 @@ export async function tasksWorkspace(
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns:\n      title: TEXT\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
   setup?.(root);
-  const w = await createWorkspace({ root, watch: fast, agents: [], mcpUrl: () => "", gh: null, ...opts });
+  const w = await createWorkspace({ root, watch: fast, gh: null, ...opts });
   open.push(w);
   return { w, root };
 }

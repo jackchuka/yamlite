@@ -1,30 +1,37 @@
 import { resolve } from "node:path";
-import { type AgentInfo, which } from "../agent/detect.ts";
+import type { LanguageModel } from "ai";
 import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
+import type { Credentials } from "../agent/providers.ts";
 import { ProposalStore } from "../agent/proposals.ts";
+import { agentTools } from "../agent/tools.ts";
 import { configPath, resolveConfig } from "../config.ts";
 import { type GitDriver, localDriver } from "../git/driver.ts";
 import { ghReady } from "../git/repo.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
 import type { WatchOptions } from "../watch.ts";
+import { which } from "../which.ts";
 import type { ApiContext } from "./context.ts";
 import { EventHub } from "./events.ts";
-import { type McpHandler, Router } from "./http.ts";
+import { Router } from "./http.ts";
 import { PageSql } from "./pagesql.ts";
 import { PageWatch } from "./pagewatch.ts";
-import { mcpEndpoint } from "./routes/agent.ts";
 import { ROUTES } from "./routes/index.ts";
 import { createTable } from "./routes/tables.ts";
 import { assertSynced } from "./write.ts";
+
+export interface AiOptions {
+  // keys the server holds, by provider id
+  keys?: Record<string, string>;
+  createModel?: (c: Credentials) => LanguageModel;
+}
 
 export interface WorkspaceOptions {
   root: string;
   db?: string;
   watch?: WatchOptions;
-  agents: AgentInfo[];
-  // the URL agents reach this workspace's MCP endpoint at; read when an agent starts
-  mcpUrl: () => string;
+  // Ask AI; absent or null turns it off
+  ai?: AiOptions | null;
   // absent: the local repository (found once it exists) with the gh probe; null: no git
   git?: GitDriver | null;
   // skips gh detection; null means no gh
@@ -35,7 +42,6 @@ export interface WorkspaceOptions {
 export interface Workspace {
   readonly context: ApiContext;
   readonly router: Router;
-  readonly mcp: McpHandler;
   close(): Promise<void>;
 }
 
@@ -115,11 +121,11 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     };
     const router = new Router();
     for (const routes of ROUTES) routes(router, ctx);
-    if (o.agents.length > 0) {
+    if (o.ai) {
       ctx.agent = new AgentHost({
-        root: ctx.root,
-        agents: o.agents,
-        mcpUrl: o.mcpUrl,
+        keys: o.ai.keys,
+        createModel: o.ai.createModel,
+        tools: (id) => agentTools(ctx, id),
         notes: git?.steps ? [GIT_NOTE] : [],
         feedback: (id) => ctx.proposals.takeFeedback(id),
       });
@@ -131,7 +137,6 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     return {
       context: ctx,
       router,
-      mcp: mcpEndpoint(ctx),
       close() {
         closing ??= (async () => {
           try {
