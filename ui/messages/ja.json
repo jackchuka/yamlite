@@ -37,6 +37,7 @@
   "shell_load_failed": "スナップショットを読み込めませんでした",
   "shell_load_file_protocol": "file:// では開けません。このフォルダを Web サーバー経由で開いてください（例: npx serve）。",
   "nav_sidebar": "サイドバー",
+  "nav_sidebar_resize": "サイドバーの幅を変更",
   "nav_menu": "メニュー",
   "nav_search": "検索",
   "nav_search_placeholder": "検索…",

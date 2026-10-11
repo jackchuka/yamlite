@@ -1,5 +1,6 @@
+import { cn } from "@/lib/utils";
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
-import { MIN_WIDTH, maxWidth } from "@/lib/drawerWidth";
+import { DRAWER_BOUNDS, type WidthBounds } from "@/lib/panelWidth";
 
 const RESIZE_STEP = 16;
 
@@ -7,11 +8,16 @@ export function PanelResizeHandle({
   width,
   label,
   onResize,
+  edge = "left",
+  bounds = DRAWER_BOUNDS,
 }: {
   width: number;
   label: string;
   onResize: (w: number | null) => void;
+  edge?: "left" | "right";
+  bounds?: WidthBounds;
 }) {
+  const dir = edge === "left" ? -1 : 1;
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
@@ -20,7 +26,7 @@ export function PanelResizeHandle({
     el.setPointerCapture?.(e.pointerId);
     document.body.setAttribute("data-resizing", "");
     const startX = e.clientX;
-    const move = (ev: PointerEvent) => onResize(width + startX - ev.clientX);
+    const move = (ev: PointerEvent) => onResize(width + dir * (ev.clientX - startX));
     let ended = false;
     const end = () => {
       if (ended) return;
@@ -41,7 +47,7 @@ export function PanelResizeHandle({
     el.addEventListener("lostpointercapture", end);
   };
   const onKeyDown = (e: ReactKeyboardEvent) => {
-    const delta = e.key === "ArrowLeft" ? RESIZE_STEP : e.key === "ArrowRight" ? -RESIZE_STEP : 0;
+    const delta = e.key === "ArrowLeft" ? -dir * RESIZE_STEP : e.key === "ArrowRight" ? dir * RESIZE_STEP : 0;
     if (delta === 0) return;
     e.preventDefault();
     onResize(width + delta);
@@ -52,13 +58,16 @@ export function PanelResizeHandle({
       aria-label={label}
       aria-orientation="vertical"
       aria-valuenow={width}
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={maxWidth()}
+      aria-valuemin={bounds.min}
+      aria-valuemax={bounds.max()}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onDoubleClick={() => onResize(null)}
       onKeyDown={onKeyDown}
-      className="absolute inset-y-0 -left-0.5 z-10 w-1 cursor-col-resize outline-none hover:bg-primary/40 focus-visible:bg-primary/40"
+      className={cn(
+        "absolute inset-y-0 z-10 w-1 cursor-col-resize outline-none hover:bg-primary/40 focus-visible:bg-primary/40",
+        edge === "left" ? "-left-0.5" : "-right-0.5",
+      )}
     />
   );
 }

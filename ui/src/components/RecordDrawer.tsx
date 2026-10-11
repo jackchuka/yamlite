@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError, api } from "@/lib/api";
 import { buildPatch, changedFields } from "@/lib/form";
 import { cn } from "@/lib/utils";
-import { useDrawerWidth } from "@/lib/drawerWidth";
+import { usePanelWidth } from "@/lib/panelWidth";
 import { PanelResizeHandle } from "./PanelResizeHandle";
 import { isReadOnly } from "@/lib/mode";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -106,7 +106,7 @@ export function RecordDrawer({
   // bumped when the form is reloaded from outside, so every field remounts with fresh state
   const [version, setVersion] = useState(0);
   const dirty = base !== null && draft !== null && changedFields(base, draft).length > 0;
-  const [width, setWidth] = useDrawerWidth();
+  const [width, setWidth] = usePanelWidth("yamlite-drawer-width", 360);
   const mobile = useIsMobile();
   const viewportHeight = useViewportHeight(mobile);
   const size = mobile ? (viewportHeight ? { height: viewportHeight } : undefined) : { width };
