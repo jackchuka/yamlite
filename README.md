@@ -486,7 +486,7 @@ tables:
 - A file without front matter is a record with only a body; adding a field adds a front matter block.
 - Writes change only what changed: editing only the body leaves the front matter text as it was, and editing a field leaves the body's bytes alone. A field edit rewrites the front matter the way it does for a YAML file: comments mostly stay on their lines, but a comment-only block loses its comment when the first field is added, and spacing or number formatting on other lines can be normalised. CRLF line endings and a BOM are kept.
 - Only YAML front matter is read. A file with TOML (`+++`) or JSON front matter is skipped with a warning and never written.
-- A Markdown table exists only where `yamlite.yaml` declares one: neither `init` nor `sync` creates one from the `.md` or `.mdx` files it finds, and a README next to your YAML stays a README. A folder holding no YAML files (only Markdown notes or images, say) is not discovered as a table.
+- A Markdown table exists only where `yamlite.yaml` declares one. `yamlite init` declares one for each top-level folder that holds `.md` or `.mdx` files and is not a YAML table, at the deepest folder holding them all and one per extension; `sync` never creates one, and a README next to your YAML or at the root stays a README.
 
 ### Removing columns
 

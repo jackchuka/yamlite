@@ -1,8 +1,16 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { type Dirent, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Document, parse, type YAMLSeq } from "yaml";
-import { configPath, expandToRaw, filesOf, isConventional, referenceToRaw, resolveConfig } from "./config.ts";
+import {
+  configPath,
+  expandToRaw,
+  filesOf,
+  isConventional,
+  referenceToRaw,
+  resolveConfig,
+  type TableInput,
+} from "./config.ts";
 import { isDate, isDatetime } from "./datetime.ts";
 import { makeSource } from "./engine.ts";
 import { MANAGED_PREFIX } from "./indexes.ts";
@@ -180,6 +188,64 @@ function inferFormats(
   return formats;
 }
 
+const MARKDOWN = [".md", ".mdx"] as const;
+
+function markdownFiles(dir: string): string[] {
+  const out: string[] = [];
+  const visit = (d: string) => {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith(".") || e.name === "node_modules") continue;
+      if (e.isDirectory()) visit(join(d, e.name));
+      else if (MARKDOWN.some((ext) => e.name.endsWith(ext))) out.push(join(d, e.name));
+    }
+  };
+  visit(dir);
+  return out;
+}
+
+function commonFolder(files: string[]): string {
+  return files.map(dirname).reduce((a, b) => {
+    while (b !== a && !b.startsWith(a + sep)) a = dirname(a);
+    return a;
+  });
+}
+
+// Markdown tables are only ever declared, so init declares one for each top-level folder outside the tables found
+// so far that holds .md or .mdx files, at the deepest folder holding them all; one table per extension
+function markdownTables(root: string, tables: TableSpec[]): TableInput[] {
+  const overlaps = (dir: string) =>
+    tables.some((t) => t.path === dir || t.path.startsWith(dir + sep) || dir.startsWith(t.path + sep));
+  const taken = new Set(tables.map((t) => t.name));
+  const out: TableInput[] = [];
+  for (const e of readdirSync(root, { withFileTypes: true })) {
+    const top = join(root, e.name);
+    if (!e.isDirectory() || e.name.startsWith(".") || e.name === "node_modules" || overlaps(top)) continue;
+    const files = markdownFiles(top);
+    const exts = MARKDOWN.filter((ext) => files.some((f) => f.endsWith(ext)));
+    // a folder's .md and .mdx tables share one base name, so they stay side by side
+    const bases = new Map<string, string>();
+    for (const ext of exts) {
+      const folder = commonFolder(files.filter((f) => f.endsWith(ext)));
+      const rel = relative(root, folder).split(sep).join("/");
+      let base = bases.get(folder);
+      if (base === undefined) {
+        base = taken.has(basename(folder)) ? rel.replaceAll("/", "_") : basename(folder);
+        bases.set(folder, base);
+      }
+      const name = exts.length > 1 && ext === ".mdx" ? `${base}_mdx` : base;
+      taken.add(name);
+      out.push({ name, files: `${rel}/**/*${ext}` });
+    }
+  }
+  return out;
+}
+
 function displayPath(root: string, path: string): string {
   const rel = relative(root, path);
   return rel.startsWith("..") || isAbsolute(rel) ? path : rel;
@@ -190,7 +256,10 @@ export function generateConfig(opts: InitOptions): string {
   if (configPath(root) !== null && !opts.force) {
     throw new Error(`${configPath(root)} already exists; use --force to overwrite it`);
   }
-  const config = resolveConfig({ root, db: opts.db }, { requireConfig: false });
+  const found = resolveConfig({ root, db: opts.db }, { requireConfig: false });
+  const markdown = markdownTables(root, found.tables);
+  const config =
+    markdown.length === 0 ? found : resolveConfig({ root, db: opts.db, tables: markdown }, { requireConfig: false });
   const db = openReadOnly(config.db);
   try {
     const doc = new Document({ tables: {} });

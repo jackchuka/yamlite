@@ -1,0 +1,20 @@
+# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;
+# edit types, keys and indexes to change the database.
+
+tables:
+  authors:
+    columns:
+      id: TEXT
+      name: TEXT
+  content:
+    files: content/**/*.md
+    columns:
+      body: TEXT
+      title: TEXT
+      date: TEXT
+      author: TEXT
+      tags: JSON
+    formats:
+      date: date
+    references:
+      author: authors
