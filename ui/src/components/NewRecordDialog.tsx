@@ -27,6 +27,8 @@ export function NewRecordDialog({
   const dispatch = useReflectDispatch();
   const [key, setKey] = useState("");
   const [values, setValues] = useState<Row>(initial);
+  // a field picks its widget once per mount, so a reset remounts them rather than feed a map widget null
+  const [generation, setGeneration] = useState(0);
   const create = useMutation({
     mutationFn: () => {
       const set = Object.fromEntries(
@@ -40,6 +42,7 @@ export function NewRecordDialog({
       onOpenChange(false);
       setKey("");
       setValues(initial);
+      setGeneration((g) => g + 1);
       void navigate({
         to: "/t/$table",
         params: { table: table.name },
@@ -67,7 +70,7 @@ export function NewRecordDialog({
         {Object.entries(table.columns)
           .filter(([c]) => c !== table.key)
           .map(([c, type]) => (
-            <div key={c}>
+            <div key={`${generation}:${c}`}>
               <div
                 className={`mb-1 text-[11.5px] font-semibold ${table.required.includes(c) && values[c] == null ? "text-warn" : "text-muted-foreground"}`}
               >

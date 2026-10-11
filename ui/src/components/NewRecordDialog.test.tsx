@@ -85,3 +85,35 @@ test("a new starting value replaces the previous one", () => {
   rerender(view({ title: "b" }));
   expect((screen.getByLabelText("title") as HTMLInputElement).value).toBe("b");
 });
+
+test("saving a map value resets the form without crashing the still-open fields", async () => {
+  const json: TableMeta = { ...table, columns: { id: "TEXT", meta: "JSON" }, required: [] };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NewRecordDialog table={json} open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByLabelText("meta as map"));
+  fireEvent.click(screen.getByText("+ key"));
+  const input = screen.getByLabelText("new key in meta");
+  fireEvent.change(input, { target: { value: "a" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  fireEvent.change(screen.getByLabelText("new key"), { target: { value: "k" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(api.create).toHaveBeenCalledWith("tasks", "k", { meta: { a: "" } }));
+  await waitFor(() => expect(screen.getByLabelText("meta as map")).toBeTruthy());
+});
+
+test("saving a list value resets the form without crashing the still-open fields", async () => {
+  const json: TableMeta = { ...table, columns: { id: "TEXT", tags: "JSON" }, required: [] };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NewRecordDialog table={json} open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByLabelText("tags as list"));
+  fireEvent.change(screen.getByLabelText("new key"), { target: { value: "k" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(api.create).toHaveBeenCalledWith("tasks", "k", { tags: [] }));
+  await waitFor(() => expect(screen.getByLabelText("tags as list")).toBeTruthy());
+});
