@@ -28,10 +28,11 @@ export function elementPath(view: ViewMeta, row: Row): Array<string | number> {
   });
 }
 
-function getIn(value: unknown, path: Array<string | number>): unknown {
+export function getIn(value: unknown, path: Array<string | number>): unknown {
   let at = value;
   for (const step of path) {
-    if (Array.isArray(at) && typeof step === "number") at = at[step];
+    // a view over both lists and maps keys every position as text, list positions included
+    if (Array.isArray(at) && (typeof step === "number" || /^\d+$/.test(step))) at = at[Number(step)];
     else if (isMap(at) && typeof step === "string" && Object.hasOwn(at, step)) at = at[step];
     else return undefined;
   }
