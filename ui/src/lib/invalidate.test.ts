@@ -35,8 +35,15 @@ test("a sync without changes refetches nothing", () => {
   expect(invalidationsFor(sync({ warnings: ["a: x"] }))).toEqual([]);
 });
 
-test("reloads refetch meta, conflicts refetch the conflict list", () => {
-  expect(invalidationsFor({ type: "reload", at: "t", tables: [] })).toEqual([["meta"], ["page"]]);
+test("reloads refetch meta, the schema and the git status, conflicts refetch the conflict list", () => {
+  // a reload means yamlite.yaml changed, which the git status counts as an edit
+  expect(invalidationsFor({ type: "reload", at: "t", tables: [] })).toEqual([
+    ["meta"],
+    ["page"],
+    ["schema"],
+    ["git"],
+    ["gitdiff"],
+  ]);
   expect(
     invalidationsFor({ type: "conflict", at: "t", table: "tasks", key: "a", winner: "file", savedTo: null }),
   ).toEqual([["conflicts"]]);
@@ -48,5 +55,5 @@ test("a saved page reloads only that page; a config reload reloads every page", 
     ["page", "board"],
     ["page", "copy"],
   ]);
-  expect(invalidationsFor({ type: "reload", at: "", tables: [] })).toEqual([["meta"], ["page"]]);
+  expect(invalidationsFor({ type: "reload", at: "", tables: [] })).toContainEqual(["page"]);
 });

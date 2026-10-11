@@ -117,6 +117,24 @@ test("the base is the one editing started from, even when the schema refetches",
   expect(api.previewRules).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), "h2");
 });
 
+test("a save refetches the git status, so the changed yamlite.yaml can be sent", async () => {
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: true });
+  vi.spyOn(api, "saveRules").mockResolvedValue({ added: [], removed: [], changed: true, base: "h2" });
+  const client = new QueryClient();
+  const invalidate = vi.spyOn(client, "invalidateQueries");
+  render(
+    <QueryClientProvider client={client}>
+      <RuleEditor {...props} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /title/ }));
+  fireEvent.click(screen.getByLabelText("Required"));
+  await waitFor(() => expect(saveButton().disabled).toBe(false));
+  fireEvent.click(saveButton());
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["git"] }));
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ["gitdiff"] });
+});
+
 test("Save waits for the preview of the latest draft", async () => {
   vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: true });
   ui();
