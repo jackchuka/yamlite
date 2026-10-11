@@ -20,7 +20,7 @@ import {
   usePendingProposals,
 } from "@/lib/agent";
 import { ApiError } from "@/lib/api";
-import { useDrawerWidth } from "@/lib/drawerWidth";
+import { usePanelWidth } from "@/lib/panelWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { formatWhen } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -158,7 +158,7 @@ export function AgentPanel() {
   const agents = useAgents();
   const state = useChat();
   const mobile = useIsMobile();
-  const [width, setWidth] = useDrawerWidth("yamlite-agent-width", 420);
+  const [width, setWidth] = usePanelWidth("yamlite-agent-width", 420);
   const [agentId, setAgentId] = useState(chat.agentId ?? agents[0]?.id ?? "");
   const [text, setText] = useState("");
   const [startError, setStartError] = useState<{ text: string; command?: string } | null>(null);

@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { agentPanel, type AgentMeta } from "@/lib/agent";
 import { Shell } from "./Shell";
@@ -38,4 +38,22 @@ test("no panel without agents, even when open", () => {
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.queryByRole("complementary", { name: "Ask AI" })).toBeNull();
+});
+
+test("dragging the sidebar's right edge widens it and the width is remembered", () => {
+  localStorage.clear();
+  render(<Shell />);
+  const handle = screen.getByRole("separator", { name: "Resize sidebar" });
+  const grid = handle.parentElement!.parentElement!;
+  expect(grid.style.gridTemplateColumns).toBe("220px 1fr");
+  fireEvent.pointerDown(handle, { clientX: 220, button: 0 });
+  fireEvent.pointerMove(document, { clientX: 300 });
+  fireEvent.pointerUp(document, { clientX: 300 });
+  expect(grid.style.gridTemplateColumns).toBe("300px 1fr");
+  expect(localStorage.getItem("yamlite-sidebar-width")).toBe("300");
+  fireEvent.keyDown(handle, { key: "ArrowLeft" });
+  expect(grid.style.gridTemplateColumns).toBe("284px 1fr");
+  fireEvent.doubleClick(handle);
+  expect(grid.style.gridTemplateColumns).toBe("220px 1fr");
+  expect(localStorage.getItem("yamlite-sidebar-width")).toBeNull();
 });

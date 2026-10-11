@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowUpRight, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, api } from "@/lib/api";
-import { useDrawerWidth } from "@/lib/drawerWidth";
+import { usePanelWidth } from "@/lib/panelWidth";
 import { changedFields, setIn } from "@/lib/form";
 import { isReadOnly } from "@/lib/mode";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
@@ -56,7 +56,7 @@ export function ViewRowDrawer({
   const client = useQueryClient();
   const dispatch = useReflectDispatch();
   const { connected } = useEvents();
-  const [width, setWidth] = useDrawerWidth();
+  const [width, setWidth] = usePanelWidth("yamlite-drawer-width", 360);
   const mobile = useIsMobile();
   const viewportHeight = useViewportHeight(mobile);
   const size = mobile ? (viewportHeight ? { height: viewportHeight } : undefined) : { width };

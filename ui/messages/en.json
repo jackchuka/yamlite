@@ -39,6 +39,7 @@
   "shell_load_failed": "Couldn't load the snapshot",
   "shell_load_file_protocol": "This page can't be opened from file://. Serve this folder over a web server instead (e.g. npx serve).",
   "nav_sidebar": "sidebar",
+  "nav_sidebar_resize": "Resize sidebar",
   "nav_menu": "menu",
   "nav_search": "search",
   "nav_search_placeholder": "Search…",
