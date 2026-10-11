@@ -176,3 +176,16 @@ test("a Markdown file added while watching adds no table", async () => {
   await t.y.close();
   expect(t.errors).toEqual([]);
 });
+
+test("reloadConfig applies a changed yamlite.yaml at once", async () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks: {}\n");
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  const y = await open({ root });
+  const w = y.watch({}, { debounceMs: 10_000 });
+  await w.ready;
+  write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    required: [title]\n");
+  w.reloadConfig();
+  expect(y.tables.find((t) => t.name === "tasks")?.required).toEqual(["title"]);
+  await y.close();
+});

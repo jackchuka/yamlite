@@ -150,6 +150,7 @@ export async function writeSnapshotData(opts: {
         // the export routes are GET-only, so the shared store is never begun or rolled back here
         agent: null,
         git: null,
+        reloadConfig: () => {},
         proposals: new ProposalStore({
           store,
           dry: store,
@@ -200,7 +201,8 @@ export async function writeSnapshotData(opts: {
         pages: served.pages.filter((p: Json) => kept.has(p.name)).map((p: Json) => ({ ...p, path: hidePath(p.path) })),
       };
       for (const name of selected) {
-        const schema = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
+        // base guards edits to yamlite.yaml; a static export has no editor
+        const { base: _base, ...schema } = get(router, `/api/tables/${encodeURIComponent(name)}/schema`);
         schemas[name] = {
           ...schema,
           path: hidePath(schema.path),

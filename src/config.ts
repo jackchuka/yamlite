@@ -10,6 +10,7 @@ import {
   type AllowedValue,
   type Bound,
   COLUMN_FORMATS,
+  isShape,
   COLUMN_TYPES,
   type ColumnFormat,
   type ColumnType,
@@ -54,6 +55,8 @@ export interface OpenOptions {
   tables?: TableInput[];
   stateDir?: string;
   persistConfig?: boolean;
+  // parsed instead of reading yamlite.yaml (a candidate the UI previews)
+  configText?: string;
 }
 
 export interface ResolvedConfig {
@@ -239,12 +242,12 @@ const TABLE_KEYS = [
   "split",
 ];
 
-function readRootConfig(root: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
-  const path = configPath(root);
+function readRootConfig(root: string, text?: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
+  const path = configPath(root) ?? (text === undefined ? null : "yamlite.yaml");
   if (path === null) return { tables: [], pages: undefined };
   let raw: { tables?: Record<string, RawTable | null>; pages?: unknown } | null;
   try {
-    raw = parse(readFileSync(path, "utf8"));
+    raw = parse(text ?? readFileSync(path, "utf8"));
   } catch (e) {
     const first = (e instanceof Error ? e.message : String(e)).split("\n")[0];
     throw new Error(`invalid ${path}: ${first}`);
@@ -338,7 +341,7 @@ function toColumns(where: string, raw: Record<string, string> | undefined): Reco
   return columns;
 }
 
-// how the UI edits a column, kept apart from its type: markdown is stored as plain TEXT
+// how the UI edits a column, kept apart from its type: markdown is stored as plain TEXT, a list or map as JSON
 function toFormats(where: string, raw: unknown, columns: Record<string, ColumnType>): Record<string, ColumnFormat> {
   const formats: Record<string, ColumnFormat> = Object.create(null);
   if (raw === undefined || raw === null) return formats;
@@ -348,8 +351,9 @@ function toFormats(where: string, raw: unknown, columns: Record<string, ColumnTy
     const lower = String(format).toLowerCase() as ColumnFormat;
     if (!COLUMN_FORMATS.includes(lower)) throw new Error(`${where}unknown format ${format} for "${column}"`);
     const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
-    if (type !== undefined && type !== "TEXT") {
-      throw new Error(`${where}formats.${column}: ${lower} needs a TEXT column, not ${type}`);
+    const needs = isShape(lower) ? "JSON" : "TEXT";
+    if (type !== undefined && type !== needs) {
+      throw new Error(`${where}formats.${column}: ${lower} needs a ${needs} column, not ${type}`);
     }
     formats[column] = lower;
   }
@@ -392,6 +396,7 @@ function toBounds(
     for (const [column, b] of Object.entries(value)) {
       const format = Object.hasOwn(formats, column) ? formats[column] : undefined;
       const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
+      if (isShape(format)) throw new Error(`${where}${which}.${column}: a ${format} column cannot have a ${which}`);
       if (format === "date" || format === "datetime") {
         const ok = typeof b === "string" && (isDate(b) || (format === "datetime" && isDatetime(b)));
         if (!ok) throw new Error(`${where}${which}.${column}: ${JSON.stringify(b)} is not a ${format}`);
@@ -583,7 +588,7 @@ const isStringList = (v: unknown): v is string[] =>
   Array.isArray(v) && v.length > 0 && v.every((c) => typeof c === "string" && c !== "");
 
 // accepts `[a, b]`, `{ columns: [a, b] | a, unique? }` or `{ expr: "...", unique? }`
-function toIndex(table: string, raw: unknown, i: number): IndexSpec {
+export function toIndex(table: string, raw: unknown, i: number): IndexSpec {
   const invalid = () =>
     new Error(`table "${table}": index #${i + 1} must be a list of columns, { columns, unique? } or { expr, unique? }`);
   if (isStringList(raw)) return { columns: raw, unique: false };
@@ -607,7 +612,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
     const scanned = scanRoot(root);
-    const raw = readRootConfig(root);
+    const raw = readRootConfig(root, opts.configText);
     const declared = new Map<string, Located>();
     const pathErrors: string[] = [];
     for (const o of raw.tables) {

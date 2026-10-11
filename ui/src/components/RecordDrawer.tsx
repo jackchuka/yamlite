@@ -6,6 +6,7 @@ import { EditorView } from "@codemirror/view";
 import CodeMirror from "@uiw/react-codemirror";
 import { ArrowLeft, Trash2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { fieldLabel } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -289,21 +290,23 @@ export function RecordDrawer({
                   key={f}
                   className={cn("mb-3.5", restoredFrom && changed.has(f) && "-mx-2 rounded-md bg-warn-soft px-2 py-1")}
                 >
-                  <div className="mb-1 flex justify-between text-[11.5px] font-semibold text-muted-foreground max-md:text-[13px]">
-                    <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
-                      {f}
-                      {table.required.includes(f) && <span aria-label={m.record_required()}> *</span>}
-                    </span>
-                    <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
-                      {reference
-                        ? `→ ${reference.table}`
-                        : (columnFormat(table, f) ?? columnType(table, f) ?? m.record_new_column())}
-                    </span>
-                  </div>
                   <FormField
                     key={`${f}:${version}`}
                     readOnly={!editable}
                     path={[f]}
+                    label={
+                      <div className={`flex flex-1 justify-between ${fieldLabel}`}>
+                        <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
+                          {f}
+                          {table.required.includes(f) && <span aria-label={m.record_required()}> *</span>}
+                        </span>
+                        <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
+                          {reference
+                            ? `→ ${reference.table}`
+                            : (columnFormat(table, f) ?? columnType(table, f) ?? m.record_new_column())}
+                        </span>
+                      </div>
+                    }
                     value={draft[f]}
                     type={columnType(table, f)}
                     format={columnFormat(table, f)}

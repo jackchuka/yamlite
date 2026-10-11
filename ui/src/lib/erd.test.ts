@@ -65,6 +65,7 @@ const schema = (
   references: TableSchema["references"] = [],
   views: TableSchema["views"] = [],
 ): TableSchema => ({
+  base: "",
   name,
   mode: "files",
   path: name,

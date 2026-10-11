@@ -1,8 +1,20 @@
 import { readFileSync } from "node:fs";
-import { type Document, isMap, parseDocument, type YAMLMap } from "yaml";
+import {
+  type Document,
+  isMap,
+  isNode,
+  isScalar,
+  isSeq,
+  type Node,
+  parseDocument,
+  type YAMLMap,
+  type YAMLSeq,
+} from "yaml";
+import { toIndex } from "./config.ts";
 import { writeAtomic } from "./fsutil.ts";
+import { canonical, hashContent } from "./hash.ts";
 import { stringifyOptions } from "./source/yamldoc.ts";
-import type { ColumnType } from "./types.ts";
+import type { AllowedValue, Bound, ColumnFormat, ColumnType, IndexSpec } from "./types.ts";
 
 export interface Registration {
   table: string;
@@ -74,4 +86,168 @@ export function setTableGroup(path: string, table: string, group: string | null)
   const padded = /[[{] [^\s\]}]/.test(text);
   writeAtomic(path, doc.toString({ ...stringifyOptions(text), flowCollectionPadding: padded }));
   return true;
+}
+
+export interface RuleTarget {
+  table: string;
+  // the fields from the table's record down to the expanded view; [] for the table
+  path: string[];
+}
+
+export interface Rules {
+  required: string[];
+  values: Record<string, AllowedValue[]>;
+  formats: Record<string, ColumnFormat>;
+  min: Record<string, Bound>;
+  max: Record<string, Bound>;
+  // column → "table" or "table.column", as written in yamlite.yaml
+  references: Record<string, string>;
+}
+
+export const RULE_KEYS: readonly (keyof Rules)[] = ["required", "values", "min", "max", "formats", "references"];
+
+export const configHash = (text: string): string => hashContent(text);
+
+const same = (node: unknown, value: unknown): boolean =>
+  canonical(isNode(node) ? node.toJSON() : node) === canonical(value);
+
+// a new list is written in flow style unless it replaces a block-style one
+function listNode(doc: Document, value: unknown, current: unknown): Node {
+  const node = doc.createNode(value) as Node;
+  if (isSeq(node)) node.flow = isSeq(current) ? current.flow === true : true;
+  return node;
+}
+
+const keyText = (key: unknown): string => (isScalar(key) ? String(key.value) : String(key));
+
+function ruleTarget(doc: Document, target: RuleTarget): YAMLMap {
+  const root = doc.contents;
+  const tables = isMap(root) ? root.get("tables", true) : undefined;
+  if (!isMap(tables) || !tables.has(target.table)) throw new Error(`unknown table: ${target.table}`);
+  let entry = blockMap(doc, tables, target.table);
+  let name = target.table;
+  for (const field of target.path) {
+    name = `${name}__${field}`;
+    const expand = entry.get("expand", true);
+    if (!isMap(expand) || !expand.has(field)) throw new Error(`unknown view: ${name}`);
+    entry = blockMap(doc, expand, field);
+  }
+  return entry;
+}
+
+export type IndexEdit = { columns: string[]; unique: boolean } | { expr: string; unique: boolean };
+
+export interface SchemaEdit {
+  rules: Rules;
+  // the target table's complete index list; absent leaves `indexes` alone
+  indexes?: IndexEdit[];
+  // the target's complete set of expanded fields; absent leaves `expand` alone
+  views?: string[];
+}
+
+function applyRules(doc: Document, entry: YAMLMap, rules: Rules): boolean {
+  let changed = false;
+  for (const key of RULE_KEYS) {
+    const want = rules[key];
+    const current = entry.get(key, true);
+    if (Array.isArray(want)) {
+      if (want.length === 0) {
+        if (entry.has(key)) changed = entry.delete(key) || changed;
+        continue;
+      }
+      if (same(current, want)) continue;
+      entry.set(key, listNode(doc, want, current));
+      changed = true;
+      continue;
+    }
+    const pairs = Object.entries(want);
+    if (pairs.length === 0) {
+      if (entry.has(key)) changed = entry.delete(key) || changed;
+      continue;
+    }
+    const map = blockMap(doc, entry, key);
+    if (!isMap(current)) changed = true;
+    for (const item of map.items.slice()) {
+      if (!Object.hasOwn(want, keyText(item.key))) changed = map.delete(item.key) || changed;
+    }
+    for (const [column, value] of pairs) {
+      const pair = map.items.find((item) => keyText(item.key) === column);
+      if (pair && same(pair.value, value)) continue;
+      if (pair) pair.value = listNode(doc, value, pair.value);
+      else map.set(column, listNode(doc, value, undefined));
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+const indexId = (spec: IndexSpec) => JSON.stringify([spec.columns ?? null, spec.expr ?? null, spec.unique]);
+
+function indexNode(doc: Document, spec: IndexSpec): Node {
+  const value = spec.columns
+    ? spec.unique
+      ? { columns: spec.columns, unique: true }
+      : spec.columns
+    : { expr: spec.expr, ...(spec.unique ? { unique: true } : {}) };
+  const node = doc.createNode(value) as Node;
+  if (isSeq(node) || isMap(node)) node.flow = true;
+  return node;
+}
+
+function applyIndexes(doc: Document, entry: YAMLMap, table: string, indexes: IndexEdit[]): boolean {
+  const wanted = new Map(indexes.map((raw, i) => toIndex(table, raw, i)).map((spec) => [indexId(spec), spec]));
+  if (wanted.size === 0) return entry.delete("indexes");
+  const current: unknown = entry.get("indexes", true);
+  const list = isSeq(current) ? current : (doc.createNode([]) as YAMLSeq);
+  let changed = list !== current;
+  for (const item of list.items.slice()) {
+    let id: string | null = null;
+    try {
+      id = indexId(toIndex(table, isNode(item) ? item.toJSON() : item, 0));
+    } catch {
+      // an invalid declaration is never wanted
+    }
+    if (id !== null && wanted.delete(id)) continue;
+    list.items.splice(list.items.indexOf(item), 1);
+    changed = true;
+  }
+  for (const spec of wanted.values()) {
+    list.items.push(indexNode(doc, spec));
+    changed = true;
+  }
+  if (list !== current) entry.set("indexes", list);
+  return changed;
+}
+
+function applyViews(doc: Document, entry: YAMLMap, views: string[]): boolean {
+  const wanted = new Set(views);
+  if (wanted.size === 0) return entry.delete("expand");
+  const current = entry.get("expand", true);
+  const map = blockMap(doc, entry, "expand");
+  let changed = !isMap(current);
+  for (const item of map.items.slice()) {
+    const field = keyText(item.key);
+    if (wanted.delete(field)) continue;
+    changed = map.delete(item.key) || changed;
+  }
+  for (const field of wanted) {
+    map.set(field, doc.createNode({}));
+    changed = true;
+  }
+  return changed;
+}
+
+// Sets one target's rules, indexes and views to exactly `edit`, editing only what differs.
+// Returns the new text, or null when nothing changed.
+export function applySchema(text: string, target: RuleTarget, edit: SchemaEdit): string | null {
+  const doc = parseDocument(text);
+  if (doc.errors.length > 0) throw new Error(`invalid yamlite.yaml: ${doc.errors[0]?.message.split("\n")[0]}`);
+  if (edit.indexes !== undefined && target.path.length > 0) throw new Error("indexes belong to a table, not a view");
+  const entry = ruleTarget(doc, target);
+  let changed = applyRules(doc, entry, edit.rules);
+  if (edit.indexes !== undefined) changed = applyIndexes(doc, entry, target.table, edit.indexes) || changed;
+  if (edit.views !== undefined) changed = applyViews(doc, entry, edit.views) || changed;
+  if (!changed) return null;
+  const padded = /[[{] [^\s\]}]/.test(text);
+  return doc.toString({ ...stringifyOptions(text), flowCollectionPadding: padded });
 }

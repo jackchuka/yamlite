@@ -193,6 +193,7 @@ The UI is available in English and Japanese. It follows your browser language on
 - `--host 0.0.0.0` exposes it to your network; anyone with the URL can then change your data.
 - The ERD page marks references with problems. Click a table to highlight its neighbours, or double-click it to open the table. The layout is recomputed only when the tables, columns or references change, so nodes you drag stay where you put them.
 - A record's History tab lists the git commits that changed it, newest first, with uncommitted changes on top: each shows the fields it changed, and the YAML diff on request. Renames are followed, and in a list file only the commits that changed that record are shown. **Restore this version** puts an older version's values into the form without saving them. It needs `git` and only reads the repository; the static export has no History tab.
+- **Edit rules** in a table's schema changes its `required`, `values`, `formats`, `min` / `max` and `references`, or an expanded view's, and can also add or remove the table's indexes and its expanded views. Each change is checked against your data first ("Saving adds 2 warnings"), and only **Save** writes `yamlite.yaml`, keeping its other lines and comments. Types, keys and paths stay in the file. If `yamlite.yaml` changed since you started, saving is refused and your draft is kept.
 
 ### Send for review
 
@@ -429,6 +430,7 @@ join projects__milestones__tasks t on t.projects_id = m.projects_id and t.milest
 - Columns and types are inferred from the data on every sync; `columns` pins a type. Nothing is written back to `yamlite.yaml`.
 - Views are read-only: edit the YAML, or update the JSON column of the table. `serve` lists them under their table and opens the record a row comes from.
 - `references` on a view are checked like a table's, and `status` shows planned `+ view` / `− view` changes. A list that can't become a view (the field isn't a JSON column, or a view of that name was made by hand) is a warning.
+- The web UI can add or remove expanded views from the table's schema (**Edit rules**); removing one also removes its rules.
 
 ## Use with AI agents
 
@@ -508,13 +510,15 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 
 ### Formats
 
-`formats` tells the web UI how to edit a `TEXT` column, and for dates also what to check:
+`formats` tells the web UI how to edit a `TEXT` or `JSON` column, and for all but `markdown` also what to check:
 
-| Format     | Edited with                                   | Checked                                                                   |
-| ---------- | --------------------------------------------- | ------------------------------------------------------------------------- |
-| `markdown` | rendered Markdown, with an Edit tab           | —                                                                         |
-| `date`     | a date picker                                 | `YYYY-MM-DD`, a real date                                                 |
-| `datetime` | a date and time picker, with the offset shown | `YYYY-MM-DD`, `T` or a space, `HH:MM[:SS[.fff]]`, optional `Z` / `±HH:MM` |
+| Format     | Column | Edited with                                   | Checked                                                                   |
+| ---------- | ------ | --------------------------------------------- | ------------------------------------------------------------------------- |
+| `markdown` | `TEXT` | rendered Markdown, with an Edit tab           | —                                                                         |
+| `date`     | `TEXT` | a date picker                                 | `YYYY-MM-DD`, a real date                                                 |
+| `datetime` | `TEXT` | a date and time picker, with the offset shown | `YYYY-MM-DD`, `T` or a space, `HH:MM[:SS[.fff]]`, optional `Z` / `±HH:MM` |
+| `list`     | `JSON` | chips for a list of text, or JSON             | a list                                                                    |
+| `map`      | `JSON` | keys and values, else JSON                    | a map                                                                     |
 
 The Markdown editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A `datetime` keeps how it is written: picking a new time leaves its offset, separator and seconds as they were, and a new value gets your browser's offset. A value the picker can't show is edited as text, and a button switches between the two.
 
@@ -522,9 +526,21 @@ A value that doesn't match its format is a warning, not a failed sync:
 
 ```
 ! due "2026-02-31" not a date (buy-milk)
+! tags {"a":1} not a list (buy-milk)
 ```
 
-`init` writes `date` or `datetime` for a `TEXT` column whose values all have that shape. A format on a column declared with another type is an error. `expand` entries take `formats` too.
+A new record starts a `map` field with its editor, and offers a `list` field only chips or JSON (for a list of maps). Only the column's own value is checked, not what it holds: to check the items of a list, or the values of a map, expand it and give the view its own `formats`:
+
+```yaml
+tables:
+  projects:
+    formats: { milestones: list }
+    expand:
+      milestones:
+        formats: { tags: list, meta: map }
+```
+
+`init` writes `date` or `datetime` for a `TEXT` column whose values all have that shape. A format on a column declared with another type is an error, and so are `values`, `min` and `max` on a `list` or `map` column. `expand` entries take `formats` too.
 
 ### Values
 
@@ -549,6 +565,8 @@ tables:
 - The web UI edits the column with a select. A value outside the list stays in it, marked, until you change it.
 - A `markdown` column cannot have values.
 
+The web UI can edit them from the table's schema (**Edit rules**).
+
 ### Required
 
 List the columns every record must have a value in, and yamlite checks them on every sync. A missing key or `null` is a warning, not a failed sync; `""` and `[]` count as values.
@@ -567,6 +585,8 @@ tables:
 ```
 
 The web UI marks required fields with `*` and highlights the empty ones. `yamlite check` fails on any of these warnings.
+
+The web UI can edit them from the table's schema (**Edit rules**).
 
 ### Min and max
 
@@ -591,6 +611,8 @@ tables:
 - A value of the wrong kind (text in an `INTEGER` column, a broken date) is not compared; the format check reports a broken date.
 - The web UI marks a value out of bounds under its field.
 
+The web UI can edit them from the table's schema (**Edit rules**).
+
 ### References
 
 Declare which fields point at other tables, and yamlite checks them on every sync — it never enforces them, so a typo or a record you haven't added yet is a warning, not a failed sync:
@@ -610,9 +632,13 @@ tables:
 
 Values are compared as text (`"1"` matches `1`). While watching, a change to `people` re-checks the tables that reference it. These are not SQLite foreign keys: nothing is rejected or cascaded, and you fix the YAML.
 
+The web UI can edit them from the table's schema (**Edit rules**).
+
 ### Indexes
 
 `indexes` is declarative: every sync makes the database match it. yamlite creates missing indexes and drops the ones you removed from the list, and leaves indexes you created yourself in SQL alone (its own are named `yamlite_<table>_<hash>`). An index that can't be created — a duplicate value for a `unique` index, or a column that doesn't exist yet — is reported as a warning and data keeps syncing. `yamlite status` shows planned index changes as `+ index` / `− index`.
+
+The web UI can add or remove indexes from the table's schema (**Edit rules**).
 
 ## Safety
 

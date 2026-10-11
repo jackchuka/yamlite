@@ -1,16 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
+import { setReadOnly } from "@/lib/mode";
+import type { Meta, TableSchema, ViewMeta } from "@/lib/types";
 import { SchemaDialog } from "./SchemaDialog";
 
 vi.mock("@/lib/api", async (orig) => ({
   ...(await orig<typeof import("@/lib/api")>()),
-  api: { schema: vi.fn() },
+  api: { schema: vi.fn(), meta: vi.fn(), previewRules: vi.fn() },
 }));
 
 test("references show their problems and indexes show whether they exist", async () => {
   vi.mocked(api.schema).mockResolvedValue({
+    base: "",
     name: "tasks",
     mode: "files",
     path: "tasks",
@@ -50,6 +53,7 @@ test("references show their problems and indexes show whether they exist", async
 
 test("a table's expanded views link to them and show their problems", async () => {
   vi.mocked(api.schema).mockResolvedValue({
+    base: "",
     name: "projects",
     mode: "files",
     path: "projects",
@@ -137,6 +141,7 @@ test("a view's schema comes from its meta, without a request", () => {
 
 test("a column's allowed values are listed", async () => {
   vi.mocked(api.schema).mockResolvedValue({
+    base: "",
     name: "tasks",
     mode: "files",
     path: "tasks",
@@ -165,6 +170,7 @@ test("a column's allowed values are listed", async () => {
 
 test("columns show their format and bounds", async () => {
   vi.mocked(api.schema).mockResolvedValue({
+    base: "",
     name: "tasks",
     mode: "files",
     path: "tasks",
@@ -193,4 +199,252 @@ test("columns show their format and bounds", async () => {
   const due = screen.getByText("due").closest("tr") as HTMLElement;
   expect(due.textContent).toContain("date");
   expect(due.textContent).toContain("≥ 2026-01-01");
+});
+
+const tasksSchema: TableSchema = {
+  base: "h1",
+  name: "tasks",
+  mode: "files",
+  path: "tasks",
+  key: "id",
+  inDb: true,
+  columns: { id: "TEXT", status: "TEXT" },
+  declared: { status: "TEXT" },
+  references: [],
+  values: { status: ["todo", "done"] },
+  required: [],
+  formats: {},
+  min: {},
+  max: {},
+  indexes: [],
+  otherIndexes: [],
+  views: [],
+};
+const tasksMeta = {
+  configError: null,
+  tables: [
+    {
+      name: "tasks",
+      key: "id",
+      required: [],
+      values: { status: ["todo", "done"] },
+      formats: {},
+      min: {},
+      max: {},
+      references: [],
+    },
+  ],
+  views: [],
+} as unknown as Meta;
+
+test("Edit rules swaps the columns for the rule editor", async () => {
+  vi.mocked(api.schema).mockResolvedValue(tasksSchema);
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Edit rules" }));
+  expect(screen.getByRole("button", { name: /status/ }).textContent).toContain("values 2");
+  expect(screen.queryByText("todo, done")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(screen.getByText("todo, done")).toBeTruthy();
+});
+
+test("read-only hides Edit rules", async () => {
+  vi.mocked(api.schema).mockResolvedValue(tasksSchema);
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  setReadOnly(true);
+  try {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByText("todo, done")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit rules" })).toBeNull();
+  } finally {
+    setReadOnly(false);
+  }
+});
+
+test("Edit rules makes the indexes and expanded views editable", async () => {
+  vi.mocked(api.schema).mockResolvedValue({
+    ...tasksSchema,
+    columns: { id: "TEXT", status: "TEXT", steps: "JSON" },
+    indexes: [{ name: "yamlite_tasks_1", definition: "(status)", columns: ["status"], unique: false, inDb: true }],
+  });
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("(status)")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Remove (status)" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Edit rules" }));
+  expect(screen.getAllByText("Indexes")).toHaveLength(1);
+  expect(screen.getAllByText("Expanded views")).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Remove (status)" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "+ Add view" }));
+  expect(screen.getByLabelText("JSON column")).toBeTruthy();
+});
+
+test("editing marks the header and pins Save below the scrolling body", async () => {
+  vi.mocked(api.schema).mockResolvedValue({ ...tasksSchema, files: "tasks/*.yaml" });
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" path="tasks/*.yaml" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  expect(screen.queryByText("Editing")).toBeNull();
+  fireEvent.click(await screen.findByRole("button", { name: "Edit rules" }));
+  expect(screen.getByText("Editing")).toBeTruthy();
+  expect(screen.getByText("Changes are checked against your data before they are saved to yamlite.yaml.")).toBeTruthy();
+  expect(screen.queryByText(/To change it, edit yamlite.yaml/)).toBeNull();
+  const save = screen.getByRole("button", { name: "Save to yamlite.yaml" });
+  expect(save.closest('[data-slot="dialog-body"]')).toBeNull();
+  expect(save.closest('[role="dialog"]')).toBeTruthy();
+  expect(screen.getAllByText("tasks/*.yaml")).toHaveLength(1);
+});
+
+test("a section heading looks the same in read and edit mode", async () => {
+  vi.mocked(api.schema).mockResolvedValue(tasksSchema);
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  const read = (await screen.findByText("Indexes")).className;
+  const columns = screen.getByText("Columns").className;
+  fireEvent.click(screen.getByRole("button", { name: "Edit rules" }));
+  expect(screen.getByText("Indexes").className).toBe(read);
+  expect(screen.getByText("Expanded views").className).toBe(read);
+  expect(screen.getByText("Columns").className).toBe(columns);
+  expect(read).toBe(columns);
+});
+
+const viewMeta = (name: string, path: string[], columns: Record<string, string>) => ({
+  name,
+  table: "tasks",
+  parent: "tasks",
+  depth: path.length,
+  path,
+  columns,
+  identity: ["tasks_id", "idx"],
+  declared: {},
+  references: [],
+  values: {},
+  required: [],
+  formats: {},
+  min: {},
+  max: {},
+  count: 0,
+  inDb: true,
+});
+const nestedMeta = {
+  ...tasksMeta,
+  views: [
+    viewMeta("tasks__steps", ["steps"], { tasks_id: "TEXT", idx: "INTEGER", note: "TEXT", subs: "JSON" }),
+    viewMeta("tasks__steps__subs", ["steps", "subs"], { tasks_id: "TEXT", idx: "INTEGER", done: "BOOLEAN" }),
+  ],
+} as unknown as Meta;
+
+const openNested = async () => {
+  vi.mocked(api.schema).mockResolvedValue({ ...tasksSchema, columns: { id: "TEXT", status: "TEXT", steps: "JSON" } });
+  vi.mocked(api.meta).mockResolvedValue(nestedMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Edit rules" }));
+};
+
+test("each section is a card in read and edit mode, with its actions in the header", async () => {
+  vi.mocked(api.schema).mockResolvedValue({ ...tasksSchema, columns: { id: "TEXT", status: "TEXT", steps: "JSON" } });
+  vi.mocked(api.meta).mockResolvedValue(tasksMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks" open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  const card = (title: string) => screen.getByRole("heading", { name: title }).closest('[data-slot="section-card"]');
+  await screen.findByText("Indexes");
+  for (const title of ["Table", "Columns", "References", "Indexes", "Expanded views"]) expect(card(title)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Edit rules" }));
+  for (const title of ["Table", "Columns", "Indexes", "Expanded views"]) expect(card(title)).toBeTruthy();
+  const header = (title: string) => card(title)?.querySelector("header");
+  expect(header("Indexes")?.contains(screen.getByRole("button", { name: "+ Add index" }))).toBe(true);
+  expect(header("Expanded views")?.contains(screen.getByRole("button", { name: "+ Add view" }))).toBe(true);
+});
+
+test("a view's breadcrumb sits in the Columns card's header", async () => {
+  await openNested();
+  fireEvent.click(screen.getByRole("button", { name: "tasks__steps ▸" }));
+  const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+  expect(crumbs.closest("header")?.contains(screen.getByRole("heading", { name: "Columns" }))).toBe(true);
+});
+
+test("a view opened from the table's editor leads back to the table", async () => {
+  await openNested();
+  expect(screen.queryByRole("button", { name: "Back to tasks" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "tasks__steps ▸" }));
+  expect(screen.getByRole("button", { name: /^note/ })).toBeTruthy();
+  const crumbs = screen.getByRole("navigation", { name: "Breadcrumb" });
+  expect(crumbs.textContent).toBe("tasks›steps");
+  fireEvent.click(screen.getByRole("button", { name: "Back to tasks" }));
+  expect(screen.getByRole("button", { name: /^status/ })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /^note/ })).toBeNull();
+});
+
+test("leaving a view with a changed draft asks first, and declining stays", async () => {
+  await openNested();
+  fireEvent.click(screen.getByRole("button", { name: "tasks__steps ▸" }));
+  fireEvent.click(screen.getByRole("button", { name: /^note/ }));
+  fireEvent.click(screen.getByLabelText("Required"));
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  fireEvent.click(screen.getByRole("button", { name: "Back to tasks" }));
+  expect(confirm).toHaveBeenCalledWith("Discard your draft and load the latest rules?");
+  expect((screen.getByLabelText("Required") as HTMLInputElement).checked).toBe(true);
+  confirm.mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Back to tasks" }));
+  expect(screen.getByRole("button", { name: /^status/ })).toBeTruthy();
+  confirm.mockRestore();
+});
+
+test("a nested view shows every ancestor and goes back to its parent view", async () => {
+  await openNested();
+  fireEvent.click(screen.getByRole("button", { name: "tasks__steps__subs ▸" }));
+  expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe("tasks›steps›subs");
+  expect(screen.getByRole("button", { name: "Back to tasks" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Back to steps" }));
+  expect(screen.getByRole("button", { name: /^note/ })).toBeTruthy();
+  expect(screen.getByRole("navigation", { name: "Breadcrumb" }).textContent).toBe("tasks›steps");
+});
+
+test("a view's own schema dialog can go back to its table's editor", async () => {
+  vi.mocked(api.schema).mockResolvedValue({ ...tasksSchema, columns: { id: "TEXT", status: "TEXT", steps: "JSON" } });
+  vi.mocked(api.meta).mockResolvedValue(nestedMeta);
+  vi.mocked(api.previewRules).mockResolvedValue({ added: [], removed: [], changed: false });
+  const view = (nestedMeta.views as ViewMeta[])[0] as ViewMeta;
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <SchemaDialog table="tasks__steps" view={view} open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Edit rules" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Back to tasks" }));
+  expect(await screen.findByRole("button", { name: /^status/ })).toBeTruthy();
+  expect(screen.getByText("Table")).toBeTruthy();
+  expect(screen.queryByText("View")).toBeNull();
 });

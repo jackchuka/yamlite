@@ -39,7 +39,7 @@ export function fieldKind(
   if (format === "date" && (value == null || isDate(value))) return "date";
   if (format === "datetime" && (value == null || (typeof value === "string" && toPicker(value) !== null)))
     return "datetime";
-  if (value === null || value === undefined) return "unset";
+  if (value === null || value === undefined) return format === "map" ? "map" : "unset";
   if (typeof value === "boolean") return "switch";
   if (typeof value === "number") return "number";
   if (typeof value === "string") {

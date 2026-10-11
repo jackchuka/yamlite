@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
 import { beforeAll, expect, test, vi } from "vitest";
 import { setMobile } from "@/test/media";
@@ -410,4 +410,43 @@ test("a chip can be added with a button on a phone", () => {
   fireEvent.change(screen.getByLabelText("tags"), { target: { value: "b" } });
   fireEvent.click(screen.getByRole("button", { name: "add to tags" }));
   expect(onChange).toHaveBeenCalledWith(["a", "b"]);
+});
+
+test("Backspace on an empty chip input removes the last chip", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={["a", "b"]} type="JSON" onChange={onChange} />));
+  fireEvent.keyDown(screen.getByLabelText("tags"), { key: "Backspace" });
+  expect(onChange).toHaveBeenLastCalledWith(["a"]);
+});
+
+test("holding Backspace in an empty chip input removes only one chip", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={["a", "b"]} type="JSON" onChange={onChange} />));
+  fireEvent.keyDown(screen.getByLabelText("tags"), { key: "Backspace", repeat: true });
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+test("an unset list field offers only list and JSON, and emits nothing until one is chosen", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} label="tags" value={null} type="JSON" format="list" onChange={onChange} />));
+  expect(screen.queryByLabelText("tags as map")).toBeNull();
+  expect(screen.getByLabelText("tags as list")).toBeTruthy();
+  expect(screen.getByLabelText("tags as JSON")).toBeTruthy();
+  expect(onChange).not.toHaveBeenCalled();
+});
+
+test("an unset map field shows the map editor at once", () => {
+  render(wrap(<FormField path={["meta"]} value={undefined} type="JSON" format="map" onChange={() => {}} />));
+  expect(screen.queryByLabelText("meta as map")).toBeNull();
+  expect(screen.getByText("+ key")).toBeTruthy();
+});
+
+test("a value of the wrong shape is marked and explained", () => {
+  render(wrap(<FormField path={["tags"]} value={{ a: "b" }} type="JSON" format="list" onChange={() => {}} />));
+  expect(screen.getByText("not a list")).toBeTruthy();
+  expect(document.querySelector("[data-problem]")?.querySelector(".border-warn")).toBeTruthy();
+  cleanup();
+  render(wrap(<FormField path={["meta"]} value={["a"]} type="JSON" format="map" onChange={() => {}} />));
+  expect(screen.getByText("not a map")).toBeTruthy();
+  expect(document.querySelector("[data-problem]")?.querySelector(".border-warn")).toBeTruthy();
 });

@@ -33,6 +33,8 @@ const RELOAD_TIMER = "\0config";
 
 export interface Watcher {
   readonly ready: Promise<void>;
+  // applies yamlite.yaml now instead of after the debounce
+  reloadConfig(): void;
   close(): Promise<void>;
 }
 
@@ -185,19 +187,21 @@ export function startWatch(
     later(name, () => void run(name));
   }
 
+  function reloadNow(): void {
+    if (!config || closed) return;
+    try {
+      current = new Map(config.reload().map((t) => [t.name, t]));
+    } catch (e) {
+      handlers.onError?.(new Error(`${asError(e).message}; keeping the previous configuration`));
+      return;
+    }
+    handlers.onReload?.([...current.keys()]);
+    ensureWatched();
+    for (const name of current.keys()) schedule(name);
+  }
+
   function scheduleReload(): void {
-    later(RELOAD_TIMER, () => {
-      if (!config || closed) return;
-      try {
-        current = new Map(config.reload().map((t) => [t.name, t]));
-      } catch (e) {
-        handlers.onError?.(new Error(`${asError(e).message}; keeping the previous configuration`));
-        return;
-      }
-      handlers.onReload?.([...current.keys()]);
-      ensureWatched();
-      for (const name of current.keys()) schedule(name);
-    });
+    later(RELOAD_TIMER, reloadNow);
   }
 
   let version = ctx.store.dataVersion();
@@ -219,6 +223,14 @@ export function startWatch(
 
   return {
     ready: initial.then(() => undefined),
+    reloadConfig() {
+      const pending = timers.get(RELOAD_TIMER);
+      if (pending) {
+        clearTimeout(pending);
+        timers.delete(RELOAD_TIMER);
+      }
+      reloadNow();
+    },
     async close() {
       closed = true;
       clearInterval(poll);
