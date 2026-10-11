@@ -162,3 +162,31 @@ test("changing the type of a JSON field with values asks first, and declining ke
   expect(screen.getByLabelText("tags as list")).toBeTruthy();
   confirm.mockRestore();
 });
+
+test("a map column starts with its editor; a list column offers list or JSON and can change between them", () => {
+  const shaped: TableMeta = {
+    ...table,
+    columns: { ...table.columns, tags: "JSON", meta: "JSON" },
+    formats: { tags: "list", meta: "map" },
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NewRecordDialog table={shaped} open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  expect(screen.queryByLabelText("meta as map")).toBeNull();
+  expect(screen.getByText("+ key")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Change type of meta" })).toBeNull();
+  expect(screen.queryByLabelText("tags as map")).toBeNull();
+  fireEvent.click(screen.getByLabelText("tags as list"));
+  const input = screen.getByLabelText("tags");
+  fireEvent.change(input, { target: { value: "a" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  fireEvent.click(screen.getByRole("button", { name: "Change type of tags" }));
+  expect(confirm).toHaveBeenCalledWith("Clear this field and choose another type?");
+  expect(screen.queryByLabelText("tags as map")).toBeNull();
+  fireEvent.click(screen.getByLabelText("tags as JSON"));
+  expect(screen.getByLabelText("tags").tagName).not.toBe("INPUT");
+  confirm.mockRestore();
+});

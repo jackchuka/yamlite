@@ -39,6 +39,40 @@ describe("formats", () => {
     await y.close();
   });
 
+  test("a list column holding anything but a list, or a map column anything but a map, is a warning", async () => {
+    const root = setup(
+      "tables:\n  tasks:\n    columns: { tags: JSON, meta: JSON }\n    formats: { tags: list, meta: map }\n",
+      {
+        "tasks/a.yaml": "tags: [x, y]\nmeta: { k: 1 }\n",
+        "tasks/b.yaml": "tags: { x: 1 }\nmeta: [1, 2]\n",
+        "tasks/d.yaml": "title: d\ntags: null\n",
+      },
+    );
+    const y = await open({ root });
+    const results = await y.sync();
+    expect(results.find((r) => r.table === "tasks")).toMatchObject({ ok: true, toDb: 3 });
+    expect(warningsOf(results, "tasks")).toEqual(['tags {"x":1} not a list (b)', "meta [1,2] not a map (b)"]);
+    await y.close();
+  });
+
+  test("a view's list and map columns are checked, with the view's name in front", async () => {
+    const root = setup(
+      "tables:\n  projects:\n    formats: { milestones: list }\n    expand:\n      milestones:\n        formats: { tags: list, meta: map }\n",
+      {
+        "projects/release.yaml":
+          "milestones:\n  - tags: [a]\n    meta: { k: v }\n  - tags: { a: 1 }\n    meta: [v]\n  - tags: ~\n  - tags: solo\n    meta: 3\n",
+      },
+    );
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "projects")).toEqual([
+      'projects__milestones: tags "solo" not a list (release/3)',
+      'projects__milestones: tags {"a":1} not a list (release/1)',
+      "projects__milestones: meta 3 not a map (release/3)",
+      'projects__milestones: meta ["v"] not a map (release/1)',
+    ]);
+    await y.close();
+  });
+
   test("more than ten warnings are cut", async () => {
     const files: Record<string, string> = {};
     for (let i = 0; i < 12; i++) files[`tasks/t${i}.yaml`] = `due: bad-${i}\n`;

@@ -46,7 +46,7 @@ const label = (path: Array<string | number>) => path.join(".");
 // the markdown parsers are large; load them only when a markdown field shows up
 const MarkdownField = lazy(() => import("./MarkdownField"));
 
-function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) {
+function JsonField({ path, value, problem, onChange, onValidity, readOnly }: FieldProps) {
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
   const theme = useTheme();
@@ -74,7 +74,7 @@ function JsonField({ path, value, onChange, onValidity, readOnly }: FieldProps) 
         theme={theme}
         editable={!readOnly}
         basicSetup={{ lineNumbers: false, foldGutter: false }}
-        className="overflow-hidden rounded-md border text-[12px]"
+        className={`overflow-hidden rounded-md border text-[12px] ${warnBorder(problem)}`}
         onChange={(next) => {
           setText(next);
           try {
@@ -164,11 +164,11 @@ function RefField({ path, value, reference, onChange }: FieldProps) {
 }
 
 function MapField(props: FieldProps) {
-  const { path, value, onChange } = props;
-  const entries = Object.entries(value as Record<string, unknown>);
+  const { path, value, problem, onChange } = props;
+  const entries = Object.entries((value ?? {}) as Record<string, unknown>);
   const [newKey, setNewKey] = useState<string | null>(null);
   return (
-    <div className="rounded-lg border bg-panel px-2.5 pt-2.5 pb-1">
+    <div className={`rounded-lg border bg-panel px-2.5 pt-2.5 pb-1 ${warnBorder(problem)}`}>
       {entries.map(([k, v]) => (
         <div key={k} className="mb-2.5 grid grid-cols-[minmax(34px,auto)_1fr_auto] items-start gap-1.5">
           <span className="pt-1.5 font-mono text-[11px] text-syn-key max-md:text-[12.5px]">{k}</span>
@@ -377,18 +377,20 @@ function Widget(props: FieldProps) {
     case "ref":
       return <RefField {...props} />;
     case "chips":
-      return <ChipsInput label={label(path)} value={value as string[]} onChange={onChange} />;
+      return <ChipsInput label={label(path)} value={(value ?? []) as string[]} onChange={onChange} invalid={problem} />;
     case "map":
       return <MapField {...props} />;
     case "json":
       return <JsonField {...props} />;
     case "unset":
       if (type === "JSON") {
-        const choices = [
+        const all = [
           { name: "map", text: "{ } map", next: {}, chosen: "map" },
           { name: "list", text: "[ ] list", next: [], chosen: "chips" },
           { name: "JSON", text: "JSON", next: [], chosen: "json" },
         ] as const;
+        // a list of maps is entered as JSON
+        const choices = format === "list" ? all.filter((c) => c.name !== "map") : all;
         return (
           <div className="flex gap-1.5">
             {choices.map((c) => (
@@ -424,8 +426,8 @@ const isEmpty = (v: unknown) =>
 export function FormField(props: FieldProps) {
   const { label: title, value, type, readOnly, onChange } = props;
   const problem = fieldProblem(value, props.format, props.min, props.max);
-  // a JSON field left unset when the form opened: its chosen type can be taken back
-  const [chosen] = useState(() => type === "JSON" && value == null);
+  // a JSON field left unset when the form opened: its chosen type can be taken back, unless a map format sets it
+  const [chosen] = useState(() => type === "JSON" && value == null && props.format !== "map");
   const [epoch, setEpoch] = useState(0);
   const changeType = () => {
     if (!isEmpty(value) && !window.confirm(m.form_change_type_confirm())) return;

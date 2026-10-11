@@ -446,3 +446,27 @@ test("an unset JSON field offers to change its chosen type; a loaded one does no
   fireEvent.click(screen.getByRole("button", { name: "Change type of tags" }));
   expect(screen.getByLabelText("tags as map")).toBeTruthy();
 });
+
+test("an unset list field offers list or JSON and an unset map field opens on its editor", async () => {
+  vi.mocked(api.record).mockResolvedValue({
+    row: { id: "a", title: "x", prio: null, tags: null, meta: null },
+    file: "f",
+    yaml: "",
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer
+        table={{
+          ...table,
+          columns: { ...table.columns, tags: "JSON", meta: "JSON" },
+          formats: { tags: "list", meta: "map" },
+        }}
+        recordKey="a"
+      />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByLabelText("tags as JSON")).toBeTruthy();
+  expect(screen.queryByLabelText("tags as map")).toBeNull();
+  expect(screen.queryByLabelText("meta as map")).toBeNull();
+  expect(screen.getByText("+ key")).toBeTruthy();
+});

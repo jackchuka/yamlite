@@ -6,6 +6,9 @@ import type { Bound, ColumnFormat } from "./types.ts";
 export function formatProblem(value: unknown, format: ColumnFormat | undefined): string | null {
   if (format === "date") return isDate(value) ? null : "not a date";
   if (format === "datetime") return isDatetime(value) ? null : "not a datetime";
+  if (format === "list") return Array.isArray(value) ? null : "not a list";
+  if (format === "map")
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? null : "not a map";
   return null;
 }
 

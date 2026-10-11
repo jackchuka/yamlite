@@ -425,3 +425,24 @@ test("on a phone the back button sits in the form's heading", () => {
   const heading = screen.getByRole("heading", { name: "title" });
   expect(heading.parentElement?.contains(screen.getByRole("button", { name: /Columns/ }))).toBe(true);
 });
+
+test("a JSON column's format is list or map, and either hides allowed values", async () => {
+  ui({ ...props, columns: { ...props.columns, tags: "JSON" }, initial: { ...none, values: { tags: ["a"] } } });
+  fireEvent.click(screen.getByRole("button", { name: /tags/ }));
+  const select = screen.getByLabelText("Format") as HTMLSelectElement;
+  expect([...select.options].map((o) => o.value)).toEqual(["", "list", "map"]);
+  expect(screen.queryByText("Allowed values")).toBeTruthy();
+  fireEvent.change(select, { target: { value: "list" } });
+  expect(screen.queryByText("Allowed values")).toBeNull();
+  expect(screen.getByRole("button", { name: /tags/ }).textContent).toContain("list");
+  await waitFor(() =>
+    expect(api.previewRules).toHaveBeenLastCalledWith(props.target, { ...none, formats: { tags: "list" } }, "h1", {}),
+  );
+  fireEvent.click(screen.getByRole("button", { name: /title/ }));
+  expect([...(screen.getByLabelText("Format") as HTMLSelectElement).options].map((o) => o.value)).toEqual([
+    "",
+    "date",
+    "datetime",
+    "markdown",
+  ]);
+});

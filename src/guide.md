@@ -70,7 +70,7 @@ Rules are checked on every sync. A broken rule is a warning, never a failed sync
 
 | Key           | Use it for                                                                                                    | Avoid it for                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `formats`     | `date` / `datetime` on TEXT dates; `markdown` on long prose edited in the web UI                              | non-TEXT columns (an error)                       |
+| `formats`     | `date` / `datetime` on TEXT dates; `markdown` on long prose; `list` / `map` on JSON columns of one shape      | other column types (an error)                     |
 | `values`      | small closed sets: status, priority labels (about 20 or fewer)                                                | free text, open sets that keep growing            |
 | `required`    | fields a record is meaningless without                                                                        | optional fields (`""` and `[]` count as values)   |
 | `min` / `max` | numeric ranges on INTEGER/REAL; date bounds on `date` / `datetime` columns                                    | TEXT columns without a date format (an error)     |
@@ -112,7 +112,7 @@ tables:
 - Deleting a column's line to tidy up. The next sync drops that column from the database; if files still have the key, the column is kept with a warning.
 - Two tables with the same folder whose globs match the same file (an error). A table in a subfolder of another's folder is fine: the deeper folder wins.
 - `body:` on a non-Markdown table, or a `body` named like the key column.
-- `values` on a column with a `formats` entry (`markdown`, `date` or `datetime`): an error.
+- `values` on a column with a `formats` entry: an error. So are `min` / `max` on a `list` or `map` column.
 - Splitting one table into several to browse it by category: keep one table and use `split`.
 
 ## Full example
@@ -151,7 +151,7 @@ Keys of a table under `tables:`. Details: https://github.com/jackchuka/yamlite#c
 | `key`        | the key column (default `id`)                                                                                                |
 | `body`       | Markdown tables only: the column for the text below the front matter (default `body`)                                        |
 | `columns`    | `{ column: INTEGER \| REAL \| TEXT \| BOOLEAN \| JSON }`                                                                     |
-| `formats`    | `{ column: markdown \| date \| datetime }`, TEXT columns only                                                                |
+| `formats`    | `{ column: markdown \| date \| datetime }` on TEXT columns, `{ column: list \| map }` on JSON columns                        |
 | `values`     | `{ column: [allowed, values] }`                                                                                              |
 | `required`   | `[column, …]`                                                                                                                |
 | `min`        | `{ column: number or date }`, bound included                                                                                 |

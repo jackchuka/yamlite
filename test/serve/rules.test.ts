@@ -217,3 +217,32 @@ test("invalid indexes and views are refused, and so are indexes on a view", asyn
     await send(t, "POST", { target: { table: "tasks", path: ["subtasks"] }, rules: none, indexes: [], base: b }),
   ).toMatchObject({ status: 400, body: { field: "indexes" } });
 });
+
+test("a preview lists the warnings a list format adds, and a list format on a TEXT column is refused", async () => {
+  t = await startServe(
+    { "tasks/a.yaml": "test: [x]\ntitle: A\n", "tasks/b.yaml": "test: { k: v }\ntitle: B\n" },
+    "tables:\n  tasks:\n    key: id\n",
+  );
+  const b = await base(t);
+  const res = await send(t, "POST", { target: tasksTarget, rules: { ...none, formats: { test: "list" } }, base: b });
+  expect(res.status).toBe(200);
+  expect(res.body).toMatchObject({ changed: true, added: ['test {"k":"v"} not a list (b)'], removed: [] });
+  const text = await send(t, "POST", {
+    target: tasksTarget,
+    rules: { ...none, formats: { title: "list" } },
+    base: b,
+  });
+  expect(text).toMatchObject({
+    status: 400,
+    body: { error: expect.stringMatching(/formats\.title: list needs a JSON column, not TEXT/) },
+  });
+  const values = await send(t, "POST", {
+    target: tasksTarget,
+    rules: { ...none, formats: { test: "list" }, values: { test: ["x"] } },
+    base: b,
+  });
+  expect(values).toMatchObject({
+    status: 400,
+    body: { error: expect.stringMatching(/a list column cannot have values/) },
+  });
+});

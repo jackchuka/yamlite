@@ -1,8 +1,10 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
 export const COLUMN_TYPES: readonly ColumnType[] = ["INTEGER", "REAL", "TEXT", "BOOLEAN", "JSON"];
-// how the UI edits a TEXT column, declared under `formats` in yamlite.yaml; date and datetime are also checked
-export type ColumnFormat = "markdown" | "date" | "datetime";
-export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown", "date", "datetime"];
+// how the UI edits a column, declared under `formats` in yamlite.yaml: markdown, date and datetime for TEXT,
+// list and map for JSON; all but markdown are also checked
+export type ColumnFormat = "markdown" | "date" | "datetime" | "list" | "map";
+export const COLUMN_FORMATS: readonly ColumnFormat[] = ["markdown", "date", "datetime", "list", "map"];
+export const isShape = (f: ColumnFormat | undefined): f is "list" | "map" => f === "list" || f === "map";
 
 // a value a column may hold, declared under `values` in yamlite.yaml
 export type AllowedValue = string | number | boolean;

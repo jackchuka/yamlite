@@ -1,7 +1,8 @@
 import { boundProblem, formatProblem } from "./rules.ts";
 import { q, type Store } from "./store.ts";
 import { sample } from "./text.ts";
-import type { Bound, ColumnFormat, DbValue, TableSpec } from "./types.ts";
+import { isShape, type Bound, type ColumnFormat, type DbValue, type TableSpec } from "./types.ts";
+import { decode } from "./value.ts";
 import { declaredViews } from "./views.ts";
 
 const MAX_WARNINGS = 10;
@@ -24,8 +25,7 @@ interface Target {
 const own = <T>(record: Record<string, T>, key: string): T | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
 
-const datedColumns = (r: Rules) =>
-  Object.keys(r.formats).filter((c) => r.formats[c] === "date" || r.formats[c] === "datetime");
+const checkedColumns = (r: Rules) => Object.keys(r.formats).filter((c) => r.formats[c] !== "markdown");
 const boundedColumns = (r: Rules) => [...new Set([...Object.keys(r.min), ...Object.keys(r.max)])];
 
 // a table and its views that have something to check
@@ -54,10 +54,17 @@ function targets(store: Store, spec: TableSpec, pick: (r: Rules) => string[]): T
   return found;
 }
 
-const shown = (v: DbValue) => (typeof v === "string" ? JSON.stringify(v) : String(v));
+const shown = (v: unknown) =>
+  typeof v === "string" || (v !== null && typeof v === "object") ? JSON.stringify(v) : String(v);
 
 // one warning per value and problem, naming the rows that have it
-function scan(store: Store, t: Target, column: string, problem: (v: DbValue) => string | null): string[] {
+function scan(
+  store: Store,
+  t: Target,
+  column: string,
+  problem: (v: unknown) => string | null,
+  read: (v: DbValue) => unknown = (v) => v,
+): string[] {
   if (!t.columns.has(column)) return [];
   const label = t.label.map((col) => `COALESCE(CAST(src.${q(col)} AS TEXT), '')`).join(" || '/' || ");
   const rows = store.query(
@@ -65,7 +72,7 @@ function scan(store: Store, t: Target, column: string, problem: (v: DbValue) => 
   );
   const grouped = new Map<string, string[]>();
   for (const row of rows) {
-    const v = row.v ?? null;
+    const v = read(row.v ?? null);
     const p = problem(v);
     if (p === null) continue;
     const message = `${t.prefix}${column} ${shown(v)} ${p}`;
@@ -82,10 +89,13 @@ const capped = (warnings: string[], kind: string) =>
 // Formats and bounds are checked, never enforced: a value that breaks them is a warning.
 // A table's views are checked with it, their warnings prefixed with the view's name.
 export function checkFormats(store: Store, spec: TableSpec): string[] {
-  const warnings = targets(store, spec, datedColumns).flatMap((t) =>
-    datedColumns(t.rules).flatMap((column) =>
-      scan(store, t, column, (v) => formatProblem(v, own(t.rules.formats, column))),
-    ),
+  const warnings = targets(store, spec, checkedColumns).flatMap((t) =>
+    checkedColumns(t.rules).flatMap((column) => {
+      const format = own(t.rules.formats, column);
+      // a list or a map is JSON text, in a JSON column and in a view's column alike
+      const read = isShape(format) ? (v: DbValue) => decode(v, "JSON") : undefined;
+      return scan(store, t, column, (v) => formatProblem(v, format), read);
+    }),
   );
   return capped(warnings, "format");
 }

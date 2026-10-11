@@ -10,6 +10,7 @@ import {
   type AllowedValue,
   type Bound,
   COLUMN_FORMATS,
+  isShape,
   COLUMN_TYPES,
   type ColumnFormat,
   type ColumnType,
@@ -340,7 +341,7 @@ function toColumns(where: string, raw: Record<string, string> | undefined): Reco
   return columns;
 }
 
-// how the UI edits a column, kept apart from its type: markdown is stored as plain TEXT
+// how the UI edits a column, kept apart from its type: markdown is stored as plain TEXT, a list or map as JSON
 function toFormats(where: string, raw: unknown, columns: Record<string, ColumnType>): Record<string, ColumnFormat> {
   const formats: Record<string, ColumnFormat> = Object.create(null);
   if (raw === undefined || raw === null) return formats;
@@ -350,8 +351,9 @@ function toFormats(where: string, raw: unknown, columns: Record<string, ColumnTy
     const lower = String(format).toLowerCase() as ColumnFormat;
     if (!COLUMN_FORMATS.includes(lower)) throw new Error(`${where}unknown format ${format} for "${column}"`);
     const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
-    if (type !== undefined && type !== "TEXT") {
-      throw new Error(`${where}formats.${column}: ${lower} needs a TEXT column, not ${type}`);
+    const needs = isShape(lower) ? "JSON" : "TEXT";
+    if (type !== undefined && type !== needs) {
+      throw new Error(`${where}formats.${column}: ${lower} needs a ${needs} column, not ${type}`);
     }
     formats[column] = lower;
   }
@@ -394,6 +396,7 @@ function toBounds(
     for (const [column, b] of Object.entries(value)) {
       const format = Object.hasOwn(formats, column) ? formats[column] : undefined;
       const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
+      if (isShape(format)) throw new Error(`${where}${which}.${column}: a ${format} column cannot have a ${which}`);
       if (format === "date" || format === "datetime") {
         const ok = typeof b === "string" && (isDate(b) || (format === "datetime" && isDatetime(b)));
         if (!ok) throw new Error(`${where}${which}.${column}: ${JSON.stringify(b)} is not a ${format}`);

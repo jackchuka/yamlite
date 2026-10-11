@@ -11,6 +11,7 @@ export function ChipsInput({
   removeLabel = (item) => m.form_remove({ item }),
   accept = () => true,
   unique = false,
+  invalid = false,
 }: {
   label: string;
   value: string[];
@@ -20,6 +21,8 @@ export function ChipsInput({
   // a text it rejects stays in the input
   accept?: (text: string) => boolean;
   unique?: boolean;
+  // drawn with a warning border
+  invalid?: boolean;
 }) {
   const [text, setText] = useState("");
   const add = () => {
@@ -30,7 +33,9 @@ export function ChipsInput({
     setText("");
   };
   return (
-    <div className="flex min-h-9 flex-wrap items-center gap-1 rounded-md border bg-background px-1.5 py-1 transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+    <div
+      className={`flex min-h-9 flex-wrap items-center gap-1 rounded-md border ${invalid ? "border-warn" : ""} bg-background px-1.5 py-1 transition-[color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50`}
+    >
       {value.map((c, i) => (
         <span key={`${i}-${c}`} className={chip}>
           {c}

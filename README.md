@@ -510,13 +510,15 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 
 ### Formats
 
-`formats` tells the web UI how to edit a `TEXT` column, and for dates also what to check:
+`formats` tells the web UI how to edit a `TEXT` or `JSON` column, and for all but `markdown` also what to check:
 
-| Format     | Edited with                                   | Checked                                                                   |
-| ---------- | --------------------------------------------- | ------------------------------------------------------------------------- |
-| `markdown` | rendered Markdown, with an Edit tab           | —                                                                         |
-| `date`     | a date picker                                 | `YYYY-MM-DD`, a real date                                                 |
-| `datetime` | a date and time picker, with the offset shown | `YYYY-MM-DD`, `T` or a space, `HH:MM[:SS[.fff]]`, optional `Z` / `±HH:MM` |
+| Format     | Column | Edited with                                   | Checked                                                                   |
+| ---------- | ------ | --------------------------------------------- | ------------------------------------------------------------------------- |
+| `markdown` | `TEXT` | rendered Markdown, with an Edit tab           | —                                                                         |
+| `date`     | `TEXT` | a date picker                                 | `YYYY-MM-DD`, a real date                                                 |
+| `datetime` | `TEXT` | a date and time picker, with the offset shown | `YYYY-MM-DD`, `T` or a space, `HH:MM[:SS[.fff]]`, optional `Z` / `±HH:MM` |
+| `list`     | `JSON` | chips for a list of text, or JSON             | a list                                                                    |
+| `map`      | `JSON` | keys and values, else JSON                    | a map                                                                     |
 
 The Markdown editor keeps the text exactly as you type it, so saving doesn't reformat the Markdown in your YAML. A `datetime` keeps how it is written: picking a new time leaves its offset, separator and seconds as they were, and a new value gets your browser's offset. A value the picker can't show is edited as text, and a button switches between the two.
 
@@ -524,9 +526,21 @@ A value that doesn't match its format is a warning, not a failed sync:
 
 ```
 ! due "2026-02-31" not a date (buy-milk)
+! tags {"a":1} not a list (buy-milk)
 ```
 
-`init` writes `date` or `datetime` for a `TEXT` column whose values all have that shape. A format on a column declared with another type is an error. `expand` entries take `formats` too.
+A new record starts a `map` field with its editor, and offers a `list` field only chips or JSON (for a list of maps). Only the column's own value is checked, not what it holds: to check the items of a list, or the values of a map, expand it and give the view its own `formats`:
+
+```yaml
+tables:
+  projects:
+    formats: { milestones: list }
+    expand:
+      milestones:
+        formats: { tags: list, meta: map }
+```
+
+`init` writes `date` or `datetime` for a `TEXT` column whose values all have that shape. A format on a column declared with another type is an error, and so are `values`, `min` and `max` on a `list` or `map` column. `expand` entries take `formats` too.
 
 ### Values
 

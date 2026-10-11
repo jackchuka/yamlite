@@ -447,6 +447,22 @@ test("rules are edited from the schema and apply at once", async ({ page }) => {
   await expect(drawer.getByLabel("required")).toHaveText("*");
 });
 
+test("a list format set in the rule editor is written and warns about a map", async ({ page }) => {
+  app = await start({ "tasks/a.yaml": "tags: [x]\n", "tasks/b.yaml": "tags: { k: v }\n" }, (r) => (app = r));
+  const running = app;
+  await page.goto(`${running.url}#/t/tasks`);
+  await page.getByRole("button", { name: /Schema/ }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Edit rules" }).click();
+  await dialog.getByRole("button", { name: /^tags/ }).click();
+  await dialog.getByLabel("Format").selectOption("list");
+  await expect(dialog.getByText("Saving adds 1 warning")).toBeVisible();
+  await expect(dialog.getByText('tags {"k":"v"} not a list (b)').first()).toBeVisible();
+  await dialog.getByRole("button", { name: "Save to yamlite.yaml" }).click();
+  await expect(dialog).not.toContainText("Save to yamlite.yaml");
+  expect(file(running, "yamlite.yaml")).toMatch(/formats:\n\s+tags: list\n/);
+});
+
 test("an index added in the rule editor is written to yamlite.yaml and created", async ({ page }) => {
   app = await start({ "tasks/a.yaml": "status: todo\n", "tasks/b.yaml": "status: done\n" }, (r) => (app = r));
   const running = app;

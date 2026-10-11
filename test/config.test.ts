@@ -680,3 +680,33 @@ test("a candidate config text is parsed instead of the file", () => {
   expect(read(join(root, "yamlite.yaml"))).toBe("tables:\n  tasks: {}\n");
   expect(() => resolveConfig({ root, configText: "tables:\n  tasks:\n    max: { title: 3 }\n" })).toThrow();
 });
+
+test("list and map formats mark JSON columns, in tables and expanded views", () => {
+  const root = tmpRoot();
+  write(join(root, "projects.yaml"), "[]\n");
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  projects:\n    columns: { milestones: JSON }\n    formats: { milestones: List, owners: map }\n    expand:\n      milestones:\n        formats: { tags: list, meta: MAP }\n",
+  );
+  const t = resolveConfig({ root }).tables[0];
+  expect(t?.formats).toEqual({ milestones: "list", owners: "map" });
+  expect(t?.expand[0]?.formats).toEqual({ tags: "list", meta: "map" });
+});
+
+test.each([
+  ["formats: { tags: list }\n    columns: { tags: TEXT }", /formats\.tags: list needs a JSON column, not TEXT/],
+  ["formats: { meta: map }\n    columns: { meta: INTEGER }", /formats\.meta: map needs a JSON column, not INTEGER/],
+  ["formats: { tags: date }\n    columns: { tags: JSON }", /formats\.tags: date needs a TEXT column, not JSON/],
+  ["formats: { tags: list }\n    values: { tags: [a] }", /values\.tags: a list column cannot have values/],
+  ["formats: { meta: map }\n    min: { meta: 1 }", /min\.meta: a map column cannot have a min/],
+  ["formats: { tags: list }\n    max: { tags: 3 }", /max\.tags: a list column cannot have a max/],
+  [
+    "expand:\n      steps:\n        columns: { tags: TEXT }\n        formats: { tags: list }",
+    /expand\.steps\.formats\.tags: list needs a JSON column, not TEXT/,
+  ],
+])("rejects a bad list or map format: %s", (body, error) => {
+  const root = tmpRoot();
+  write(join(root, "tasks.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), `tables:\n  tasks:\n    ${body}\n`);
+  expect(() => resolveConfig({ root })).toThrow(error);
+});

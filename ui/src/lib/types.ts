@@ -1,5 +1,5 @@
 export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
-export type ColumnFormat = "markdown" | "date" | "datetime";
+export type ColumnFormat = "markdown" | "date" | "datetime" | "list" | "map";
 export type AllowedValue = string | number | boolean;
 export type Bound = number | string;
 

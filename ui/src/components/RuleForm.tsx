@@ -7,7 +7,12 @@ import type { AllowedValue, Bound, ColumnFormat, ColumnType, Rules } from "@/lib
 import { m } from "@/paraglide/messages.js";
 import { ChipsInput } from "./ChipsInput";
 
-const FORMATS: ColumnFormat[] = ["date", "datetime", "markdown"];
+const FORMATS: Partial<Record<ColumnType, ColumnFormat[]>> = {
+  TEXT: ["date", "datetime", "markdown"],
+  JSON: ["list", "map"],
+};
+// the formats whose values are not compared to a list of allowed values
+const FREE: (ColumnFormat | undefined)[] = ["markdown", "list", "map"];
 
 type Setter = <K extends Exclude<keyof Rules, "required">>(
   key: K,
@@ -87,7 +92,8 @@ export function RuleForm({
   const refTable = dot < 0 ? ref : ref.slice(0, dot);
   const refColumn = dot < 0 ? "" : ref.slice(dot + 1);
   const hintsOf = (field: HintField) => hints.filter((h) => hintField(column, h) === field);
-  const showValues = format !== "markdown";
+  const showValues = !FREE.includes(format);
+  const formats = FORMATS[type];
 
   // chips are the values as text; a chip already there keeps its value
   const setValues = (texts: string[]) => {
@@ -98,7 +104,7 @@ export function RuleForm({
   };
   const setFormat = (next: ColumnFormat | undefined) => {
     set("formats", column, next);
-    if (next === "markdown") set("values", column, undefined);
+    if (FREE.includes(next)) set("values", column, undefined);
     if (boundKind(type, next) !== kind) {
       set("min", column, undefined);
       set("max", column, undefined);
@@ -149,7 +155,7 @@ export function RuleForm({
           />
         </Field>
       )}
-      {type === "TEXT" && (
+      {formats && (
         <Field title={m.rules_format()}>
           <select
             aria-label={m.rules_format()}
@@ -158,7 +164,7 @@ export function RuleForm({
             onChange={(e) => setFormat(e.target.value === "" ? undefined : (e.target.value as ColumnFormat))}
           >
             <option value="">{m.rules_none()}</option>
-            {FORMATS.map((f) => (
+            {formats.map((f) => (
               <option key={f} value={f}>
                 {f}
               </option>
