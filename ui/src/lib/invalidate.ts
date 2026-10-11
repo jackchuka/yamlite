@@ -17,6 +17,7 @@ export function invalidationsFor(e: ServeEvent | { type: "hello" }): QueryKey[] 
         ["meta"],
         ["git"],
         ["gitdiff"],
+        ["search"],
       ];
     case "reload":
       return [["meta"], ["page"]];

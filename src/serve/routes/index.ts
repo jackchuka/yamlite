@@ -9,6 +9,7 @@ import { metaRoutes } from "./meta.ts";
 import { pageRoutes } from "./pages.ts";
 import { rowRoutes } from "./rows.ts";
 import { schemaRoutes } from "./schema.ts";
+import { searchRoutes } from "./search.ts";
 import { sqlRoutes } from "./sql.ts";
 import { tableRoutes } from "./tables.ts";
 
@@ -18,6 +19,7 @@ export const ROUTES: Routes[] = [
   metaRoutes,
   eventRoutes,
   rowRoutes,
+  searchRoutes,
   historyRoutes,
   schemaRoutes,
   tableRoutes,

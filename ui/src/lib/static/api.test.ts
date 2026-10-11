@@ -411,3 +411,17 @@ test("page sql runs a WITH-led SELECT but not a WITH-led write", async () => {
   });
   expect((await api.rows("tasks", { limit: 10, offset: 0, filters: [] })).total).toBe(total);
 });
+
+test("search ranks hits across tables like the server", async () => {
+  const api = make();
+  expect((await api.search("ab", 5)).hits).toEqual([
+    { table: "tasks", key: "ab", label: "Write", column: "id", value: "ab", rank: 0, total: 1 },
+  ]);
+  expect((await api.search("a_", 5)).hits).toEqual([
+    { table: "tasks", key: "a_1", label: "Call", column: "id", value: "a_1", rank: 1, total: 1 },
+  ]);
+  expect((await api.search("[3", 5)).hits).toEqual([
+    { table: "nums", key: "n1", label: null, column: "vals", value: "[3]", rank: 3, total: 1 },
+  ]);
+  await expect(api.search("a", 5)).rejects.toMatchObject({ status: 400 });
+});

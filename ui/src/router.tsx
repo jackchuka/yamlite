@@ -6,6 +6,7 @@ import { NewRecordDialog } from "./components/NewRecordDialog";
 import { Placeholder } from "./components/Placeholder";
 import { RecordDrawer } from "./components/RecordDrawer";
 import { RenameKeyDialog } from "./components/RenameKeyDialog";
+import { SearchView } from "./components/SearchView";
 import { Shell } from "./components/Shell";
 import { SqlConsole } from "./components/SqlConsole";
 import { SyncView } from "./components/SyncView";
@@ -15,7 +16,7 @@ import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import { useIsMobile } from "./lib/useIsMobile";
 import type { TableMeta } from "./lib/types";
-import { erdRoute, pageRoute, rootRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
+import { erdRoute, pageRoute, rootRoute, searchRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
 import { m } from "@/paraglide/messages.js";
 
 function Home() {
@@ -114,6 +115,7 @@ function PagePage() {
 rootRoute.update({ component: Shell });
 tableRoute.update({ component: TablePage });
 sqlRoute.update({ component: SqlConsole });
+searchRoute.update({ component: SearchView });
 pageRoute.update({ component: PagePage });
 syncRoute.update({ component: () => (isReadOnly() ? <Navigate to="/" /> : <SyncView />) });
 // React Flow and dagre load only when the ERD opens
@@ -121,7 +123,7 @@ erdRoute.update({ component: lazyRouteComponent(() => import("./components/ErdVi
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute, pageRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute, pageRoute, searchRoute]),
   history: createHashHistory(),
 });
 

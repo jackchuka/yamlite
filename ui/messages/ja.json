@@ -244,9 +244,46 @@
   "schema_unmanaged_index": "yamlite の管理外（SQL などで作成）",
   "schema_not_created_hint": "未作成の理由は同期画面の警告に出ます。",
   "schema_expanded_views": "展開ビュー",
-  "cmd_placeholder": "テーブルや画面を検索…",
+  "cmd_placeholder": "テーブル・画面・レコードを検索…",
   "cmd_empty": "見つかりません",
   "cmd_views": "ビュー",
+  "cmd_records": "レコード",
+  "cmd_all_results": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "すべての結果を見る（{count} 件）"
+      }
+    }
+  ],
+  "cmd_searching": "検索中…",
+  "cmd_hint_move": "移動",
+  "cmd_hint_open": "開く",
+  "cmd_hint_all": "すべての結果",
+  "search_tables": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} テーブル"
+      }
+    }
+  ],
+  "search_title": "検索",
+  "search_placeholder": "すべてのテーブルを検索…",
+  "search_hint": "2 文字以上入力してください。",
+  "search_empty": "一致するレコードはありません。",
+  "search_hits": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件"
+      }
+    }
+  ],
+  "search_show_all": "{count} 件すべて表示",
   "sql_history": "履歴",
   "sql_run_shortcut": "実行 ⌘↵",
   "sql_run": "実行",
