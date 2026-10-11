@@ -20,7 +20,8 @@ export function invalidationsFor(e: ServeEvent | { type: "hello" }): QueryKey[] 
         ["search"],
       ];
     case "reload":
-      return [["meta"], ["page"]];
+      // yamlite.yaml changed, and the git status counts it as an edit
+      return [["meta"], ["page"], ["schema"], ["git"], ["gitdiff"]];
     case "page":
       return e.pages.map((name) => ["page", name]);
     case "conflict":

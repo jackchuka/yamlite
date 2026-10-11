@@ -107,6 +107,8 @@ export function RuleEditor(p: Props) {
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ["schema"] });
     void queryClient.invalidateQueries({ queryKey: ["meta"] });
+    void queryClient.invalidateQueries({ queryKey: ["git"] });
+    void queryClient.invalidateQueries({ queryKey: ["gitdiff"] });
   };
 
   const save = useMutation({
