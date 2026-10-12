@@ -99,12 +99,12 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
       return config.pages;
     },
     async status(opts = {}) {
-      if (closed) throw new Error("yamlite is closed");
+      if (closed) throw new Error("YAMLite is closed");
       const dbTime = store.lastWriteMs();
       return withChecks(select(opts.tables).map((t) => syncTable(ctx, t, { dryRun: true, dbTime })));
     },
     async sync(opts = {}) {
-      if (closed) throw new Error("yamlite is closed");
+      if (closed) throw new Error("YAMLite is closed");
       const tables = select(opts.tables);
       // read before this sync writes anything, so that only other writers move it
       const dbTime = store.lastWriteMs();
@@ -115,7 +115,7 @@ export async function open(options: OpenOptions): Promise<Yamlite> {
       );
     },
     watch(handlers = {}, opts = {}) {
-      if (closed) throw new Error("yamlite is closed");
+      if (closed) throw new Error("YAMLite is closed");
       if (watcher) throw new Error("already watching");
       lock();
       const source =

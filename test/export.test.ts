@@ -260,7 +260,7 @@ test("a previous export is replaced, another folder is refused unless forced", a
 
   const other = tmpRoot();
   write(join(other, "keep.txt"), "mine");
-  await expect(exportSite({ root, out: other, uiDir: ui() })).rejects.toThrow("not a yamlite export");
+  await expect(exportSite({ root, out: other, uiDir: ui() })).rejects.toThrow("not a YAMLite export");
   expect(readFileSync(join(other, "keep.txt"), "utf8")).toBe("mine");
   await exportSite({ root, out: other, uiDir: ui(), force: true });
   expect(existsSync(join(other, "keep.txt"))).toBe(false);

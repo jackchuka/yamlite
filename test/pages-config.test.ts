@@ -77,7 +77,7 @@ test.each([
   ],
   [
     "pages:\n  b:\n    path: b.html\n    access: { _yamlite_state: read }\n",
-    'page "b": _yamlite_state is yamlite\'s bookkeeping and cannot be in access',
+    'page "b": _yamlite_state is YAMLite\'s bookkeeping and cannot be in access',
   ],
   ["pages:\n  b:\n    path: b.html\n    network: https://a.example\n", 'page "b": network must be a list of origins'],
   [

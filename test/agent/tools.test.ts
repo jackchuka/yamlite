@@ -51,7 +51,7 @@ test("propose tools create pending proposals and say nothing was saved", async (
     /^Proposal p_\w+ created: 1 row in tasks \(1 update\)\. Nothing is saved until the user applies it/,
   );
   expect(out).toContain("card in this same chat panel");
-  expect(out).not.toContain("yamlite UI");
+  expect(out).not.toContain("YAMLite UI");
   const changes = await call(t, "propose_changes", {
     title: "rename",
     changes: [{ table: "tasks", key: "a", op: "update", values: { title: "Z" } }],

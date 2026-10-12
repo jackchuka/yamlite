@@ -7,7 +7,7 @@ import { open } from "../src/index.ts";
 import { read, sql, tmpRoot, write } from "./helpers.ts";
 
 const HEADER = [
-  "# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;",
+  "# The schema of record for this folder. YAMLite adds new tables and columns here as it finds them;",
   "# edit types, keys and indexes to change the database.",
   "",
 ];
@@ -314,7 +314,7 @@ describe("generateConfig", () => {
         "      extra: REAL",
         "    indexes:",
         "      - [title]",
-        '      # replaces index "by_priority" created outside yamlite; drop it after adopting',
+        '      # replaces index "by_priority" created outside YAMLite; drop it after adopting',
         "      - {columns: [priority], unique: true}",
         "",
       ].join("\n"),

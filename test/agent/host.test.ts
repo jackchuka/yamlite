@@ -73,7 +73,7 @@ test("the system prompt holds the preamble and the notes", async () => {
   await idle(c);
   const prompt = model.doStreamCalls[0]?.prompt ?? [];
   expect(prompt[0]).toMatchObject({ role: "system" });
-  expect(JSON.stringify(prompt[0])).toContain("yamlite");
+  expect(JSON.stringify(prompt[0])).toContain("YAMLite");
   expect(JSON.stringify(prompt[0])).toContain("NOTE-1");
 });
 

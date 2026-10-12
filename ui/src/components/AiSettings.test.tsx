@@ -54,9 +54,9 @@ test("a model outside the suggestions can be typed and is marked unverified", ()
   const onSave = renderSettings();
   const model = screen.getByLabelText("Model") as HTMLInputElement;
   expect(model.value).toBe("gpt-5");
-  expect(screen.queryByText(/not been checked with yamlite/)).toBeNull();
+  expect(screen.queryByText(/not been checked with YAMLite/)).toBeNull();
   fireEvent.change(model, { target: { value: "gpt-6" } });
-  expect(screen.getByText(/not been checked with yamlite/)).toBeTruthy();
+  expect(screen.getByText(/not been checked with YAMLite/)).toBeTruthy();
   fireEvent.submit(screen.getByRole("form", { name: "AI settings" }));
   expect(onSave).toHaveBeenCalledWith({ provider: "openai", model: "gpt-6", apiKey: "" }, false);
 });

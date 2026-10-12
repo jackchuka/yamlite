@@ -95,7 +95,7 @@ test("serve refuses to start while another watcher holds the lock", async () => 
   const y = await open({ root });
   const w = y.watch({}, fast);
   await w.ready;
-  await expect(serve({ root, port: 0, uiDir: tmpRoot(), watch: fast })).rejects.toThrow(/another yamlite process/);
+  await expect(serve({ root, port: 0, uiDir: tmpRoot(), watch: fast })).rejects.toThrow(/another YAMLite process/);
   await y.close();
 });
 

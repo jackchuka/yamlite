@@ -68,7 +68,7 @@ export function agentTools(ctx: ApiContext, conversationId: string): AgentTool[]
     {
       name: "schema",
       description:
-        "List the tables and views in this yamlite folder: key column, column types, formats, allowed values, required columns, bounds and references. Call this first.",
+        "List the tables and views in this YAMLite folder: key column, column types, formats, allowed values, required columns, bounds and references. Call this first.",
       inputSchema: { type: "object", properties: {} },
       call: () => ({
         tables: ctx.y.tables.map((t) => ({

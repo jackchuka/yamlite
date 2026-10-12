@@ -47,7 +47,7 @@ describe("report", () => {
     );
     expect(out).toBe(
       [
-        "yamlite · /data/notes",
+        "YAMLite · /data/notes",
         "",
         "  ✓ people   in sync                               2 records",
         "  ● tasks    1 → db · 1 → file · 1 conflict        4 records",
@@ -81,7 +81,7 @@ describe("report", () => {
     );
     expect(out).toBe(
       [
-        "yamlite · /data/notes",
+        "YAMLite · /data/notes",
         "",
         "  ✓ tasks   1 → db · 2 files deleted · 1 conflict  4 records",
         "            ⚠ buy-milk: changed on both sides · kept db · file version saved to .yamlite/conflicts/tasks/b.yaml",
@@ -103,7 +103,7 @@ describe("watch", () => {
 
   test("header", () => {
     expect(watchHeader(["people", "tasks"], root, plain)).toBe(
-      "yamlite · watching people, tasks in /data/notes · Ctrl-C to stop",
+      "YAMLite · watching people, tasks in /data/notes · Ctrl-C to stop",
     );
   });
 
@@ -312,7 +312,7 @@ test("checkReport lists problems per table and counts them", () => {
   );
   expect(out).toBe(
     [
-      "yamlite · /tmp/data",
+      "YAMLite · /tmp/data",
       "",
       "  ✓ people",
       "  ✗ tasks",

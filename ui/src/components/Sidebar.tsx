@@ -175,7 +175,7 @@ export function Sidebar({ onNewTable, onSearch }: { onNewTable?: () => void; onS
         {!isEmbedded() && (
           <>
             <Logo className="size-6" />
-            yamlite
+            YAMLite
             <RootInfo />
           </>
         )}

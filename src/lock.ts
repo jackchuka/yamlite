@@ -42,7 +42,7 @@ export function acquireLock(stateDir: string): () => void {
         const pidStr = readFileSync(path, "utf8");
         const pid = Number(pidStr);
         if (Number.isInteger(pid) && pid > 0 && isAlive(pid)) {
-          throw new Error(`another yamlite process (pid ${pid}) is running; lock file: ${path}`);
+          throw new Error(`another YAMLite process (pid ${pid}) is running; lock file: ${path}`);
         }
         // Re-read to ensure we're still looking at the same stale lock
         const pidStrCheck = readFileSync(path, "utf8");

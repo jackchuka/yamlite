@@ -106,7 +106,7 @@ test("only one process syncs at a time", async () => {
   const a = await open({ root });
   const b = await open({ root });
   await a.sync();
-  await expect(b.sync()).rejects.toThrow(/another yamlite process/);
+  await expect(b.sync()).rejects.toThrow(/another YAMLite process/);
   await expect(b.status()).resolves.toHaveLength(1);
   await a.close();
   await expect(b.sync()).resolves.toHaveLength(1);

@@ -75,7 +75,7 @@ test("watch twice throws, and watch after close throws", async () => {
   const t = await start({ "tasks/a.yaml": "title: A\n" });
   expect(() => t.y.watch()).toThrow("already watching");
   await t.y.close();
-  expect(() => t.y.watch()).toThrow("yamlite is closed");
+  expect(() => t.y.watch()).toThrow("YAMLite is closed");
 });
 
 const managedIndexes = (db: string) =>

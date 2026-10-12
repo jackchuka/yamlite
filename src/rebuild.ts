@@ -71,7 +71,7 @@ function assertRebuildable(store: Store, table: string): void {
     const name = String(obj.name);
     if (obj.type === "trigger") throw refuse(table, `has a trigger "${name}"`);
     if (obj.type === "index" && obj.sql !== null && !name.startsWith("yamlite_")) {
-      throw refuse(table, `has an index "${name}" not managed by yamlite`);
+      throw refuse(table, `has an index "${name}" not managed by YAMLite`);
     }
     if (obj.type === "table" && UNSUPPORTED_SQL.test(String(obj.sql))) {
       throw refuse(
