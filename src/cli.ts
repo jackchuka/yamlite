@@ -191,7 +191,7 @@ withRoot(program.command("serve").description("open the web UI and sync continuo
         ),
       );
     }
-    console.log(`${out("green", "✓")} yamlite UI · ${out("bold", s.url)}`);
+    console.log(`${out("green", "✓")} YAMLite UI · ${out("bold", s.url)}`);
     console.log(out("dim", `  watching ${displayPath(resolve(root))} · Ctrl+C to stop`));
     if (o.open) openBrowser(s.url);
     let stopping = false;

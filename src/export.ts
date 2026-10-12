@@ -303,7 +303,7 @@ function checkOut(out: string, force: boolean): void {
     throw new Error(`${out} is a file; pass --force to replace it`);
   }
   if (force || existsSync(join(out, "data", "snapshot.json")) || readdirSync(out).length === 0) return;
-  throw new Error(`${out} is not a yamlite export and not empty; pass --force to replace it`);
+  throw new Error(`${out} is not a YAMLite export and not empty; pass --force to replace it`);
 }
 
 // symlinks and letter case (on case-insensitive volumes) resolved, so another spelling of the root cannot slip past
@@ -332,7 +332,7 @@ function checkAgainstRoot(out: string, root: string): void {
   if (escapes(inside)) return;
   const segments = inside.split(sep);
   if (segments[0] === ".yamlite")
-    throw new Error(`refusing to write to ${out}: it is yamlite's state folder ${join(root, ".yamlite")}`);
+    throw new Error(`refusing to write to ${out}: it is YAMLite's state folder ${join(root, ".yamlite")}`);
   if (segments.some((segment) => segment.startsWith("."))) return;
   throw new Error(
     `${out} is inside the data root and would be synced as a table; use a folder outside it or a dot-folder such as .yamlite-export`,

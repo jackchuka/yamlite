@@ -201,7 +201,7 @@ export function reconcileViews(store: Store, spec: TableSpec, apply: boolean): V
       }
       const kind = store.objectType(e.name);
       if (kind === "table" || (kind !== null && !registered.has(e.name))) {
-        plan.warnings.push(`view ${e.name} not created: a ${kind} with that name is not managed by yamlite`);
+        plan.warnings.push(`view ${e.name} not created: a ${kind} with that name is not managed by YAMLite`);
         if (registered.has(e.name)) drop(e.name);
         continue;
       }

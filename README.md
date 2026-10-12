@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="assets/logo/icon.svg" width="96" height="96" alt="yamlite">
+  <img src="assets/logo/icon.svg" width="96" height="96" alt="YAMLite">
 </p>
 
-<h1 align="center">yamlite</h1>
+<h1 align="center">YAMLite</h1>
 
 <p align="center">
   <strong>Your YAML files, queryable with SQL.<br>Your SQLite database, reviewable in git.</strong>
@@ -17,15 +17,15 @@
 
 ---
 
-yamlite keeps a folder of YAML files and a local SQLite database in sync, in both directions, continuously. Edit a file in your editor and the row changes. Run an `UPDATE` and the file changes — with your comments still in place.
+YAMLite keeps a folder of YAML files and a local SQLite database in sync, in both directions, continuously. Edit a file in your editor and the row changes. Run an `UPDATE` and the file changes — with your comments still in place.
 
 <p align="center">
-  <img src="assets/demo.gif" width="800" alt="yamlite demo: editing the YAML file updates the SQLite row, and an SQL UPDATE rewrites the file with its comment intact">
+  <img src="assets/demo.gif" width="800" alt="YAMLite demo: editing the YAML file updates the SQLite row, and an SQL UPDATE rewrites the file with its comment intact">
 </p>
 
 ## Why
 
-YAML is great for data humans write: readable, diffable, comment-friendly, git-native. It is terrible to query. SQLite is the opposite. yamlite lets you keep both without choosing:
+YAML is great for data humans write: readable, diffable, comment-friendly, git-native. It is terrible to query. SQLite is the opposite. YAMLite lets you keep both without choosing:
 
 - **Hand-written data, SQL queries** — tasks, notes, contacts, configs, fixtures. Keep editing YAML; ask questions with SQL, Datasette, or any SQLite tool.
 - **App-written data, git history** — let a script or app write to SQLite and get every change as a reviewable YAML diff.
@@ -42,7 +42,7 @@ flowchart LR
 ## Features
 
 - **Two-way, continuous sync** — `yamlite watch` reacts to file saves and to commits from any process writing the database.
-- **One schema file** — `yamlite init` writes `yamlite.yaml` from your data. Commit it next to your YAML: it pins every column's type, and yamlite keeps the database matching it.
+- **One schema file** — `yamlite init` writes `yamlite.yaml` from your data. Commit it next to your YAML: it pins every column's type, and YAMLite keeps the database matching it.
 - **Comment-preserving writes** — only changed fields are rewritten; comments, key order and flow style (`[a, b]`) survive.
 - **Typed columns** — `true` → `BOOLEAN`, `1` → `INTEGER`, `1.5` → `REAL`, maps/lists → `JSON`, inferred from your data.
 - **Safe by default** — broken YAML is never overwritten or treated as deleted, mass deletions are refused, and the losing side of a conflict is always backed up.
@@ -137,7 +137,7 @@ npx @jackchuka/yamlite status ./notes
 
    ```console
    $ yamlite watch notes
-   yamlite · watching people, tasks in ~/notes · Ctrl-C to stop
+   YAMLite · watching people, tasks in ~/notes · Ctrl-C to stop
 
      12:03:41  tasks   → db        buy-milk
      12:03:55  people  → file      2
@@ -212,15 +212,15 @@ Click the folder name at the top of the sidebar to see its full path, `yamlite.y
 
 Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` before `yamlite serve`, or enter a key in the **Ask AI** panel. Ask in plain words — "list the tasks due next week", "mark every errand task done" — and the model searches with SQL and proposes changes. A proposal shows each record's changes in the panel and in the table; nothing is written until you press **Apply**, and then it is saved like an edit in the form, so comments and the safety checks apply.
 
-- Models: the panel suggests the ones checked with yamlite — Anthropic `claude-sonnet-5-5` (default), `claude-haiku-5-5`, `claude-opus-5-5`; OpenAI `gpt-5`, `gpt-5-mini` — and takes any other model id the provider offers. Other models may not use the tools well.
+- Models: the panel suggests the ones checked with YAMLite — Anthropic `claude-sonnet-5-5` (default), `claude-haiku-5-5`, `claude-opus-5-5`; OpenAI `gpt-5`, `gpt-5-mini` — and takes any other model id the provider offers. Other models may not use the tools well.
 - A key entered in the panel is kept in the browser only if you tick "Remember the key on this device", and is sent only to your `yamlite serve` and from there to the provider. What you ask, and the data the model reads to answer, go to that provider.
-- The model can only use yamlite's tools: read the schema, run read-only SQL, read records, check rules, read the guide, and create proposals, and, in a git repository, the git tools below. It cannot run commands or write files.
+- The model can only use YAMLite's tools: read the schema, run read-only SQL, read records, check rules, read the guide, and create proposals, and, in a git repository, the git tools below. It cannot run commands or write files.
 - A proposal is refused, with nothing written, if a record in it changed after it was made. It holds at most 500 rows. If applying would add rule warnings (required, allowed values, formats, bounds), the proposal shows them; they don't block applying, as with any other edit.
 - With `--host 0.0.0.0`, anyone with the URL's token can use Ask AI, and it spends the API key that `serve` read from the environment.
 - Conversations stay listed under **Conversations** while `serve` runs; conversations and pending proposals are kept in memory, so stopping `serve` discards them.
 - When the folder is in a git repository, the agent can also read its status, diffs, log and branches, and propose git steps: create or switch a branch, commit files it picks, push a branch, fast-forward-only pull, and open a draft pull request. The card lists every step and the files of each commit; nothing runs until you press its button, and the steps stop at the first failure. Branch names must be plain short names (no leading `+` or `-`, no `refs/` or `heads/` prefix, no `@`). Push never forces, and pushing to the default branch is refused, as is pushing when the default branch cannot be determined.
 - While git steps run, edits in the UI and other proposals are refused until they finish.
-- Push and pull use your own git setup (SSH keys or credential helper); yamlite never asks for a password. Pushing and opening a pull request publish your data outside this machine.
+- Push and pull use your own git setup (SSH keys or credential helper); YAMLite never asks for a password. Pushing and opening a pull request publish your data outside this machine.
 - If [GitHub CLI](https://cli.github.com) is installed and logged in, the pull request is created for you and linked in the chat. Without it, the card links to GitHub's pull request form with the title and body filled in.
 - Switching branches changes the YAML files, and the database follows them, like an edit in your editor, even when many records disappear. If a declared table's folder doesn't exist on the target branch, the switch still happens but the database sync fails, and the card says so.
 
@@ -249,7 +249,7 @@ Start from [`examples/pages/kanban.html`](examples/pages/kanban.html): copy it i
 | `yamlite.sql(select)`                                                                            | needs `sql: true`; one SELECT over the names in `access`                                                                                          |
 | `yamlite.on("change", ({ tables }) => …)`                                                        | called after a sync changes a table or view the page can read                                                                                     |
 | `yamlite.theme` / `yamlite.on("theme", ({ theme }) => …)`                                        | the current theme (`light` or `dark`), and a call when it changes                                                                                 |
-| `yamlite.open(table, key)`                                                                       | opens the record in yamlite's own form; tables only, a view gives 400                                                                             |
+| `yamlite.open(table, key)`                                                                       | opens the record in YAMLite's own form; tables only, a view gives 400                                                                             |
 
 Errors reject with `yamlite.YamliteError` (`status`, `message`, `extra`).
 
@@ -274,9 +274,9 @@ Add `data-yamlite-ui` to `<html>` to also get the UI's look for plain elements �
 
 The variable and class names are part of the page API: renaming one is a breaking change.
 
-- The page runs in a sandboxed frame with no access to yamlite's session; every call goes through yamlite, which checks it against `access`. SQL runs on a read-only connection where SQLite itself refuses tables outside `access`.
+- The page runs in a sandboxed frame with no access to YAMLite's session; every call goes through YAMLite, which checks it against `access`. SQL runs on a read-only connection where SQLite itself refuses tables outside `access`.
 - `network` is enforced with a Content Security Policy. It limits what the page loads and where it connects. Declaring an origin lets the page send data, including anything it can read through `access`, off your machine to that origin.
-- Every page, even with `network: []`, can leak data by navigating its own frame to another site with the data in the URL. yamlite then disconnects the page, but the data has already left. Only declare pages you trust, as you would any script you run.
+- Every page, even with `network: []`, can leak data by navigating its own frame to another site with the data in the URL. YAMLite then disconnects the page, but the data has already left. Only declare pages you trust, as you would any script you run.
 - In an [export](#export) pages are read-only, and `access` does not hide data: the exported `db.sqlite` is downloadable, and `sql: true` reads every exported table. Pages whose `access` names a table left out of the export are skipped with a warning.
 
 ## Check
@@ -335,7 +335,7 @@ yamlite export notes --out ../notes-site
 - `--table` (repeatable) limits the export to those tables; the others are left out of the database too.
 - Output: `index.html`, `assets/`, and `data/` (`snapshot.json`, `db.sqlite`, one `yaml/<table>.json` per table, holding each YAML file's text once). Every URL is relative, so it works under a subpath such as GitHub Pages' `/<repo>/`.
 - Machine paths are hidden: the root is shown as its folder name, and paths outside the root as their base names.
-- `--out` defaults to `.yamlite-export`. It cannot be the data root, an ancestor of it, or `.yamlite/` (also when reached through a symlink or a different letter case), and inside the root it must sit in a dot-folder (yamlite ignores those; a plain folder would become a table on the next sync).
+- `--out` defaults to `.yamlite-export`. It cannot be the data root, an ancestor of it, or `.yamlite/` (also when reached through a symlink or a different letter case), and inside the root it must sit in a dot-folder (YAMLite ignores those; a plain folder would become a table on the next sync).
 - An existing `--out` folder is replaced only if it holds a previous export or is empty; `--force` replaces anything else, but never the root, its ancestors or `.yamlite/`.
 - Open it over HTTP (`npx serve ../notes-site`); browsers do not load the app from `file://`, so the page opened that way only says to use a web server.
 - Set `SOURCE_DATE_EPOCH` to make the output byte-for-byte reproducible.
@@ -444,7 +444,7 @@ The skill tells the agent to read `yamlite guide` and to finish with `yamlite ch
 
 ## Configuration
 
-`<root>/yamlite.yaml` (or `yamlite.yml`) is required — it is the schema of record. Create it with `yamlite init`, commit it with your data, and edit it to change keys, types, indexes or to add tables that live elsewhere. yamlite keeps it current for you: when `sync` or `watch` meets a new table under the root, a new YAML key, or a column an app added to the database, it appends it to `yamlite.yaml` (existing lines, comments and order are left untouched) — so new schema shows up as a reviewable diff. `yamlite status` lists these as `+ column … (will be added to yamlite.yaml)` first. `yamlite watch` reloads it on save — and picks up tables added under the root — without a restart; a broken file is reported and the previous configuration stays in effect.
+`<root>/yamlite.yaml` (or `yamlite.yml`) is required — it is the schema of record. Create it with `yamlite init`, commit it with your data, and edit it to change keys, types, indexes or to add tables that live elsewhere. YAMLite keeps it current for you: when `sync` or `watch` meets a new table under the root, a new YAML key, or a column an app added to the database, it appends it to `yamlite.yaml` (existing lines, comments and order are left untouched) — so new schema shows up as a reviewable diff. `yamlite status` lists these as `+ column … (will be added to yamlite.yaml)` first. `yamlite watch` reloads it on save — and picks up tables added under the root — without a restart; a broken file is reported and the previous configuration stays in effect.
 
 ```yaml
 tables:
@@ -497,7 +497,7 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 
 - Values are converted where possible (`1` ↔ `"1"`, `"true"` → `BOOLEAN`, JSON text → `JSON`).
 - A value that can't be converted is cleared and refilled from YAML, which stays the source of truth. If that value was changed in SQL and never synced, the rebuild stops instead; fix the row or pass `--force-convert` to clear it.
-- Tables with triggers, CHECK, UNIQUE or foreign-key constraints, COLLATE, AUTOINCREMENT, generated columns, `STRICT` or `WITHOUT ROWID`, indexes yamlite doesn't manage, or other tables referencing them are never rebuilt; yamlite reports an error and leaves the migration to you.
+- Tables with triggers, CHECK, UNIQUE or foreign-key constraints, COLLATE, AUTOINCREMENT, generated columns, `STRICT` or `WITHOUT ROWID`, indexes YAMLite doesn't manage, or other tables referencing them are never rebuilt; YAMLite reports an error and leaves the migration to you.
 - The key column's type is never changed; to change it, recreate the database (delete `.yamlite/`).
 
 ### Groups
@@ -544,7 +544,7 @@ tables:
 
 ### Values
 
-List the values a column may hold, and yamlite checks them on every sync. Like references, they are never enforced: a value outside the list is a warning, not a failed sync.
+List the values a column may hold, and YAMLite checks them on every sync. Like references, they are never enforced: a value outside the list is a warning, not a failed sync.
 
 ```yaml
 tables:
@@ -569,7 +569,7 @@ The web UI can edit them from the table's schema (**Edit rules**).
 
 ### Required
 
-List the columns every record must have a value in, and yamlite checks them on every sync. A missing key or `null` is a warning, not a failed sync; `""` and `[]` count as values.
+List the columns every record must have a value in, and YAMLite checks them on every sync. A missing key or `null` is a warning, not a failed sync; `""` and `[]` count as values.
 
 ```yaml
 tables:
@@ -590,7 +590,7 @@ The web UI can edit them from the table's schema (**Edit rules**).
 
 ### Min and max
 
-Bound a column, and yamlite checks it on every sync. Bounds are included, and a value outside them is a warning, not a failed sync.
+Bound a column, and YAMLite checks it on every sync. Bounds are included, and a value outside them is a warning, not a failed sync.
 
 ```yaml
 tables:
@@ -615,7 +615,7 @@ The web UI can edit them from the table's schema (**Edit rules**).
 
 ### References
 
-Declare which fields point at other tables, and yamlite checks them on every sync — it never enforces them, so a typo or a record you haven't added yet is a warning, not a failed sync:
+Declare which fields point at other tables, and YAMLite checks them on every sync — it never enforces them, so a typo or a record you haven't added yet is a warning, not a failed sync:
 
 ```yaml
 tables:
@@ -636,13 +636,13 @@ The web UI can edit them from the table's schema (**Edit rules**).
 
 ### Indexes
 
-`indexes` is declarative: every sync makes the database match it. yamlite creates missing indexes and drops the ones you removed from the list, and leaves indexes you created yourself in SQL alone (its own are named `yamlite_<table>_<hash>`). An index that can't be created — a duplicate value for a `unique` index, or a column that doesn't exist yet — is reported as a warning and data keeps syncing. `yamlite status` shows planned index changes as `+ index` / `− index`.
+`indexes` is declarative: every sync makes the database match it. YAMLite creates missing indexes and drops the ones you removed from the list, and leaves indexes you created yourself in SQL alone (its own are named `yamlite_<table>_<hash>`). An index that can't be created — a duplicate value for a `unique` index, or a column that doesn't exist yet — is reported as a warning and data keeps syncing. `yamlite status` shows planned index changes as `+ index` / `− index`.
 
 The web UI can add or remove indexes from the table's schema (**Edit rules**).
 
 ## Safety
 
-yamlite is built so that a sync never silently loses data:
+YAMLite is built so that a sync never silently loses data:
 
 - **Unreadable files are untouchable.** A YAML file with a syntax error, several documents, or the wrong top-level shape is never overwritten and never treated as a deletion: a record file is skipped, and a broken list file stops its table with an error. A subfolder that can't be read and a symlink whose target is gone also stop their table, since they may hold records. Fix it and the next sync picks it up.
 - **Mass deletions are refused.** A sync that would delete more than `max(10, 50%)` of a table, or empty a table that had several records, stops unless you pass `--force`. A missing folder or a dropped table with previously synced records is an error, not a wipe.
@@ -662,7 +662,7 @@ flowchart LR
   E -- changed in both --> C[newer wins<br/>loser → .yamlite/conflicts]
 ```
 
-For every record, yamlite compares the current file hash and row hash with the hashes recorded at the last sync (stored in the `_yamlite_state` table). Only the side that changed is propagated, and each side is re-read after writing, so yamlite never echoes its own writes back or loops. Apart from three bookkeeping tables (`_yamlite_state`, `_yamlite_columns` and `_yamlite_views`) and the views you declare under `expand`, nothing is added to your database — no triggers, no change log.
+For every record, YAMLite compares the current file hash and row hash with the hashes recorded at the last sync (stored in the `_yamlite_state` table). Only the side that changed is propagated, and each side is re-read after writing, so YAMLite never echoes its own writes back or loops. Apart from three bookkeeping tables (`_yamlite_state`, `_yamlite_columns` and `_yamlite_views`) and the views you declare under `expand`, nothing is added to your database — no triggers, no change log.
 
 ## Library
 
@@ -688,7 +688,7 @@ Open your own `node:sqlite` (or any SQLite) connection to write to the database 
 
 ## Limitations
 
-- Local, single-machine use. One yamlite process per data folder.
+- Local, single-machine use. One YAMLite process per data folder.
 - Sized for hundreds to thousands of records per table; every sync scans the whole table.
 - No SQLite foreign-key constraints ([references](#references) are checked, not enforced). Only YAML is read: `.md` and `.mdx` files through their YAML front matter, never TOML or JSON front matter or other formats.
 - A table splits by one column only.

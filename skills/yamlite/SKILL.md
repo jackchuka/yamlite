@@ -1,9 +1,9 @@
 ---
 name: yamlite
-description: Use when managing YAML or Markdown files with yamlite (YAML files kept in sync with SQLite), or when creating, editing or reviewing a yamlite.yaml schema — choosing tables, column types and rules such as values, required, formats, references, indexes and split.
+description: Use when managing YAML or Markdown files with YAMLite (YAML files kept in sync with SQLite), or when creating, editing or reviewing a yamlite.yaml schema — choosing tables, column types and rules such as values, required, formats, references, indexes and split.
 ---
 
-# yamlite
+# YAMLite
 
 Before writing or changing `yamlite.yaml`, read the guide that matches the installed version:
 

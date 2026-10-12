@@ -71,7 +71,7 @@ export const conflictRoutes: Routes = (router, ctx) => {
     const backup = readConflict(ctx.stateDir, id, sourceReader(ctx));
     const { entry } = backup;
     if (!entry.restorable || entry.key === null) {
-      throw new HttpError(400, "this backup has no yamlite header, so its key is unknown; restore it by hand");
+      throw new HttpError(400, "this backup has no YAMLite header, so its key is unknown; restore it by hand");
     }
     const spec = tableSpec(ctx, entry.table);
     const key = entry.key;

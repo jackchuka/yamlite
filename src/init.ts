@@ -27,7 +27,7 @@ export interface InitOptions {
 }
 
 const HEADER = [
-  " The schema of record for this folder. yamlite adds new tables and columns here as it finds them;",
+  " The schema of record for this folder. YAMLite adds new tables and columns here as it finds them;",
   " edit types, keys and indexes to change the database.",
 ].join("\n");
 
@@ -321,7 +321,7 @@ export function generateConfig(opts: InitOptions): string {
                 };
           const item = doc.createNode(value, { flow: true });
           if (adoptedFrom)
-            item.commentBefore = ` replaces index "${adoptedFrom}" created outside yamlite; drop it after adopting`;
+            item.commentBefore = ` replaces index "${adoptedFrom}" created outside YAMLite; drop it after adopting`;
           items.items.push(item);
         }
         (node as unknown as { set: (k: string, v: unknown) => void }).set("indexes", items);

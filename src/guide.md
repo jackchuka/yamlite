@@ -1,6 +1,6 @@
 # Writing yamlite.yaml
 
-yamlite keeps a folder of YAML (and Markdown) files and a local SQLite database in sync in both directions. `yamlite.yaml` at the data root is the schema of record: it names the tables, pins column types and declares the rules yamlite checks. This guide is how to write it well. The full reference is the README: https://github.com/jackchuka/yamlite#configuration
+YAMLite keeps a folder of YAML (and Markdown) files and a local SQLite database in sync in both directions. `yamlite.yaml` at the data root is the schema of record: it names the tables, pins column types and declares the rules YAMLite checks. This guide is how to write it well. The full reference is the README: https://github.com/jackchuka/yamlite#configuration
 
 ## Workflow
 
@@ -15,12 +15,12 @@ yamlite keeps a folder of YAML (and Markdown) files and a local SQLite database 
    `init` finds every folder and list file directly under the root and infers column types from the values (and from an existing database). It adds `date` / `datetime` formats where every value has that shape, a `key` for a list file whose items have no `id` (a field every item has, once each; `slug`, `key`, `code` or `name` first), `expand` for lists of maps and maps of maps, and `references` where the data leaves no doubt: a field named after a table (`team` → `teams`) whose values are all that table's keys, or a field whose values are all keys of exactly one table. A reference is left out when any value is missing from the table, so `check` passes on the generated file. A top-level folder that holds `.md` or `.mdx` files and is not a YAML table becomes a Markdown table at the deepest folder holding them all (`files: "src/content/blog/**/*.md"`), one per extension. It never creates tables outside the root: declare those yourself.
 
 3. **Edit only what inference cannot know**: tables outside the root, Markdown tables, types that must not follow the data, and rules. Add a YAML comment where a choice is not obvious.
-4. **Preview** with `yamlite status`. It writes nothing. `↻ column title TEXT → JSON` means a table rebuild for a type change; `+ column … (will be added to yamlite.yaml)` means yamlite found a key not yet declared.
+4. **Preview** with `yamlite status`. It writes nothing. `↻ column title TEXT → JSON` means a table rebuild for a type change; `+ column … (will be added to yamlite.yaml)` means YAMLite found a key not yet declared.
 5. **Sync** with `yamlite sync`. It appends the columns of tables you declared by hand (and any other new key) to `yamlite.yaml`.
 6. **Validate** with `yamlite check`. It exits 1 on a failing table, a rule warning, or a column or table not yet in `yamlite.yaml` (`+ column … (not in yamlite.yaml)`; `yamlite sync` adds those). `--json` gives machine-readable output. Fix the data or the rule until it exits 0.
 7. **Commit** `yamlite.yaml` with the data, and add `.yamlite/` (the database and its state) to `.gitignore`.
 
-yamlite edits `yamlite.yaml` too: when `sync` or `watch` meets a new table under the root, a new YAML key, or a column an app added to the database, it appends a line and leaves existing lines and comments alone. Review those diffs; don't revert them.
+YAMLite edits `yamlite.yaml` too: when `sync` or `watch` meets a new table under the root, a new YAML key, or a column an app added to the database, it appends a line and leaves existing lines and comments alone. Review those diffs; don't revert them.
 
 ## Laying out tables
 

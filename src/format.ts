@@ -86,7 +86,7 @@ export function report(results: TableResult[], { mode, root, paint, elapsedMs = 
   const nameWidth = Math.max(0, ...results.map((r) => r.table.length));
   const summaryWidth = Math.max(MIN_SUMMARY_WIDTH, ...results.map((r) => summary(r).length + 2));
   const indent = " ".repeat(2 + 1 + 1 + nameWidth + 3);
-  const lines = [`${paint("bold", "yamlite")} ${paint("dim", `· ${displayPath(root)}`)}`, ""];
+  const lines = [`${paint("bold", "YAMLite")} ${paint("dim", `· ${displayPath(root)}`)}`, ""];
 
   for (const r of results) {
     const name = r.table.padEnd(nameWidth);
@@ -142,7 +142,7 @@ export function report(results: TableResult[], { mode, root, paint, elapsedMs = 
 export function checkReport(result: CheckResult, { root, paint }: { root: string; paint: Painter }): string {
   const nameWidth = Math.max(0, ...result.tables.map((t) => t.table.length));
   const indent = " ".repeat(2 + 1 + 1 + nameWidth + 3);
-  const lines = [`${paint("bold", "yamlite")} ${paint("dim", `· ${displayPath(root)}`)}`, ""];
+  const lines = [`${paint("bold", "YAMLite")} ${paint("dim", `· ${displayPath(root)}`)}`, ""];
   const unlisted = new Set(result.unregisteredTables);
   let problems = 0;
   for (const t of result.tables) {
@@ -169,7 +169,7 @@ export function checkReport(result: CheckResult, { root, paint }: { root: string
 
 export function watchHeader(tables: string[], root: string, paint: Painter): string {
   const names = tables.length > 0 ? tables.join(", ") : "(no tables)";
-  return `${paint("bold", "yamlite")} · watching ${names} in ${displayPath(root)} ${paint("dim", "· Ctrl-C to stop")}`;
+  return `${paint("bold", "YAMLite")} · watching ${names} in ${displayPath(root)} ${paint("dim", "· Ctrl-C to stop")}`;
 }
 
 const clock = (now: Date) =>

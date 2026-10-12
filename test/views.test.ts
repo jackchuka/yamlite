@@ -295,7 +295,7 @@ describe("reconcileViews", () => {
     write(t.file("website"), "milestones: [{ title: Design }]\n");
     const r = t.sync();
     expect(r.warnings).toEqual([
-      "view projects__milestones not created: a view with that name is not managed by yamlite",
+      "view projects__milestones not created: a view with that name is not managed by YAMLite",
     ]);
     expect(sql(t.db, "SELECT * FROM projects__milestones")).toEqual([{ mine: 1 }]);
   });
@@ -318,7 +318,7 @@ describe("reconcileViews", () => {
     const r = t.sync();
     expect(r.ok).toBe(true);
     expect(r.warnings).toEqual([
-      "view projects__milestones not created: a table with that name is not managed by yamlite",
+      "view projects__milestones not created: a table with that name is not managed by YAMLite",
     ]);
     expect(sql(t.db, "SELECT x FROM projects__milestones")).toEqual([{ x: 1 }]);
     expect(sql(t.db, "SELECT count(*) AS n FROM _yamlite_views")).toEqual([{ n: 0 }]);

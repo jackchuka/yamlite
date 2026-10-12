@@ -563,7 +563,7 @@ function toPages(raw: unknown, root: string, tables: TableSpec[]): PageSpec[] {
     const access: Record<string, PageAccess> = {};
     for (const [target, level] of Object.entries((v.access ?? {}) as Record<string, unknown>)) {
       if (target.startsWith("_yamlite")) {
-        throw new Error(`${where}${target} is yamlite's bookkeeping and cannot be in access`);
+        throw new Error(`${where}${target} is YAMLite's bookkeeping and cannot be in access`);
       }
       if (level !== "read" && level !== "write") throw new Error(`${where}access.${target} must be read or write`);
       if (viewNames.has(target)) {

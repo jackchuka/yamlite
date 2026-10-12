@@ -1,4 +1,4 @@
-# The schema of record for this folder. yamlite adds new tables and columns here as it finds them;
+# The schema of record for this folder. YAMLite adds new tables and columns here as it finds them;
 # edit types, keys and indexes to change the database.
 
 tables:
