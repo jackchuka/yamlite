@@ -139,6 +139,15 @@ describe("execute", () => {
     s.close();
   });
 
+  test("executeRead refuses a write and leaves the store writable", () => {
+    const s = new Store(join(tmpRoot(), "db.sqlite"));
+    s.exec("CREATE TABLE t (id TEXT)");
+    expect(() => s.executeRead("WITH x AS (SELECT 1) INSERT INTO t VALUES ('a')", 10)).toThrow(/readonly/);
+    expect(s.executeRead("SELECT count(*) AS n FROM t", 10).rows).toEqual([{ n: 0n }]);
+    expect(s.execute("INSERT INTO t VALUES ('a')", 10).changes).toBe(1);
+    s.close();
+  });
+
   test("a locked database raises BusyError", () => {
     const path = join(tmpRoot(), "db.sqlite");
     const a = new Store(path, { busyTimeoutMs: 0 });

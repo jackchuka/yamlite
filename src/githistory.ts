@@ -2,13 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join, posix, relative, sep } from "node:path";
 import { canonical } from "./hash.ts";
-import { own, type Rec } from "./types.ts";
-
-export interface FieldChange {
-  path: string;
-  from: unknown;
-  to: unknown;
-}
+import { type FieldChange, type HistoryEntry, type HistoryPage, own, type Rec } from "./types.ts";
 
 const isMap = (v: unknown): v is Rec =>
   v !== null && typeof v === "object" && !Array.isArray(v) && !(v instanceof Uint8Array);
@@ -44,26 +38,6 @@ export interface HistoryTarget {
   dir: string;
   file: string;
 }
-
-export interface HistoryEntry {
-  kind: "wip" | "commit";
-  sha: string | null;
-  head: boolean;
-  subject: string | null;
-  author: string | null;
-  date: string;
-  path: string;
-  renamedFrom?: string;
-  event?: "created" | "deleted";
-  unreadable?: boolean;
-  changes: FieldChange[];
-  record: Rec | null;
-}
-
-export type HistoryPage =
-  | { state: "nogit" | "untracked" }
-  | { state: "error"; message: string }
-  | { state: "ok"; entries: HistoryEntry[]; next: string | null };
 
 export type DiffResult =
   | { state: "nogit" | "untracked" | "missing" }

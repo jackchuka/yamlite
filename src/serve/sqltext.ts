@@ -47,14 +47,15 @@ export const statementCount = (sql: string): number =>
 export const firstKeyword = (sql: string): string => /^\s*([A-Za-z]+)/.exec(stripSql(sql))?.[1]?.toUpperCase() ?? "";
 
 const READS = new Set(["SELECT", "EXPLAIN", "VALUES"]);
-export const isRead = (sql: string): boolean => READS.has(firstKeyword(sql));
 
 // replace() the function is a read; REPLACE INTO is not
 const WRITES = /\b(?:INSERT|UPDATE|DELETE|REPLACE(?!\s*\())\b/i;
 
-// what a page may run, in serve and in an export alike: a read, or a WITH whose code never writes
-export const isPageStatement = (sql: string): boolean =>
-  isRead(sql) || (firstKeyword(sql) === "WITH" && !WRITES.test(stripSql(sql, false)));
+// a SELECT, EXPLAIN or VALUES, or a WITH whose code never writes
+export function isRead(sql: string): boolean {
+  const first = firstKeyword(sql);
+  return READS.has(first) || (first === "WITH" && !WRITES.test(stripSql(sql, false)));
+}
 
 export const touchesInternal = (sql: string): boolean => /_yamlite_(state|columns|views)\b/i.test(stripSql(sql));
 

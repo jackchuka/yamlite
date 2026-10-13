@@ -100,8 +100,8 @@ test("--table drops references to the tables it leaves out", async () => {
   await writeSnapshotData({ root, dir, tables: ["projects", "notes"] });
   const snap = readJson(join(dir, "data/snapshot.json"));
   const tableRefs = snap.meta.tables.find((t: any) => t.name === "projects").references;
-  expect(tableRefs).toEqual([{ column: "note", table: "notes" }]);
-  expect(snap.meta.views[0].references).toEqual([{ column: "about", table: "projects" }]);
+  expect(tableRefs).toEqual([{ column: "note", table: "notes", key: "id" }]);
+  expect(snap.meta.views[0].references).toEqual([{ column: "about", table: "projects", key: "id" }]);
   expect(snap.schemas.projects.references.map((r: any) => [r.column, r.table])).toEqual([["note", "notes"]]);
 });
 

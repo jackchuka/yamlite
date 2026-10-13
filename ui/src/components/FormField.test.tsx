@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { type ReactNode, useState } from "react";
 import { beforeAll, expect, test, vi } from "vitest";
 import { setMobile } from "@/test/media";
+import { api } from "@/lib/api";
 import { FormField } from "./FormField";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -150,6 +151,53 @@ test("a reference field links to the record it names once it has a value", () =>
     table: "people",
     search: JSON.stringify({ key: "ann" }),
   });
+});
+
+test("a reference field suggests the target column's values", async () => {
+  vi.mocked(api.rows).mockResolvedValueOnce({
+    columns: [],
+    rows: [
+      { id: 7, slug: "core" },
+      { id: 8, slug: "web" },
+    ],
+    total: 2,
+  } as never);
+  const { container } = render(
+    wrap(
+      <FormField
+        path={["team"]}
+        value={null}
+        reference={{ column: "team", table: "teams", key: "slug" }}
+        onChange={() => {}}
+      />,
+    ),
+  );
+  await waitFor(() =>
+    expect([...container.querySelectorAll("datalist option")].map((o) => o.getAttribute("value"))).toEqual([
+      "core",
+      "web",
+    ]),
+  );
+});
+
+test("a reference in an INTEGER column stores the key as a number", () => {
+  const onChange = vi.fn();
+  render(
+    wrap(
+      <FormField
+        path={["team"]}
+        value={null}
+        type="INTEGER"
+        reference={{ column: "team", table: "teams", key: "id" }}
+        onChange={onChange}
+      />,
+    ),
+  );
+  const input = screen.getByRole("combobox", { name: "team" });
+  fireEvent.change(input, { target: { value: "2" } });
+  expect(onChange).toHaveBeenLastCalledWith(2);
+  fireEvent.change(input, { target: { value: "x2" } });
+  expect(onChange).toHaveBeenLastCalledWith("x2");
 });
 
 test("a markdown preview opens links in a new tab, so following one keeps the app open", async () => {

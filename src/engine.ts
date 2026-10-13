@@ -3,7 +3,7 @@ import { relative, sep } from "node:path";
 import { mismatches, preferFileValues, recordToRow, rowToRecord } from "./codec.ts";
 import { type ConflictSource, saveConflict } from "./conflicts.ts";
 import { hashContent, hashRecord } from "./hash.ts";
-import { reconcileIndexes, type SchemaChange } from "./indexes.ts";
+import { reconcileIndexes } from "./indexes.ts";
 import { migrateSchema, type Schema } from "./migrate.ts";
 import { planTable, type Registered, type TablePlan, undeclaredColumns } from "./plan.ts";
 import type { Decision, KeyState } from "./reconcile.ts";
@@ -13,7 +13,7 @@ import type { FileOp, Source, SourceRead } from "./source/types.ts";
 import { markdownCodec, markdownExt } from "./source/markdown.ts";
 import { YAML_GLOB, yamlCodec } from "./source/yamldoc.ts";
 import { BusyError, isConstraintError, type Store } from "./store.ts";
-import type { ColumnType, TableSpec } from "./types.ts";
+import type { Change, ChangeOp, ColumnType, ConflictInfo, SchemaChange, TableSpec } from "./types.ts";
 import { reconcileViews } from "./views.ts";
 
 export type { Registered } from "./plan.ts";
@@ -30,20 +30,6 @@ export interface SyncOptions {
   forceConvert?: boolean;
   dryRun?: boolean;
   dbTime?: number;
-}
-
-export interface ConflictInfo {
-  table: string;
-  key: string;
-  winner: "file" | "db";
-  savedTo: string | null;
-}
-
-export type ChangeOp = "toDb" | "toFile" | "deleteDb" | "deleteFile";
-
-export interface Change {
-  key: string;
-  op: ChangeOp;
 }
 
 export interface TableResult {

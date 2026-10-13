@@ -221,6 +221,16 @@ export class Store {
     }
   }
 
+  // the console's read path: SQLite refuses any write that slips past the text check
+  executeRead(sql: string, limit: number): ExecResult {
+    this.db.exec("PRAGMA query_only = ON");
+    try {
+      return this.execute(sql, limit);
+    } finally {
+      this.db.exec("PRAGMA query_only = OFF");
+    }
+  }
+
   columns(table: string): Map<string, ColumnType> {
     const rows = this.db.prepare(`PRAGMA table_info(${q(table)})`).all() as Array<{ name: string; type: string }>;
     return new Map(rows.map((r) => [r.name, logicalType(r.type)]));

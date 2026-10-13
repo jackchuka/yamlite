@@ -1,20 +1,5 @@
-import type { Change, ConflictInfo, SchemaChange, TableResult, WatchHandlers } from "../index.ts";
-
-export type ServeEvent =
-  | {
-      type: "sync";
-      at: string;
-      table: string;
-      ok: boolean;
-      error?: string;
-      changes: Change[];
-      warnings: string[];
-      schema: SchemaChange[];
-    }
-  | ({ type: "conflict"; at: string } & ConflictInfo)
-  | { type: "error"; at: string; table?: string; message: string }
-  | { type: "reload"; at: string; tables: string[] }
-  | { type: "page"; at: string; pages: string[] };
+import type { TableResult, WatchHandlers } from "../index.ts";
+import type { ServeEvent } from "./types.ts";
 
 const KEEP = 200;
 const KEEPALIVE_MS = 15_000;

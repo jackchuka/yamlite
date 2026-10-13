@@ -1,12 +1,7 @@
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
-import {
-  MAX_PROPOSAL_ROWS,
-  type Proposal,
-  type ProposalDeps,
-  ProposalStore,
-  type RecordChange,
-} from "../../src/agent/proposals.ts";
+import { MAX_PROPOSAL_ROWS, type ProposalDeps, ProposalStore, type RecordChange } from "../../src/agent/proposals.ts";
+import type { Proposal } from "../../src/agent/types.ts";
 import { open, type Yamlite } from "../../src/index.ts";
 import { HttpError } from "../../src/serve/http.ts";
 import { readRecord, updateRecord } from "../../src/serve/records.ts";

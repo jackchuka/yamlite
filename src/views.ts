@@ -1,4 +1,4 @@
-import type { SchemaChange } from "./indexes.ts";
+import type { SchemaChange } from "./types.ts";
 import { inferColumns } from "./schema.ts";
 import { q, type Store } from "./store.ts";
 import {

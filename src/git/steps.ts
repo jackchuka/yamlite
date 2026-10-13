@@ -1,22 +1,8 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { openPr } from "./pr.ts";
+import type { GitStep, StepResult } from "./types.ts";
 import { currentBranch, defaultBranch, GitError, insideRoot, type Repo, runGit, SLOW_MS } from "./repo.ts";
-
-export type GitStep =
-  | { kind: "create_branch"; name: string; from?: string }
-  | { kind: "switch"; branch: string }
-  | { kind: "commit"; message: string; paths: string[] }
-  | { kind: "push"; branch: string }
-  | { kind: "pull"; branch: string }
-  | { kind: "open_pr"; title: string; body: string; base?: string };
-
-export interface StepResult {
-  status: "done" | "failed" | "skipped";
-  message?: string;
-  url?: string;
-  created?: boolean;
-}
 
 export const STEP_KINDS = ["create_branch", "switch", "commit", "push", "pull", "open_pr"] as const;
 

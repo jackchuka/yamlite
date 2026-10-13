@@ -135,3 +135,16 @@ test("a group change is refused for unknown tables, views and bad values", async
     body: { field: "group" },
   });
 });
+
+test("meta keeps each reference's target as written and adds the resolved key", async () => {
+  t = await startServe(
+    { "teams/core.yaml": "name: Core\n", "tasks/a.yaml": "team: core\n" },
+    "tables:\n  teams:\n    key: slug\n  tasks:\n    references:\n      team: teams\n      lead: people.handle\n      owner: people\n",
+  );
+  const tasks = (await t.api("/api/meta")).body.tables.find((x: { name: string }) => x.name === "tasks");
+  expect(tasks.references).toEqual([
+    { column: "team", table: "teams", key: "slug" },
+    { column: "lead", table: "people", target: "handle", key: "handle" },
+    { column: "owner", table: "people" },
+  ]);
+});

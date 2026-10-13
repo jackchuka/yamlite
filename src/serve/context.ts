@@ -4,11 +4,12 @@ import type { ProposalStore } from "../agent/proposals.ts";
 import type { GitDriver } from "../git/driver.ts";
 import type { Yamlite } from "../index.ts";
 import type { Store } from "../store.ts";
-import type { TableSpec, ViewRecord } from "../types.ts";
+import type { Reference, TableSpec, ViewRecord } from "../types.ts";
 import { declaredViews } from "../views.ts";
 import type { EventHub } from "./events.ts";
 import { HttpError } from "./http.ts";
 import type { PageSql } from "./pagesql.ts";
+import type { MetaReference } from "./types.ts";
 
 export interface ApiContext {
   y: Yamlite;
@@ -55,3 +56,16 @@ export function tableSpec(ctx: ApiContext, name: string): TableSpec {
   if (findView(ctx, name)) throw new HttpError(405, `${name} is a read-only view`);
   throw new HttpError(404, `unknown table: ${name}`);
 }
+
+// a reference without a target points at the referenced table's key; undefined when that table is undeclared
+export const referenceKey = (ctx: ApiContext, ref: Reference): string | undefined =>
+  ref.target ?? ctx.y.tables.find((t) => t.name === ref.table)?.key;
+
+export const referenceTarget = (ctx: ApiContext, ref: Reference): string => referenceKey(ctx, ref) ?? "id";
+
+// target stays as the config wrote it, so a client that saves the references back leaves them unchanged
+export const keyedReferences = (ctx: ApiContext, refs: Reference[]): MetaReference[] =>
+  refs.map((r) => {
+    const key = referenceKey(ctx, r);
+    return key === undefined ? r : { ...r, key };
+  });

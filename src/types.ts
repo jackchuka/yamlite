@@ -117,3 +117,49 @@ export interface PageSpec {
   // origins the page may load from and connect to
   network: string[];
 }
+
+export interface SchemaChange {
+  op: "createIndex" | "dropIndex" | "alterColumn" | "dropColumn" | "createView" | "dropView";
+  name: string;
+  definition: string;
+}
+
+export interface ConflictInfo {
+  table: string;
+  key: string;
+  winner: "file" | "db";
+  savedTo: string | null;
+}
+
+export type ChangeOp = "toDb" | "toFile" | "deleteDb" | "deleteFile";
+
+export interface Change {
+  key: string;
+  op: ChangeOp;
+}
+
+export interface FieldChange {
+  path: string;
+  from: unknown;
+  to: unknown;
+}
+
+export interface HistoryEntry {
+  kind: "wip" | "commit";
+  sha: string | null;
+  head: boolean;
+  subject: string | null;
+  author: string | null;
+  date: string;
+  path: string;
+  renamedFrom?: string;
+  event?: "created" | "deleted";
+  unreadable?: boolean;
+  changes: FieldChange[];
+  record: Rec | null;
+}
+
+export type HistoryPage =
+  | { state: "nogit" | "untracked" }
+  | { state: "error"; message: string }
+  | { state: "ok"; entries: HistoryEntry[]; next: string | null };

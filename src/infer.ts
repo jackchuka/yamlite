@@ -51,7 +51,8 @@ export interface KeyedTable {
   keys: Set<string>;
 }
 
-const isScalar = (v: unknown): v is string | number => typeof v === "string" || typeof v === "number";
+const isScalar = (v: unknown): v is string | number | bigint =>
+  typeof v === "string" || typeof v === "number" || typeof v === "bigint";
 const NUMERIC = /^-?\d+(\.\d+)?$/;
 
 // the distinct values of a field whose values are all scalars or lists of scalars, as text; null otherwise

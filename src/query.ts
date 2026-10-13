@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { withScratch } from "./scratch.ts";
-import { isPageStatement, statementCount } from "./serve/sqltext.ts";
+import { isRead, statementCount } from "./serve/sqltext.ts";
 import type { DbValue } from "./types.ts";
 
 export interface QueryResult {
@@ -51,7 +51,7 @@ export async function query(opts: QueryOptions): Promise<QueryResult> {
   const count = statementCount(opts.sql);
   if (count === 0) throw new Error("no statement to run");
   if (count > 1) throw new Error("run one statement at a time");
-  if (!isPageStatement(opts.sql)) throw new Error("query only reads; use sqlite3 or the web UI to write");
+  if (!isRead(opts.sql)) throw new Error("query only reads; use sqlite3 or the web UI to write");
   const limit = opts.limit ?? DEFAULT_LIMIT;
   if (opts.db !== undefined) {
     const path = resolve(opts.db);

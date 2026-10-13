@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { constants } from "node:sqlite";
 import { canonical } from "../hash.ts";
-import type { GitStep, StepResult } from "../git/steps.ts";
+import type { GitStep, StepResult } from "../git/types.ts";
 import { checkRequired } from "../required.ts";
 import { checkBounds, checkFormats } from "../rulecheck.ts";
 import { HttpError } from "../serve/http.ts";
@@ -9,47 +9,13 @@ import { deleteRecord, insertRecord, readRecord, updateRecord } from "../serve/r
 import { toWire } from "../serve/wire.ts";
 import { writeTx } from "../serve/write.ts";
 import { BusyError, type Store } from "../store.ts";
-import type { ColumnType, Rec, TableSpec } from "../types.ts";
+import type { Rec, TableSpec } from "../types.ts";
+import type { NewTable, Proposal, ProposalRow, ProposalStatus, RowOp } from "./types.ts";
 import { checkValues } from "../values.ts";
 
 export const MAX_PROPOSAL_ROWS = 500;
 
-export type ProposalStatus = "pending" | "applied" | "discarded" | "stale" | "failed";
-export type RowOp = "insert" | "update" | "delete";
 const ROW_OPS = new Set<string>(["insert", "update", "delete"] satisfies RowOp[]);
-
-export interface ProposalRow {
-  table: string;
-  key: string;
-  op: RowOp;
-  before: Rec | null;
-  after: Rec | null;
-  changed: string[];
-}
-
-export interface NewTable {
-  name: string;
-  mode: "files" | "list";
-  key: string;
-  columns: Record<string, ColumnType>;
-  group?: string;
-}
-
-export interface Proposal {
-  id: string;
-  conversationId: string;
-  title: string;
-  status: ProposalStatus;
-  createdAt: string;
-  rows: ProposalRow[];
-  // rule warnings (required, values, formats, bounds) the proposal would add
-  warnings: string[];
-  table?: NewTable;
-  sql?: string;
-  git?: { steps: GitStep[]; startBranch: string | null; results: StepResult[] };
-  stale?: string[];
-  error?: string;
-}
 
 export interface RecordChange {
   table: string;

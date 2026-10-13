@@ -1,6 +1,6 @@
 import { filesOf } from "../../config.ts";
 import { q } from "../../store.ts";
-import { displayPath, findView } from "../context.ts";
+import { displayPath, findView, keyedReferences } from "../context.ts";
 import { splitOf } from "../split.ts";
 import type { ColumnType } from "../../types.ts";
 import { declaredViews } from "../../views.ts";
@@ -33,7 +33,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         required: t.required,
         min: t.min,
         max: t.max,
-        references: t.references,
+        references: keyedReferences(ctx, t.references),
         count,
         inDb,
         group: t.group,
@@ -66,7 +66,7 @@ export const metaRoutes: Routes = (router, ctx) => {
           columns: record?.columns ?? {},
           identity: record?.identity ?? [],
           declared: spec.columns,
-          references: spec.references,
+          references: keyedReferences(ctx, spec.references),
           values: spec.values,
           required: spec.required,
           formats: spec.formats,

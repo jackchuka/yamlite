@@ -5,11 +5,12 @@ import { STEP_KINDS } from "../git/steps.ts";
 import type { ApiContext } from "../serve/context.ts";
 import { readRecord } from "../serve/records.ts";
 import { validateNewTable } from "../serve/routes/tables.ts";
-import { isPageStatement, statementCount } from "../serve/sqltext.ts";
+import { isRead, statementCount } from "../serve/sqltext.ts";
 import { toWire } from "../serve/wire.ts";
 import { declaredViews } from "../views.ts";
 import { COLUMN_TYPES } from "../types.ts";
-import type { NewTable, Proposal, RecordChange } from "./proposals.ts";
+import type { RecordChange } from "./proposals.ts";
+import type { NewTable, Proposal } from "./types.ts";
 
 export interface AgentTool {
   name: string;
@@ -96,8 +97,7 @@ export function agentTools(ctx: ApiContext, conversationId: string): AgentTool[]
       call: (a) => {
         const sql = str(a.sql, "sql");
         if (statementCount(sql) > 1) throw new Error("run one statement at a time");
-        if (!isPageStatement(sql))
-          throw new Error("query only reads; use propose_sql or propose_changes to change data");
+        if (!isRead(sql)) throw new Error("query only reads; use propose_sql or propose_changes to change data");
         const names = [...ctx.y.tables.map((t) => t.name), ...views().map((v) => v.name)];
         const rules = {
           name: "agent",

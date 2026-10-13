@@ -1,9 +1,9 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { defaultFilter } from "cmdk";
+import { MIN_QUERY } from "../../../src/serve/search.ts";
 import { api } from "./api";
 import type { SearchHit } from "./types";
 
-export const MIN_QUERY = 2;
 const AROUND = 30;
 
 export const enoughText = (needle: string): boolean => [...needle.trim()].length >= MIN_QUERY;

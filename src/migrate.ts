@@ -1,5 +1,5 @@
 import { hashRecord } from "./hash.ts";
-import type { SchemaChange } from "./indexes.ts";
+import type { SchemaChange } from "./types.ts";
 import { type Alteration, describeAlterations, plannedAlterations, rebuildTable } from "./rebuild.ts";
 import type { BaseHashes } from "./reconcile.ts";
 import type { SourceRead } from "./source/types.ts";

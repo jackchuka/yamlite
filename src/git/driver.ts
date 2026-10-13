@@ -1,15 +1,10 @@
-import {
-  type DiffResult,
-  type Extract,
-  fileDiff,
-  type HistoryPage,
-  type HistoryTarget,
-  recordHistory,
-} from "../githistory.ts";
+import { type DiffResult, type Extract, fileDiff, type HistoryTarget, recordHistory } from "../githistory.ts";
 import { findOpenPr } from "./pr.ts";
 import { defaultBranch, findRepo, gitStatus, insideRoot, type Repo, runGit } from "./repo.ts";
 import { localReview, type ReviewRequest } from "./review.ts";
-import { type GitStep, type RunOptions, runSteps, type StepResult, validateSteps } from "./steps.ts";
+import { type RunOptions, runSteps, validateSteps } from "./steps.ts";
+import type { GitStep, StepResult } from "./types.ts";
+import type { HistoryPage } from "../types.ts";
 
 export interface GitStatus {
   branch: string | null;

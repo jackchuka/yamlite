@@ -2,8 +2,8 @@ import { homedir } from "node:os";
 import { relative } from "node:path";
 import { styleText } from "node:util";
 import type { CheckResult } from "./check.ts";
-import type { ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
-import type { SchemaChange } from "./indexes.ts";
+import type { TableResult } from "./engine.ts";
+import type { ChangeOp, ConflictInfo, SchemaChange } from "./types.ts";
 
 type Style = Parameters<typeof styleText>[0];
 export type Painter = (style: Style, text: string) => string;

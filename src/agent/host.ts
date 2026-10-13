@@ -2,25 +2,8 @@ import { randomBytes } from "node:crypto";
 import { APICallError, jsonSchema, type LanguageModel, type ModelMessage, stepCountIs, streamText, tool } from "ai";
 import { HttpError } from "../serve/http.ts";
 import { type Credentials, createModel, PROVIDERS, providerOf } from "./providers.ts";
-import type { Proposal } from "./proposals.ts";
+import type { AgentEvent, ConversationSummary } from "./types.ts";
 import { type AgentTool, toolText } from "./tools.ts";
-
-export type AgentEvent =
-  | { type: "user"; text: string }
-  | { type: "text"; text: string }
-  | { type: "tool"; id: string; title?: string; status?: "in_progress" | "completed" | "failed"; input?: unknown }
-  | { type: "proposal"; proposal: Proposal }
-  | { type: "busy"; busy: boolean }
-  | { type: "error"; message: string; code?: "auth" }
-  | { type: "closed"; message?: string };
-
-export interface ConversationSummary {
-  id: string;
-  provider: string;
-  model: string;
-  title: string;
-  updatedAt: string;
-}
 
 const MAX_CONVERSATIONS = 20;
 const MAX_STEPS = 20;

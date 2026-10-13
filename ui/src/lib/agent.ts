@@ -5,65 +5,11 @@ import { request } from "./api";
 import { transport } from "./transport";
 import { queryClient } from "./providers";
 import type { Row } from "./types";
+import type { AgentEvent, ConversationSummary, Proposal } from "../../../src/agent/types.ts";
 import { m } from "@/paraglide/messages.js";
 
-export type ProposalStatus = "pending" | "applied" | "discarded" | "stale" | "failed";
-
-export interface ProposalRow {
-  table: string;
-  key: string;
-  op: "insert" | "update" | "delete";
-  before: Row | null;
-  after: Row | null;
-  changed: string[];
-}
-
-export type GitStep =
-  | { kind: "create_branch"; name: string; from?: string }
-  | { kind: "switch"; branch: string }
-  | { kind: "commit"; message: string; paths: string[] }
-  | { kind: "push"; branch: string }
-  | { kind: "pull"; branch: string }
-  | { kind: "open_pr"; title: string; body: string; base?: string };
-
-export interface StepResult {
-  status: "done" | "failed" | "skipped";
-  message?: string;
-  url?: string;
-  created?: boolean;
-}
-
-export interface Proposal {
-  id: string;
-  conversationId: string;
-  title: string;
-  status: ProposalStatus;
-  createdAt: string;
-  rows: ProposalRow[];
-  warnings: string[];
-  table?: { name: string; mode: string; key: string; columns: Record<string, string> };
-  git?: { steps: GitStep[]; startBranch: string | null; results: StepResult[] };
-  sql?: string;
-  stale?: string[];
-  error?: string;
-}
-
-export type AgentEvent =
-  | { type: "user"; text: string }
-  | { type: "text"; text: string }
-  | { type: "tool"; id: string; title?: string; kind?: string | null; status?: string | null; input?: unknown }
-  | { type: "proposal"; proposal: Proposal }
-  | { type: "busy"; busy: boolean }
-  | { type: "error"; message: string; code?: "auth" }
-  | { type: "closed"; message?: string };
-
-export interface ConversationSummary {
-  id: string;
-  provider: string;
-  model: string;
-  title: string;
-  updatedAt: string;
-}
+export type { AgentEvent, ConversationSummary, Proposal, ProposalRow } from "../../../src/agent/types.ts";
+export type { GitStep } from "../../../src/git/types.ts";
 
 export type ChatItem =
   | { kind: "user"; text: string }
