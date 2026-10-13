@@ -12,10 +12,10 @@ export {
   type DiffResult,
   type Extract,
   type Extracted,
-  type HistoryEntry,
-  type HistoryPage,
   type HistoryTarget,
 } from "./githistory.ts";
 export type { ReviewRequest } from "./git/review.ts";
 export type { Repo } from "./git/repo.ts";
-export type { GitStep, RunOptions, StepResult } from "./git/steps.ts";
+export type { RunOptions } from "./git/steps.ts";
+export type { GitStep, StepResult } from "./git/types.ts";
+export type { HistoryEntry, HistoryPage } from "./types.ts";

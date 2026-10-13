@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, request } from "./api";
+import type { StepResult } from "../../../src/git/types.ts";
 import type { Row } from "./types";
 import { isReadOnly } from "./mode";
 
@@ -38,11 +39,6 @@ export interface GitState {
   defaultBranch: string | null;
   upstream: string | null;
   changes: GitChange[];
-}
-
-export interface StepResult {
-  status: "done" | "failed" | "skipped";
-  message?: string;
 }
 
 export interface ReviewResult {

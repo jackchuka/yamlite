@@ -67,6 +67,15 @@ describe("generateConfig", () => {
     expect(out).toContain(["    references:", "      team: teams", "      manager: people", ""].join("\n"));
   });
 
+  test("references a table keyed by integers", () => {
+    const root = tmpRoot();
+    write(join(root, "teams/1.yaml"), "name: Platform\n");
+    write(join(root, "teams/2.yaml"), "name: Sales\n");
+    write(join(root, "tasks/a.yaml"), "team: 1\n");
+    write(join(root, "tasks/b.yaml"), "team: 2\n");
+    expect(generateConfig({ root })).toContain(["    references:", "      team: teams", ""].join("\n"));
+  });
+
   test("references the one table that holds every value of a list or of an expanded item's field", () => {
     const root = tmpRoot();
     write(join(root, "users.yaml"), "- id: u1\n- id: u2\n- id: u3\n");

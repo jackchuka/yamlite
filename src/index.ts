@@ -15,11 +15,19 @@ export { check, type CheckResult, type CheckTable } from "./check.ts";
 export type { OpenOptions, TableInput } from "./config.ts";
 export { exportSite, type ExportOptions, type ExportResult } from "./export.ts";
 export { generateConfig, init, type InitOptions } from "./init.ts";
-export type { Change, ChangeOp, ConflictInfo, TableResult } from "./engine.ts";
-export type { SchemaChange } from "./indexes.ts";
+export type { TableResult } from "./engine.ts";
 export { formatCsv, formatJson, formatTable, type QueryOptions, type QueryResult, query } from "./query.ts";
 export type { Decision } from "./reconcile.ts";
-export type { ColumnType, IndexSpec, PageSpec, TableSpec } from "./types.ts";
+export type {
+  Change,
+  ChangeOp,
+  ColumnType,
+  ConflictInfo,
+  IndexSpec,
+  PageSpec,
+  SchemaChange,
+  TableSpec,
+} from "./types.ts";
 export type { Watcher, WatchHandlers, WatchOptions } from "./watch.ts";
 
 export interface Yamlite {

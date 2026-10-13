@@ -3,17 +3,8 @@ import { join } from "node:path";
 import { parse } from "yaml";
 import { DELETED_MARKER, readConflictHeader } from "../conflicts.ts";
 import type { Rec } from "../types.ts";
+import type { ConflictEntry } from "./types.ts";
 import { HttpError } from "./http.ts";
-
-export interface ConflictEntry {
-  id: string;
-  table: string;
-  file: string;
-  key: string | null;
-  winner: "file" | "db" | null;
-  at: string;
-  restorable: boolean;
-}
 
 export interface ConflictBackup {
   entry: ConflictEntry;

@@ -9,7 +9,7 @@ vi.mock("../src/serve/sqltext.ts", async (importOriginal) => {
   const original = await importOriginal<typeof import("../src/serve/sqltext.ts")>();
   return {
     ...original,
-    isPageStatement: (s: string) => textCheck.bypass || original.isPageStatement(s),
+    isRead: (s: string) => textCheck.bypass || original.isRead(s),
   };
 });
 

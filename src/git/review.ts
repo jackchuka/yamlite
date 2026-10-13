@@ -1,6 +1,7 @@
 import { type ReviewOutcome, ReviewRefused, type StepRunner } from "./driver.ts";
 import { defaultBranch, gitStatus } from "./repo.ts";
-import { type GitStep, localBranchExists } from "./steps.ts";
+import { localBranchExists } from "./steps.ts";
+import type { GitStep } from "./types.ts";
 
 export interface ReviewRequest {
   title: string;

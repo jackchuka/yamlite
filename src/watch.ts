@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, relative, resolve, sep } from "node:path";
 import { watch as chokidarWatch, type FSWatcher } from "chokidar";
-import { type ConflictInfo, type EngineContext, syncTable, type TableResult } from "./engine.ts";
+import { type EngineContext, syncTable, type TableResult } from "./engine.ts";
 import { checkReferences, referrersOf } from "./references.ts";
 import { checkRequired } from "./required.ts";
 import { checkBounds, checkFormats } from "./rulecheck.ts";
 import { matchesFiles } from "./source/files.ts";
-import type { TableSpec } from "./types.ts";
+import type { ConflictInfo, TableSpec } from "./types.ts";
 import { checkValues } from "./values.ts";
 
 export interface WatchHandlers {

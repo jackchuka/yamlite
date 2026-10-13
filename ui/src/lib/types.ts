@@ -1,13 +1,21 @@
-export type ColumnType = "INTEGER" | "REAL" | "TEXT" | "BOOLEAN" | "JSON";
-export type ColumnFormat = "markdown" | "date" | "datetime" | "list" | "map";
-export type AllowedValue = string | number | boolean;
-export type Bound = number | string;
+import type { SearchHit } from "../../../src/serve/search.ts";
+import type { ConflictEntry, MetaReference, ServeEvent } from "../../../src/serve/types.ts";
+import type { AllowedValue, Bound, ColumnFormat, ColumnType } from "../../../src/types.ts";
 
-export interface Reference {
-  column: string;
-  table: string;
-  target?: string;
-}
+export type { Filter, FilterOp } from "../../../src/serve/query.ts";
+export type { SearchHit } from "../../../src/serve/search.ts";
+export type { ConflictEntry, MetaReference, ServeEvent } from "../../../src/serve/types.ts";
+export type {
+  AllowedValue,
+  Bound,
+  Change,
+  ChangeOp,
+  ColumnFormat,
+  ColumnType,
+  HistoryEntry,
+  HistoryPage,
+  Reference,
+} from "../../../src/types.ts";
 
 export interface SplitItem {
   value: string | number | boolean | null;
@@ -29,7 +37,7 @@ export interface TableMeta {
   key: string;
   columns: Record<string, ColumnType>;
   formats: Record<string, ColumnFormat>;
-  references: Reference[];
+  references: MetaReference[];
   values: Record<string, AllowedValue[]>;
   required: string[];
   min: Record<string, Bound>;
@@ -50,7 +58,7 @@ export interface ViewMeta {
   columns: Record<string, ColumnType>;
   identity: string[];
   declared: Record<string, ColumnType>;
-  references: Reference[];
+  references: MetaReference[];
   values: Record<string, AllowedValue[]>;
   required: string[];
   formats: Record<string, ColumnFormat>;
@@ -133,69 +141,10 @@ export interface RecordDetail {
   yamlError?: string;
 }
 
-export interface HistoryChange {
-  path: string;
-  from: unknown;
-  to: unknown;
-}
-
-export interface HistoryEntry {
-  kind: "wip" | "commit";
-  sha: string | null;
-  head: boolean;
-  subject: string | null;
-  author: string | null;
-  date: string;
-  path: string;
-  renamedFrom?: string;
-  event?: "created" | "deleted";
-  unreadable?: boolean;
-  changes: HistoryChange[];
-  record: Row | null;
-}
-
-export type HistoryPage =
-  | { state: "nogit" | "untracked" }
-  | { state: "error"; message: string }
-  | { state: "ok"; entries: HistoryEntry[]; next: string | null };
-
-export type ChangeOp = "toDb" | "toFile" | "deleteDb" | "deleteFile";
-
-export interface Change {
-  key: string;
-  op: ChangeOp;
-}
-
-export type ServeEvent =
-  | { type: "page"; at: string; pages: string[] }
-  | {
-      type: "sync";
-      at: string;
-      table: string;
-      ok: boolean;
-      error?: string;
-      changes: Change[];
-      warnings: string[];
-      schema: unknown[];
-    }
-  | { type: "conflict"; at: string; table: string; key: string; winner: "file" | "db"; savedTo: string | null }
-  | { type: "error"; at: string; table?: string; message: string }
-  | { type: "reload"; at: string; tables: string[] };
-
 export interface Hello {
   activity: ServeEvent[];
   warnings: Record<string, string[]>;
   configError: string | null;
-}
-
-export interface ConflictEntry {
-  id: string;
-  table: string;
-  file: string;
-  key: string | null;
-  winner: "file" | "db" | null;
-  at: string;
-  restorable: boolean;
 }
 
 export interface ConflictDetail {
@@ -204,14 +153,6 @@ export interface ConflictDetail {
   saved: Row | null;
   current: Row | null;
   text: string;
-}
-
-export type FilterOp = "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "contains" | "has" | "null" | "notnull";
-
-export interface Filter {
-  col: string;
-  op: FilterOp;
-  value?: unknown;
 }
 
 export type SqlResult =
@@ -230,16 +171,6 @@ export interface Snapshot {
 export interface YamlMap {
   files: Record<string, string>;
   keys: Record<string, string>;
-}
-
-export interface SearchHit {
-  table: string;
-  key: string;
-  label: string | null;
-  column: string;
-  value: string;
-  rank: number;
-  total: number;
 }
 
 export interface SearchResult {

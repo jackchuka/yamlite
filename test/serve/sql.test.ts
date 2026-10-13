@@ -72,4 +72,5 @@ test("a write is refused while git steps run, a read is not", async () => {
   Object.defineProperty(t.s.context.proposals, "running", { get: () => true });
   expect((await run(t, "update tasks set title = 'B'")).status).toBe(409);
   expect((await run(t, "select id from tasks")).status).toBe(200);
+  expect((await run(t, "with x as (select id from tasks) select * from x")).status).toBe(200);
 });

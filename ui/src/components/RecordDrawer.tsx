@@ -19,6 +19,7 @@ import { isReadOnly } from "@/lib/mode";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { useViewportHeight } from "@/lib/viewportHeight";
 import { useEvents, useReflectDispatch } from "@/lib/providers";
+import { useTheme } from "@/lib/theme";
 import { historyCount, restoreDraft, useRecordHistory } from "@/lib/recordHistory";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, RecordDetail, Row, TableMeta } from "@/lib/types";
 import { FormField } from "./FormField";
@@ -42,8 +43,6 @@ const columnBound = (bounds: Record<string, Bound>, field: string): Bound | unde
 export const panel =
   "absolute inset-y-0 right-0 z-20 border-l bg-background shadow-xl max-md:fixed max-md:inset-0 max-md:z-40 max-md:h-dvh max-md:border-l-0 max-md:shadow-none max-md:animate-[y-slide-up_160ms_ease-out]";
 const tabTrigger = "max-md:flex-1 max-md:text-[14px]";
-
-const isDark = () => document.documentElement.dataset.theme === "dark";
 
 // Escape or a click elsewhere closes the drawer, unless that would throw away unsaved edits
 export function useDismiss(close: () => void, enabled = true) {
@@ -91,6 +90,7 @@ export function RecordDrawer({
   headerActions?: ReactNode;
   onClose?: () => void;
 }) {
+  const theme = useTheme();
   const client = useQueryClient();
   const navigate = useNavigate();
   const dispatch = useReflectDispatch();
@@ -335,7 +335,7 @@ export function RecordDrawer({
             aria-label={m.record_json()}
             value={JSON.stringify(draft, null, 2)}
             extensions={[json(), EditorView.lineWrapping]}
-            theme={isDark() ? "dark" : "light"}
+            theme={theme}
             editable={editable}
             onChange={(text) => {
               try {
@@ -361,7 +361,7 @@ export function RecordDrawer({
             value={data.yaml ?? "# not written to a file yet"}
             extensions={[yaml(), EditorView.lineWrapping]}
             editable={false}
-            theme={isDark() ? "dark" : "light"}
+            theme={theme}
           />
         </TabsContent>
         {!isReadOnly() && (

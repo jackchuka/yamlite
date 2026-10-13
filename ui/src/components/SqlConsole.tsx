@@ -27,15 +27,16 @@ import { useEventStore, useMeta } from "@/lib/providers";
 import { recordFileOf } from "@/lib/reflect";
 import { isReadOnly } from "@/lib/mode";
 import { needsConfirm } from "@/lib/sqlguard";
+import { useTheme } from "@/lib/theme";
 import type { ChangeOp } from "@/lib/types";
 import { Grid } from "./Grid";
 import { NewTableDialog } from "./NewTableDialog";
 import { m } from "@/paraglide/messages.js";
 
 const OP_LABEL: Record<ChangeOp, string> = { toFile: "M", deleteFile: "−", toDb: "M", deleteDb: "−" };
-const isDark = () => document.documentElement.dataset.theme === "dark";
 
 export function SqlConsole() {
+  const theme = useTheme();
   const mobile = useIsMobile();
   const { data: meta } = useMeta();
   const store = useEventStore();
@@ -127,7 +128,7 @@ export function SqlConsole() {
           value={text}
           onChange={setText}
           extensions={extensions}
-          theme={isDark() ? "dark" : "light"}
+          theme={theme}
           minHeight="110px"
           className="overflow-hidden rounded-lg border text-[12.5px]"
         />

@@ -1,7 +1,8 @@
 import type { LanguageModel } from "ai";
 import { APICallError } from "ai";
 import { afterEach, expect, test } from "vitest";
-import { type AgentEvent, AgentHost, type Conversation, type HostOptions } from "../../src/agent/host.ts";
+import type { AgentEvent } from "../../src/agent/types.ts";
+import { AgentHost, type Conversation, type HostOptions } from "../../src/agent/host.ts";
 import type { Credentials } from "../../src/agent/providers.ts";
 import type { AgentTool } from "../../src/agent/tools.ts";
 import { waitFor } from "../helpers.ts";

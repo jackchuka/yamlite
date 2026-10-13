@@ -1,6 +1,6 @@
 import { decode } from "./codec.ts";
 import { hashRecord } from "./hash.ts";
-import type { SchemaChange } from "./indexes.ts";
+import type { SchemaChange } from "./types.ts";
 import type { BaseHashes } from "./reconcile.ts";
 import { isStructured } from "./schema.ts";
 import { q, type Store } from "./store.ts";

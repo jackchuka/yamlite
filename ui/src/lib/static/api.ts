@@ -3,7 +3,7 @@ import { q } from "../../../../src/ident.ts";
 import { HttpError } from "../../../../src/serve/errors.ts";
 import { buildWhere, orderBy, parseRowQuery } from "../../../../src/serve/query.ts";
 import { buildSearchSql, parseSearchQuery, toSearchHit } from "../../../../src/serve/search.ts";
-import { isPageStatement, isRead, statementCount } from "../../../../src/serve/sqltext.ts";
+import { isRead, statementCount } from "../../../../src/serve/sqltext.ts";
 import { toWire } from "../../../../src/serve/wire.ts";
 import type { ColumnType, DbRow, DbValue } from "../../../../src/types.ts";
 import { type Api, ApiError, rowsQuery, searchQuery } from "../api";
@@ -151,7 +151,7 @@ export function createStaticApi(opts: {
         if (!spec.sql) throw new HttpError(403, `page ${name} may not run SQL`);
         if (sql.trim() === "") throw new HttpError(400, "sql is required");
         if (statementCount(sql) > 1) throw new HttpError(400, "run one statement at a time");
-        if (!isPageStatement(sql)) throw new HttpError(403, "a page can only run SELECT");
+        if (!isRead(sql)) throw new HttpError(403, "a page can only run SELECT");
         return select(sql);
       }),
     conflicts: async () => ({ conflicts: [] }),

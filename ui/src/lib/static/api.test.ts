@@ -300,6 +300,10 @@ test("sql runs reads with the server's shape and refuses everything else", async
     ],
     truncated: false,
   });
+  expect(await api.sql("with x as (select id from tasks) select id from x limit 1")).toMatchObject({
+    columns: ["id"],
+    rows: [{ id: "a" }],
+  });
   await expect(api.sql("update tasks set title = 'x'")).rejects.toMatchObject({
     status: 403,
   });

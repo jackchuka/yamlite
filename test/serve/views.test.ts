@@ -48,7 +48,7 @@ test("meta lists the views under their table", async () => {
       columns: { projects_id: "TEXT", idx: "INTEGER", title: "TEXT", owner: "TEXT", tasks: "JSON" },
       identity: ["projects_id", "idx"],
       declared: { title: "TEXT" },
-      references: [{ column: "owner", table: "people" }],
+      references: [{ column: "owner", table: "people", key: "id" }],
       values: { title: ["Design", "Launch", "Draft"] },
       required: ["title"],
       formats: {},

@@ -1,12 +1,6 @@
 import { createHash } from "node:crypto";
 import { q, type Store } from "./store.ts";
-import type { IndexSpec } from "./types.ts";
-
-export interface SchemaChange {
-  op: "createIndex" | "dropIndex" | "alterColumn" | "dropColumn" | "createView" | "dropView";
-  name: string;
-  definition: string;
-}
+import type { IndexSpec, SchemaChange } from "./types.ts";
 
 export const MANAGED_PREFIX = "yamlite_";
 

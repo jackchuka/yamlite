@@ -3,7 +3,7 @@ import { filesOf } from "../../config.ts";
 import { configHash } from "../../configfile.ts";
 import { describeIndex, indexName, MANAGED_PREFIX } from "../../indexes.ts";
 import { checkReferences } from "../../references.ts";
-import { displayPath, findView, tableSpec } from "../context.ts";
+import { displayPath, findView, referenceTarget, tableSpec } from "../context.ts";
 import { declaredViews, reconcileViews } from "../../views.ts";
 import type { Routes } from "./index.ts";
 
@@ -42,11 +42,10 @@ export const schemaRoutes: Routes = (router, ctx) => {
       min: spec.min,
       max: spec.max,
       references: spec.references.map((r) => {
-        const target = r.target ?? ctx.y.tables.find((t) => t.name === r.table)?.key ?? "id";
         return {
           column: r.column,
           table: r.table,
-          target,
+          target: referenceTarget(ctx, r),
           problems: problems.filter((p) => p.startsWith(`${r.column} `) || p.startsWith(`references.${r.column}:`)),
         };
       }),

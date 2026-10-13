@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { fromPicker, localOffset, pickerBound, toPicker } from "@/lib/datetime";
 import { emptyValueFor, fieldKind, fieldProblem } from "@/lib/form";
 import { useTheme } from "@/lib/theme";
-import type { AllowedValue, Bound, ColumnFormat, ColumnType, Reference } from "@/lib/types";
+import type { AllowedValue, Bound, ColumnFormat, ColumnType, MetaReference } from "@/lib/types";
 import { ChipsInput } from "./ChipsInput";
 import { RefLink } from "./RefLink";
 import { m } from "@/paraglide/messages.js";
@@ -25,7 +25,7 @@ export interface FieldProps {
   format?: ColumnFormat;
   // a markdown field read from an .mdx file: the preview shows its JSX and ESM
   mdx?: boolean;
-  reference?: Reference;
+  reference?: MetaReference;
   // the column's declared values: edited with a select, a value outside the list kept and marked
   allowed?: AllowedValue[];
   // the column's bounds: shown as a warning when the value is outside them, never enforced
@@ -125,8 +125,9 @@ function ValuesField({ path, value, allowed, onChange, readOnly }: FieldProps & 
   );
 }
 
-function RefField({ path, value, reference, onChange }: FieldProps) {
+function RefField({ path, value, type, reference, onChange }: FieldProps) {
   const target = reference?.table ?? "";
+  const column = reference?.key;
   const { data } = useQuery({
     queryKey: ["refKeys", target],
     queryFn: () => api.rows(target, { limit: 500, offset: 0, filters: [] }),
@@ -141,7 +142,13 @@ function RefField({ path, value, reference, onChange }: FieldProps) {
           aria-label={label(path)}
           list={listId}
           value={text}
-          onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+          onChange={(e) => {
+            const t = e.target.value;
+            if (t === "") return onChange(null);
+            // an INTEGER column keeps its keys numeric in the YAML, as the number field does
+            const n = Number(t);
+            onChange(type === "INTEGER" && INTEGER.test(t) && Number.isSafeInteger(n) ? n : t);
+          }}
         />
         {reference && text !== "" && (
           <RefLink
@@ -154,10 +161,10 @@ function RefField({ path, value, reference, onChange }: FieldProps) {
         )}
       </div>
       <datalist id={listId}>
-        {data?.rows.map((r) => {
-          const key = String(r[reference?.target ?? "id"] ?? Object.values(r)[0]);
-          return <option key={key} value={key} />;
-        })}
+        {column !== undefined &&
+          [...new Set(data?.rows.flatMap((r) => (r[column] == null ? [] : [String(r[column])])))].map((key) => (
+            <option key={key} value={key} />
+          ))}
       </datalist>
     </>
   );
