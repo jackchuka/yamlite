@@ -285,46 +285,57 @@ export function RecordDrawer({
           <fieldset disabled={!editable} className="m-0 min-w-0 border-0 p-0">
             {[...fields, ...extra].map((f) => {
               const reference = table.references.find((r) => r.column === f);
+              // a captured column comes from the record's folder; moving the file is the only way to change it
+              const captured = (table.captures ?? []).some((c) => c.column === f);
+              const field = (
+                <FormField
+                  key={`${f}:${version}`}
+                  readOnly={!editable || captured}
+                  path={[f]}
+                  label={
+                    <div className={`flex flex-1 justify-between ${fieldLabel}`}>
+                      <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
+                        {f}
+                        {table.required.includes(f) && <span aria-label={m.record_required()}> *</span>}
+                      </span>
+                      <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
+                        {reference
+                          ? `→ ${reference.table}`
+                          : (columnFormat(table, f) ?? columnType(table, f) ?? m.record_new_column())}
+                      </span>
+                    </div>
+                  }
+                  value={draft[f]}
+                  type={columnType(table, f)}
+                  format={columnFormat(table, f)}
+                  mdx={isMdx(table)}
+                  allowed={columnValues(table, f)}
+                  min={columnBound(table.min, f)}
+                  max={columnBound(table.max, f)}
+                  reference={reference}
+                  onChange={(next) => setDraft({ ...draft, [f]: next })}
+                  onValidity={(p, ok) =>
+                    setInvalid((prev) => {
+                      const next = new Set(prev);
+                      if (ok) next.delete(p);
+                      else next.add(p);
+                      return next;
+                    })
+                  }
+                />
+              );
               return (
                 <div
                   key={f}
                   className={cn("mb-3.5", restoredFrom && changed.has(f) && "-mx-2 rounded-md bg-warn-soft px-2 py-1")}
                 >
-                  <FormField
-                    key={`${f}:${version}`}
-                    readOnly={!editable}
-                    path={[f]}
-                    label={
-                      <div className={`flex flex-1 justify-between ${fieldLabel}`}>
-                        <span className={table.required.includes(f) && draft[f] == null ? "text-warn" : undefined}>
-                          {f}
-                          {table.required.includes(f) && <span aria-label={m.record_required()}> *</span>}
-                        </span>
-                        <span className="font-mono text-[10px] font-medium max-md:text-[11.5px]">
-                          {reference
-                            ? `→ ${reference.table}`
-                            : (columnFormat(table, f) ?? columnType(table, f) ?? m.record_new_column())}
-                        </span>
-                      </div>
-                    }
-                    value={draft[f]}
-                    type={columnType(table, f)}
-                    format={columnFormat(table, f)}
-                    mdx={isMdx(table)}
-                    allowed={columnValues(table, f)}
-                    min={columnBound(table.min, f)}
-                    max={columnBound(table.max, f)}
-                    reference={reference}
-                    onChange={(next) => setDraft({ ...draft, [f]: next })}
-                    onValidity={(p, ok) =>
-                      setInvalid((prev) => {
-                        const next = new Set(prev);
-                        if (ok) next.delete(p);
-                        else next.add(p);
-                        return next;
-                      })
-                    }
-                  />
+                  {captured ? (
+                    <fieldset disabled className="m-0 min-w-0 border-0 p-0">
+                      {field}
+                    </fieldset>
+                  ) : (
+                    field
+                  )}
                 </div>
               );
             })}

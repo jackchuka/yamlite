@@ -34,6 +34,7 @@ function setup(mode: Mode = "files") {
     expand: [],
     group: null,
     split: null,
+    captures: [],
   };
   return {
     db,
@@ -899,5 +900,43 @@ describe("column type changes", () => {
     sql(t.db, "UPDATE tasks SET title = 'A2' WHERE id = 'a'");
     t.sync();
     expect(existsSync(t.file)).toBe(false);
+  });
+});
+
+describe("captures", () => {
+  const withCapture = () => {
+    const t = setup();
+    t.spec.glob = "*/*.{yaml,yml}";
+    t.spec.captures = [{ column: "team", segment: 0 }];
+    return t;
+  };
+
+  test("a database edit of a captured column is undone with a warning and never reaches the file", () => {
+    const t = withCapture();
+    write(join(t.path, "platform/a.yaml"), "title: A\n");
+    expect(t.sync()).toMatchObject({ ok: true });
+    expect(sql(t.db, "SELECT team FROM tasks")).toEqual([{ team: "platform" }]);
+    sql(t.db, "UPDATE tasks SET team = 'sales', title = 'B'");
+    const r = t.sync();
+    expect(r.warnings).toContain(
+      'platform/a: team "sales" differs from the folder name "platform"; the folder name wins',
+    );
+    expect(sql(t.db, "SELECT team, title FROM tasks")).toEqual([{ team: "platform", title: "B" }]);
+    expect(read(join(t.path, "platform/a.yaml"))).toBe("title: B\n");
+    expect(t.sync()).toMatchObject({ ok: true, warnings: [], toDb: 0, toFile: 0 });
+  });
+
+  test("a row added with only a key gets its captures without a warning", () => {
+    const t = withCapture();
+    write(join(t.path, "platform/a.yaml"), "title: A\n");
+    t.sync();
+    sql(t.db, "INSERT INTO tasks (id, title) VALUES ('sales/b', 'B')");
+    const r = t.sync();
+    expect(r.warnings).toEqual([]);
+    expect(sql(t.db, "SELECT id, team FROM tasks ORDER BY id")).toEqual([
+      { id: "platform/a", team: "platform" },
+      { id: "sales/b", team: "sales" },
+    ]);
+    expect(read(join(t.path, "sales/b.yaml"))).toBe("title: B\n");
   });
 });

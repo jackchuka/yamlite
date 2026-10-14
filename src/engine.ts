@@ -7,12 +7,12 @@ import { reconcileIndexes } from "./indexes.ts";
 import { migrateSchema, type Schema } from "./migrate.ts";
 import { planTable, type Registered, type TablePlan, undeclaredColumns } from "./plan.ts";
 import type { Decision, KeyState } from "./reconcile.ts";
-import { FilesSource } from "./source/files.ts";
+import { capturedValues, FilesSource } from "./source/files.ts";
 import { ListSource } from "./source/list.ts";
 import type { FileOp, Source, SourceRead } from "./source/types.ts";
 import { markdownCodec, markdownExt } from "./source/markdown.ts";
 import { YAML_GLOB, yamlCodec } from "./source/yamldoc.ts";
-import { BusyError, isConstraintError, type Store } from "./store.ts";
+import { BusyError, isConstraintError, q, type Store } from "./store.ts";
 import type { Change, ChangeOp, ColumnType, ConflictInfo, SchemaChange, TableSpec } from "./types.ts";
 import { reconcileViews } from "./views.ts";
 
@@ -54,7 +54,7 @@ export function makeSource(spec: TableSpec): Source {
   if (spec.mode === "list") return new ListSource(spec.path, spec.key);
   const codec =
     spec.codec === "markdown" ? markdownCodec(spec.body ?? "body", markdownExt(spec.glob) ?? ".md") : yamlCodec;
-  return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude, codec);
+  return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude, codec, spec.captures);
 }
 
 function emptyResult(table: string): TableResult {
@@ -99,6 +99,42 @@ function plannedOp(d: Decision, s: KeyState): ChangeOp | null {
   return null;
 }
 
+// a captured column always holds its key's folder: a database edit is undone before planning
+function applyCaptures(store: Store, spec: TableSpec): string[] {
+  if (spec.captures.length === 0 || !store.tableExists(spec.name)) return [];
+  const existing = store.columns(spec.name);
+  const captures = spec.captures.filter((c) => existing.has(c.column));
+  if (captures.length === 0) return [];
+  const warnings: string[] = [];
+  const rows = store.query(
+    `SELECT ${q(spec.key)} AS k, ${captures.map((c) => q(c.column)).join(", ")} FROM ${q(spec.name)}`,
+  );
+  for (const row of rows) {
+    const key = String(row.k);
+    const want = capturedValues(key, captures);
+    // compared as text: a capture declared INTEGER holds 2026 for the folder "2026"
+    const wrong = captures.filter((c) => {
+      const v = row[c.column];
+      return want[c.column] !== undefined && (v === null || v === undefined || String(v) !== want[c.column]);
+    });
+    if (wrong.length === 0) continue;
+    for (const c of wrong) {
+      const was = row[c.column];
+      if (was !== null && was !== undefined) {
+        warnings.push(
+          `${key}: ${c.column} "${String(was)}" differs from the folder name "${want[c.column]}"; the folder name wins`,
+        );
+      }
+    }
+    store.run(
+      `UPDATE ${q(spec.name)} SET ${wrong.map((c) => `${q(c.column)} = ?`).join(", ")} WHERE ${q(spec.key)} = ?`,
+      ...wrong.map((c) => want[c.column] as string),
+      row.k ?? null,
+    );
+  }
+  return warnings;
+}
+
 export function syncTable(ctx: EngineContext, spec: TableSpec, opts: SyncOptions = {}): TableResult {
   const res = emptyResult(spec.name);
   const { store } = ctx;
@@ -113,6 +149,7 @@ export function syncTable(ctx: EngineContext, spec: TableSpec, opts: SyncOptions
     const source = makeSource(spec);
     const files = source.read();
     res.warnings.push(...files.warnings);
+    res.warnings.push(...applyCaptures(store, spec));
     const schema = migrateSchema(store, spec, files, {
       dryRun,
       forceConvert: opts.forceConvert ?? false,

@@ -32,12 +32,14 @@ Every folder and YAML file directly under the root is a table, with no configura
 | One YAML file holding a list (`people.yaml`)          | nothing                                  | the `id` field                                              |
 | Files outside the root, or a narrower glob            | `files: "<folder>/**/*.yaml"`            | the path below the folder                                   |
 | Markdown with YAML front matter                       | `files: "<folder>/**/*.md"` (or `*.mdx`) | the path; the text below the front matter goes in `body`    |
+| Folders that carry meaning (`notes/platform/a.md`)    | `files: "notes/<team>/*.md"`             | the path; `<team>` is a read-only column (`platform`)       |
 
 How to choose:
 
 - **One file per record** when records are edited separately, are long, or hold nested data. Diffs, reviews and conflicts stay per record.
 - **A list file** for small, flat lookup tables (tens of rows) such as people, labels or projects.
 - **`path:`** is only for a list file. A folder takes `files:`; `path:` on a folder is an error.
+- **`<name>` in `files:`** when a folder level means something (team, year, language). It matches one folder like `*` and becomes a column that is never written to a file. Don't repeat that value inside each file.
 - **`key:`** for a list table: the field that identifies a record uniquely and stably (default `id`). Choose it once: the key column's type can never change later without rebuilding the database.
 
 ```yaml
@@ -67,6 +69,8 @@ A field must be always a scalar or always a map/list across records. `min` / `ma
 ## Rules
 
 Rules are checked on every sync. A broken rule is a warning, never a failed sync, but `yamlite check` fails on it. Use them for real invariants; a rule that half the data breaks is noise.
+
+Any rule's column, and `split`, may be a field path into a JSON column: `metadata.status` checks the `status` field of a `metadata` map (`metadata` must be declared `JSON` in `columns`). A list at the path is checked item by item; `min` / `max` on a path take numbers.
 
 | Key           | Use it for                                                                                                    | Avoid it for                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
@@ -114,6 +118,8 @@ tables:
 - `body:` on a non-Markdown table, or a `body` named like the key column.
 - `values` on a column with a `formats` entry: an error. So are `min` / `max` on a `list` or `map` column.
 - Splitting one table into several to browse it by category: keep one table and use `split`.
+- Editing a captured column (`<team>` in `files:`) to move a record: the edit is undone; move the file.
+- A field path whose first part is not a JSON column in `columns` (an error).
 
 ## Full example
 

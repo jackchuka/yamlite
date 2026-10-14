@@ -68,6 +68,7 @@ const snapshot: Snapshot = {
         inDb: true,
         group: null,
         split: null,
+        captures: [],
       },
       {
         name: "nums",
@@ -85,6 +86,7 @@ const snapshot: Snapshot = {
         inDb: true,
         group: null,
         split: null,
+        captures: [],
       },
     ],
     views: [

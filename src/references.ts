@@ -1,3 +1,4 @@
+import { fieldEach, isPath, resolveField } from "./fieldpath.ts";
 import { q, type Store } from "./store.ts";
 import { sample } from "./text.ts";
 import type { ColumnType, Reference, TableSpec } from "./types.ts";
@@ -26,16 +27,18 @@ function check(store: Store, c: Checked, tables: readonly TableSpec[]): string[]
       continue;
     }
     const targetColumn = ref.target ?? target.key;
-    if (!store.tableExists(target.name) || !c.columns.has(ref.column)) continue;
+    const field = resolveField(ref.column, c.columns);
+    if (!store.tableExists(target.name) || field === null) continue;
     if (!store.columns(target.name).has(targetColumn)) {
       warnings.push(`${c.prefix}references.${ref.column}: column "${targetColumn}" not found in ${target.name}`);
       continue;
     }
-    const source = `src.${q(ref.column)}`;
-    const json = c.columns.get(ref.column) === "JSON";
-    const value = json ? "item.value" : source;
-    const from = json
-      ? `${q(c.name)} AS src, json_each(${source}) AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
+    const source = `src.${q(field.column)}`;
+    const each = isPath(field) || c.columns.get(field.column) === "JSON";
+    const value = each ? "item.value" : source;
+    const items = isPath(field) ? fieldEach("src", field) : `json_each(${source})`;
+    const from = each
+      ? `${q(c.name)} AS src, ${items} AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
       : `${q(c.name)} AS src WHERE ${source} IS NOT NULL`;
     const rows = store.query(
       `SELECT ${label} AS k, CAST(${value} AS TEXT) AS v FROM ${from}

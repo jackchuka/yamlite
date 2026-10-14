@@ -14,6 +14,7 @@ import {
   COLUMN_TYPES,
   type ColumnFormat,
   type ColumnType,
+  type Capture,
   type Claim,
   type ExpandSpec,
   type IndexSpec,
@@ -22,6 +23,7 @@ import {
   type Reference,
   type TableSpec,
 } from "./types.ts";
+import { resolveField } from "./fieldpath.ts";
 import { declaredViews } from "./views.ts";
 
 export interface TableInput {
@@ -47,7 +49,7 @@ export interface TableInput {
 }
 
 // a table input whose files are found: path is absolute, glob is null for a list table
-type Located = Omit<TableInput, "path" | "files"> & { path: string; glob: string | null };
+type Located = Omit<TableInput, "path" | "files"> & { path: string; glob: string | null; captures?: Capture[] };
 
 export interface OpenOptions {
   root?: string;
@@ -74,19 +76,32 @@ export function expandPath(p: string, base: string): string {
   return isAbsolute(p) ? p : resolve(base, p);
 }
 
-const WILDCARD = /[*?[{]/;
+const WILDCARD = /[*?[{<]/;
 const FILE_GLOB_TAIL = /\*\.(?:mdx?|ya?ml|\{yaml,yml\}|\{yml,yaml\})$/;
+const CAPTURE = /^<([A-Za-z_][A-Za-z0-9_-]*)>$/;
 
-// "content/blog/**/*.yaml" → base "content/blog", glob "**/*.yaml"
-export function splitFiles(where: string, files: string): { base: string; glob: string } {
+// "content/<lang>/**/*.yaml" → base "content", glob "*/**/*.yaml", captures [{ column: "lang", segment: 0 }]
+export function splitFiles(where: string, files: string): { base: string; glob: string; captures: Capture[] } {
   const parts = files.split("/");
   const i = parts.findIndex((p) => WILDCARD.test(p));
+  if (i >= 0 && /[<>]/.test(parts[parts.length - 1] ?? ""))
+    throw new Error(`${where}files cannot capture the file name`);
   if (i < 0 || !FILE_GLOB_TAIL.test(files)) {
     throw new Error(`${where}files must end in *.md, *.mdx, *.yaml, *.yml or *.{yaml,yml}`);
   }
   const tail = parts.slice(i);
   if (tail.some((p) => p === "." || p === "..")) throw new Error(`${where}files cannot use . or .. after a wildcard`);
-  return { base: parts.slice(0, i).join("/"), glob: tail.join("/") };
+  const captures: Capture[] = [];
+  const glob = tail.map((p, segment) => {
+    if (!/[<>]/.test(p)) return p;
+    const column = CAPTURE.exec(p)?.[1];
+    if (column === undefined) throw new Error(`${where}files segment "${p}" must be exactly <name>`);
+    if (tail.slice(0, segment).includes("**")) throw new Error(`${where}files cannot capture after **`);
+    if (captures.some((c) => c.column === column)) throw new Error(`${where}files captures "${column}" twice`);
+    captures.push({ column, segment });
+    return "*";
+  });
+  return { base: parts.slice(0, i).join("/"), glob: glob.join("/"), captures };
 }
 
 class FolderPathError extends Error {}
@@ -96,11 +111,15 @@ function locate(
   t: { path?: string; files?: string },
   base: string,
   conventional?: { name: string; root: string },
-): { path: string; glob: string | null } {
+): { path: string; glob: string | null; captures: Capture[] } {
   if (t.path !== undefined && t.files !== undefined) throw new Error(`${where}use either path or files, not both`);
   if (t.files !== undefined) {
     const split = splitFiles(where, t.files);
-    return { path: expandPath(split.base === "" ? "." : split.base, base), glob: split.glob };
+    return {
+      path: expandPath(split.base === "" ? "." : split.base, base),
+      glob: split.glob,
+      captures: split.captures,
+    };
   }
   if (t.path === undefined) throw new Error(`${where}needs path or files`);
   const path = expandPath(t.path, base);
@@ -114,15 +133,18 @@ function locate(
         : `${where}path must be a YAML file; for one record per file use files: "${glob}"`,
     );
   }
-  return { path, glob: null };
+  return { path, glob: null, captures: [] };
 }
 
 // how yamlite.yaml writes a files table: relative to the root inside it, absolute outside
 export function filesOf(root: string, spec: TableSpec): string {
+  const segments = (spec.glob ?? "").split("/");
+  for (const c of spec.captures) segments[c.segment] = `<${c.column}>`;
+  const glob = segments.join("/");
   const rel = relative(root, spec.path);
-  if (rel === "") return spec.glob ?? "";
+  if (rel === "") return glob;
   const base = rel.startsWith("..") || isAbsolute(rel) ? spec.path : rel.split(sep).join("/");
-  return `${base}/${spec.glob}`;
+  return `${base}/${glob}`;
 }
 
 // whether a folder holds files at some depth but no YAML file among them; stops at the first YAML file
@@ -273,16 +295,43 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     if (t.body === (t.key ?? "id")) throw new Error(`${where}body cannot be the key column`);
   }
   const body = codec === "markdown" ? (t.body ?? "body") : null;
+  const key = t.key ?? "id";
+  const captures = t.captures ?? [];
+  for (const c of captures) {
+    if (c.column === key) throw new Error(`${where}capture "${c.column}" is the key column`);
+    if (c.column === body) throw new Error(`${where}capture "${c.column}" is the body column`);
+    const type = Object.hasOwn(columns, c.column) ? columns[c.column] : "TEXT";
+    // "01" and "1" are different folders, so a capture is never converted to a number
+    if (type !== "TEXT")
+      throw new Error(`${where}capture "${c.column}" is a folder name and must be TEXT, not ${type}`);
+    columns[c.column] = "TEXT";
+  }
   if (t.group !== undefined && (typeof t.group !== "string" || t.group.trim() === "")) {
     throw new Error(`${where}group must be a non-empty string`);
   }
+  // a rule's column: a declared column, a column found later in the data, or a path through a declared JSON column
+  const field = (rule: string, name: string) => {
+    if (Object.hasOwn(columns, name) || !name.includes(".")) return;
+    if (resolveField(name, columns) === null) {
+      throw new Error(`${where}${rule} "${name}": ${name.slice(0, name.indexOf("."))} is not a JSON column`);
+    }
+  };
   if (t.split !== undefined) {
     if (typeof t.split !== "string" || t.split === "") throw new Error(`${where}split must be a column name`);
-    if (t.split === (t.key ?? "id") || t.split === body)
-      throw new Error(`${where}split cannot be the key or body column`);
-    if (!Object.hasOwn(columns, t.split)) throw new Error(`${where}split column "${t.split}" is not in columns`);
+    if (t.split === key || t.split === body) throw new Error(`${where}split cannot be the key or body column`);
+    if (!Object.hasOwn(columns, t.split)) {
+      if (!t.split.includes(".")) throw new Error(`${where}split column "${t.split}" is not in columns`);
+      field("split", t.split);
+    }
   }
   const formats = toFormats(where, body === null ? t.formats : { [body]: "markdown", ...t.formats }, columns);
+  const values = toValues(where, t.values, formats);
+  const required = toRequired(where, t.required);
+  const bounds = toBounds(where, t, columns, formats);
+  const references = Object.entries(t.references ?? {}).map(([column, raw]) => toReference(where, column, raw));
+  for (const k of Object.keys(values)) field("values", k);
+  for (const c of required) field("required", c);
+  for (const r of references) field("references", r.column);
   return {
     name: t.name,
     path: t.path,
@@ -290,21 +339,20 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
     glob: t.glob,
     codec,
     body,
-    key: t.key ?? "id",
+    key,
     columns,
     formats,
     indexes: (t.indexes ?? []).map((raw, i) => toIndex(t.name, raw, i)),
-    references: Object.entries(t.references ?? {}).map(([column, raw]) =>
-      toReference(`table "${t.name}": `, column, raw),
-    ),
-    values: toValues(where, t.values, formats),
-    required: toRequired(where, t.required),
-    ...toBounds(where, t, columns, formats),
+    references,
+    values,
+    required,
+    ...bounds,
     persisted,
     exclude: [],
     expand: toExpand(t.name, t.name, t.expand, "expand"),
     group: t.group ?? null,
     split: t.split ?? null,
+    captures,
   };
 }
 
@@ -397,7 +445,13 @@ function toBounds(
       const format = Object.hasOwn(formats, column) ? formats[column] : undefined;
       const type = Object.hasOwn(columns, column) ? columns[column] : undefined;
       if (isShape(format)) throw new Error(`${where}${which}.${column}: a ${format} column cannot have a ${which}`);
-      if (format === "date" || format === "datetime") {
+      if (type === undefined && format === undefined && column.includes(".")) {
+        if (resolveField(column, columns) === null) {
+          throw new Error(`${where}${which}.${column}: ${column.slice(0, column.indexOf("."))} is not a JSON column`);
+        }
+        if (typeof b !== "number" || !Number.isFinite(b))
+          throw new Error(`${where}${which}.${column}: a field path takes a number`);
+      } else if (format === "date" || format === "datetime") {
         const ok = typeof b === "string" && (isDate(b) || (format === "datetime" && isDatetime(b)));
         if (!ok) throw new Error(`${where}${which}.${column}: ${JSON.stringify(b)} is not a ${format}`);
       } else if (type === "INTEGER" || type === "REAL") {
@@ -618,7 +672,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     for (const o of raw.tables) {
       const where = `table "${o.name}": `;
       const prev = scanned.find((s) => s.name === o.name);
-      let loc: { path: string; glob: string | null };
+      let loc: { path: string; glob: string | null; captures?: Capture[] };
       try {
         loc =
           o.path !== undefined || o.files !== undefined

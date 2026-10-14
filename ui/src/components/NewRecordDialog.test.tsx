@@ -32,6 +32,7 @@ const table: TableMeta = {
   inDb: true,
   group: null,
   split: null,
+  captures: [],
 };
 
 test("a required column shows * and the warn color until it has a value", () => {
@@ -189,4 +190,20 @@ test("a map column starts with its editor; a list column offers list or JSON and
   fireEvent.click(screen.getByLabelText("tags as JSON"));
   expect(screen.getByLabelText("tags").tagName).not.toBe("INPUT");
   confirm.mockRestore();
+});
+
+test("a seeded key starts the key field, and captured columns are not fields", () => {
+  const notes: TableMeta = {
+    ...table,
+    columns: { id: "TEXT", title: "TEXT", team: "TEXT" },
+    captures: [{ column: "team", segment: 0 }],
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <NewRecordDialog table={notes} open onOpenChange={() => {}} initialKey="platform/" />
+    </QueryClientProvider>,
+  );
+  expect((screen.getByLabelText("new key") as HTMLInputElement).value).toBe("platform/");
+  expect(screen.queryByLabelText("team")).toBeNull();
+  expect(screen.getByLabelText("title")).toBeTruthy();
 });

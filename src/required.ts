@@ -1,13 +1,14 @@
+import { fieldSql, resolveField } from "./fieldpath.ts";
 import { q, type Store } from "./store.ts";
 import { sample } from "./text.ts";
-import type { TableSpec } from "./types.ts";
+import type { ColumnType, TableSpec } from "./types.ts";
 import { declaredViews } from "./views.ts";
 
 const MAX_WARNINGS = 10;
 
 interface Checked {
   name: string;
-  columns: Set<string>;
+  columns: Map<string, ColumnType>;
   // the columns that name a row in warnings, joined with "/"
   label: string[];
   required: string[];
@@ -20,7 +21,8 @@ function check(store: Store, c: Checked): string[] {
   for (const column of c.required) {
     if (c.label.includes(column)) continue;
     // a column no record has yet is missing from every record
-    const where = c.columns.has(column) ? ` WHERE src.${q(column)} IS NULL` : "";
+    const ref = resolveField(column, c.columns);
+    const where = ref ? ` WHERE ${fieldSql("src", ref)} IS NULL` : "";
     const keys = store
       .query(`SELECT ${label} AS k FROM ${q(c.name)} AS src${where} ORDER BY k`)
       .map((r) => String(r.k));
@@ -36,7 +38,7 @@ export function checkRequired(store: Store, spec: TableSpec): string[] {
   if (spec.required.length > 0 && store.tableExists(spec.name)) {
     checked.push({
       name: spec.name,
-      columns: new Set(store.columns(spec.name).keys()),
+      columns: store.columns(spec.name),
       label: [spec.key],
       required: spec.required,
       prefix: "",
@@ -47,7 +49,7 @@ export function checkRequired(store: Store, spec: TableSpec): string[] {
     if (!record || store.objectType(view.name) !== "view") continue;
     checked.push({
       name: view.name,
-      columns: new Set(Object.keys(record.columns)),
+      columns: new Map(Object.entries(record.columns)),
       label: record.identity,
       required: view.required,
       prefix: `${view.name}: `,

@@ -38,6 +38,7 @@ const table: TableMeta = {
   inDb: true,
   group: null,
   split: null,
+  captures: [],
 };
 
 test("after a save the form keeps the saved values until the refetch arrives", async () => {
@@ -469,4 +470,26 @@ test("an unset list field offers list or JSON and an unset map field opens on it
   expect(screen.queryByLabelText("tags as map")).toBeNull();
   expect(screen.queryByLabelText("meta as map")).toBeNull();
   expect(screen.getByText("+ key")).toBeTruthy();
+});
+
+test("a captured column is shown but cannot be edited", async () => {
+  vi.mocked(api.record).mockResolvedValue({
+    row: { id: "platform/a", title: "x", team: "platform" },
+    file: "f",
+    yaml: "",
+  });
+  const notes: TableMeta = {
+    ...table,
+    columns: { id: "TEXT", title: "TEXT", team: "TEXT" },
+    captures: [{ column: "team", segment: 0 }],
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RecordDrawer table={notes} recordKey="platform/a" />
+    </QueryClientProvider>,
+  );
+  const team = (await screen.findByLabelText("team")) as HTMLInputElement;
+  expect(team.value).toBe("platform");
+  expect(team.matches(":disabled")).toBe(true);
+  expect((screen.getByLabelText("title") as HTMLInputElement).matches(":disabled")).toBe(false);
 });

@@ -24,6 +24,12 @@ const config = `tables:
     files: "empty/*.yaml"
     split: kind
     columns: { kind: TEXT }
+  docs:
+    split: meta.status
+    columns: { meta: JSON }
+  team_docs:
+    files: "team_docs/<team>/*.yaml"
+    split: team
 `;
 const files = {
   "notes/a.yaml": "type: idea\n",
@@ -39,9 +45,14 @@ const files = {
   "flags/r.yaml": "done: true\n",
   "odd/s.yaml": "tags: { a: 1 }\n",
   "odd/u.yaml": "tags: [a]\n",
+  "docs/a.yaml": "meta: { status: draft, tags: [x, y] }\n",
+  "docs/b.yaml": "meta: { status: draft }\n",
+  "docs/c.yaml": "meta: { status: done, tags: [x] }\n",
+  "docs/d.yaml": "meta: {}\n",
+  "team_docs/platform/a.yaml": "title: A\n",
 };
 
-type Meta = { tables: Array<{ name: string; count: number; split: unknown }> };
+type Meta = { tables: Array<{ name: string; count: number; split: unknown; captures: unknown }> };
 const split = (meta: Meta, name: string) => meta.tables.find((x) => x.name === name)?.split;
 
 async function ready(served: Served): Promise<Meta> {
@@ -117,4 +128,40 @@ test("each item's filter returns exactly its records", async () => {
   expect(await rows("notes", { col: "type", op: "null" })).toBe(1);
   expect(await rows("posts", { col: "tags", op: "has", value: "a" })).toBe(2);
   expect(await rows("flags", { col: "done", op: "eq", value: true })).toBe(2);
+});
+
+test("a field path lists its values like a JSON column, then the empty item", async () => {
+  t = await startServe(files, config);
+  const meta = await ready(t);
+  expect(split(meta, "docs")).toEqual({
+    column: "meta.status",
+    json: true,
+    items: [
+      { value: "done", count: 1 },
+      { value: "draft", count: 2 },
+      { value: null, count: 1 },
+    ],
+  });
+});
+
+test("rows filter by a field path", async () => {
+  t = await startServe(files, config);
+  await ready(t);
+  const rows = async (filter: unknown) =>
+    (await t!.api(`/api/tables/docs/rows?filter=${encodeURIComponent(JSON.stringify([filter]))}`)).body;
+  expect((await rows({ col: "meta.status", op: "eq", value: "draft" })).total).toBe(2);
+  expect((await rows({ col: "meta.status", op: "has", value: "done" })).total).toBe(1);
+  expect((await rows({ col: "meta.tags", op: "has", value: "x" })).total).toBe(2);
+  expect((await rows({ col: "meta.status", op: "null" })).total).toBe(1);
+  expect(
+    (await t!.api(`/api/tables/docs/rows?filter=${encodeURIComponent('[{"col":"nope.x","op":"eq","value":1}]')}`))
+      .status,
+  ).toBe(400);
+});
+
+test("meta lists a table's captures", async () => {
+  t = await startServe(files, config);
+  const meta = await ready(t);
+  expect(meta.tables.find((x) => x.name === "team_docs")?.captures).toEqual([{ column: "team", segment: 0 }]);
+  expect(meta.tables.find((x) => x.name === "notes")?.captures).toEqual([]);
 });

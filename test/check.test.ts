@@ -96,3 +96,39 @@ test("a missing required value is a problem", async () => {
   expect(r.ok).toBe(false);
   expect(r.tables[0]?.warnings).toEqual(["title missing (a)"]);
 });
+
+const notes =
+  'tables:\n  teams: {}\n  people: {}\n  notes:\n    files: "notes/<team>/*.md"\n    columns: { metadata: JSON }\n' +
+  "    split: team\n    references:\n      team: teams\n      metadata.reviewer: people\n" +
+  "    values:\n      metadata.status: [draft, done]\n    required: [metadata.status]\n" +
+  "    min: { metadata.priority: 1 }\n";
+
+test("captures and field paths pass on valid data", async () => {
+  const root = setup(notes, {
+    "teams.yaml": "- id: platform\n",
+    "people.yaml": "- id: ana\n",
+    "notes/platform/a.md": "---\nmetadata:\n  status: draft\n  reviewer: ana\n  priority: 2\n---\nText\n",
+  });
+  const r = await check({ root });
+  expect(r.tables.flatMap((t) => t.warnings)).toEqual([]);
+});
+
+test("captures and field paths report each broken rule", async () => {
+  const root = setup(notes, {
+    "teams.yaml": "- id: platform\n",
+    "people.yaml": "- id: ana\n",
+    "notes/sales/a.md": "---\nmetadata:\n  status: drfat\n  reviewer: [ana, bo]\n  priority: 0\n---\n",
+    "notes/platform/b.md": "---\nmetadata: {}\n---\n",
+  });
+  const warnings = (await check({ root })).tables.find((t) => t.table === "notes")?.warnings ?? [];
+  expect(warnings).toEqual(
+    expect.arrayContaining([
+      'metadata.status "drfat" not in values (sales/a)',
+      "metadata.status missing (platform/b)",
+      'team "sales" not found in teams.id (sales/a)',
+      'metadata.reviewer "bo" not found in people.id (sales/a)',
+      expect.stringMatching(/^metadata\.priority 0 .*\(sales\/a\)$/),
+    ]),
+  );
+  expect(warnings).toHaveLength(5);
+});

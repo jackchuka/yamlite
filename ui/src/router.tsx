@@ -11,7 +11,7 @@ import { Shell } from "./components/Shell";
 import { SqlConsole } from "./components/SqlConsole";
 import { SyncView } from "./components/SyncView";
 import { TableView } from "./components/TableView";
-import { seedValues } from "./lib/split";
+import { seedKey, seedValues } from "./lib/split";
 import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import { useIsMobile } from "./lib/useIsMobile";
@@ -33,6 +33,7 @@ function NewRecordButton({ table }: { table: TableMeta }) {
   const mobile = useIsMobile();
   const { filter } = tableRoute.useSearch();
   const initial = seedValues(table, filter ?? []);
+  const initialKey = seedKey(table, filter ?? []);
   return (
     <>
       <Button
@@ -49,11 +50,12 @@ function NewRecordButton({ table }: { table: TableMeta }) {
         {m.nav_new_record()}
       </Button>
       <NewRecordDialog
-        key={JSON.stringify(initial)}
+        key={JSON.stringify([initial, initialKey])}
         table={table}
         open={open}
         onOpenChange={setOpen}
         initial={initial}
+        initialKey={initialKey}
       />
     </>
   );

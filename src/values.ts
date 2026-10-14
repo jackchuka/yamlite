@@ -1,3 +1,4 @@
+import { fieldEach, isPath, resolveField } from "./fieldpath.ts";
 import { q, type Store } from "./store.ts";
 import { sample } from "./text.ts";
 import type { AllowedValue, ColumnType, TableSpec } from "./types.ts";
@@ -21,12 +22,14 @@ function check(store: Store, c: Checked): string[] {
   const warnings: string[] = [];
   const label = c.label.map((col) => `CAST(src.${q(col)} AS TEXT)`).join(" || '/' || ");
   for (const [column, allowed] of Object.entries(c.values)) {
-    if (!c.columns.has(column)) continue;
-    const source = `src.${q(column)}`;
-    const json = c.columns.get(column) === "JSON";
-    const value = json ? "item.value" : source;
-    const from = json
-      ? `${q(c.name)} AS src, json_each(${source}) AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
+    const ref = resolveField(column, c.columns);
+    if (ref === null) continue;
+    const source = `src.${q(ref.column)}`;
+    const each = isPath(ref) || c.columns.get(ref.column) === "JSON";
+    const value = each ? "item.value" : source;
+    const items = isPath(ref) ? fieldEach("src", ref) : `json_each(${source})`;
+    const from = each
+      ? `${q(c.name)} AS src, ${items} AS item WHERE json_valid(${source}) AND item.type NOT IN ('object', 'array', 'null')`
       : `${q(c.name)} AS src WHERE ${source} IS NOT NULL`;
     const texts = allowed.map(valueText);
     // 2.0 in a REAL column is "2.0" as text, so numbers are also compared as numbers

@@ -38,6 +38,7 @@ export const metaRoutes: Routes = (router, ctx) => {
         inDb,
         group: t.group,
         split: splitOf(ctx.store, t, columns),
+        captures: t.captures,
       };
     }),
     pages: ctx.y.pages.map((p) => ({

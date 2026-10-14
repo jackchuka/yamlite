@@ -487,6 +487,46 @@ tables:
 - Only YAML front matter is read. A file with TOML (`+++`) or JSON front matter is skipped with a warning and never written.
 - A Markdown table exists only where `yamlite.yaml` declares one. `yamlite init` declares one for each top-level folder that holds `.md` or `.mdx` files and is not a YAML table, at the deepest folder holding them all and one per extension; `sync` never creates one, and a README next to your YAML or at the root stays a README.
 
+### Captured columns
+
+A `<name>` folder in `files:` matches one folder like `*`, and its name becomes a column:
+
+```yaml
+tables:
+  notes:
+    files: "notes/<team>/<project>/*.md"
+    split: team
+    references:
+      team: teams
+```
+
+`notes/platform/search/plan.md` is a row with `team: platform` and `project: search`. The column is always `TEXT`: `01` and `1` are different folders.
+
+- It is never written to a file: the folder is its only source. An edit in the database or the web UI is undone on the next sync with a warning, and the web UI shows the field read-only. To move a record, move its file.
+- A file field with the same name is left in the file but ignored, with a warning when it differs from the folder.
+- New record under a split item of a captured column starts its key in that folder (`platform/`).
+- A capture is a whole folder (`<year>-*` is not one), cannot be the file name or come after `**`, and cannot be named like the key or body column.
+
+### Field paths
+
+`split`, `values`, `required`, `min`, `max` and `references` take `column.field` for a field inside a JSON column, so front matter like `metadata: { status: draft }` can be checked and browsed without its own column:
+
+```yaml
+tables:
+  notes:
+    files: "notes/**/*.md"
+    columns: { metadata: JSON }
+    split: metadata.status
+    values:
+      metadata.status: [draft, review, done]
+    required: [metadata.reviewer]
+```
+
+- A name that is a column is that column, so a column named `a.b` keeps working. Otherwise the part before the first `.` must be a JSON column in `columns`.
+- A list at the path is checked item by item, and `split` lists each item.
+- `min` and `max` on a field path take numbers.
+- `metadata` stays one JSON column in the database, the same shape as in the file.
+
 ### Removing columns
 
 Delete a column's line from `yamlite.yaml` and the next sync drops it from the database (with any yamlite-managed index on it). If YAML files still have that key, a file can't be read, or a row in the database still holds a value in that column (an unsynced or app-written value), the column is kept and listed in a warning until you resolve it or add the line back. Columns that were never declared — say, one an app added — are registered instead, never dropped.
@@ -506,7 +546,7 @@ Delete a column's line from `yamlite.yaml` and the next sync drops it from the d
 
 ### Split
 
-`split` names a column whose values the web UI's sidebar lists under the table, each with its count; it never changes the database. A table of notes with `split: type` stays one table, and the sidebar shows `idea`, `todo` and so on under it. Clicking one opens the table filtered to that value, and New record there starts with the value filled in. A JSON column lists each element of its arrays, so a record tagged `[a, b]` is under both `a` and `b`. Records with no value are under "(none)", shown only when there are some. The items fold with the table's views behind the arrow on its row: they start folded, an open table stays open in that browser, and a table opens by itself while one of its items or views is shown. The column must be declared in `columns`, and cannot be the key or the Markdown body.
+`split` names a column whose values the web UI's sidebar lists under the table, each with its count; it never changes the database. A table of notes with `split: type` stays one table, and the sidebar shows `idea`, `todo` and so on under it. Clicking one opens the table filtered to that value, and New record there starts with the value filled in. A JSON column lists each element of its arrays, so a record tagged `[a, b]` is under both `a` and `b`. Records with no value are under "(none)", shown only when there are some. The items fold with the table's views behind the arrow on its row: they start folded, an open table stays open in that browser, and a table opens by itself while one of its items or views is shown. The column must be declared in `columns` (or be a [field path](#field-paths) into one), and cannot be the key or the Markdown body.
 
 ### Formats
 

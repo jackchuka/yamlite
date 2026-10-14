@@ -18,16 +18,18 @@ export function NewRecordDialog({
   open,
   onOpenChange,
   initial = {},
+  initialKey = "",
 }: {
   table: TableMeta;
   open: boolean;
   onOpenChange: (o: boolean) => void;
   initial?: Row;
+  initialKey?: string;
 }) {
   const navigate = useNavigate();
   const { connected } = useEvents();
   const dispatch = useReflectDispatch();
-  const [key, setKey] = useState("");
+  const [key, setKey] = useState(initialKey);
   const [values, setValues] = useState<Row>(initial);
   // a field picks its widget once per mount, so a reset remounts them rather than feed a map widget null
   const [generation, setGeneration] = useState(0);
@@ -42,7 +44,7 @@ export function NewRecordDialog({
     onError: () => dispatch({ type: "cancelled", table: table.name, key }),
     onSuccess: () => {
       onOpenChange(false);
-      setKey("");
+      setKey(initialKey);
       setValues(initial);
       setGeneration((g) => g + 1);
       void navigate({
@@ -71,7 +73,7 @@ export function NewRecordDialog({
           </label>
           {err?.field === "key" && <p className="text-[11px] text-err">{err.message}</p>}
           {Object.entries(table.columns)
-            .filter(([c]) => c !== table.key)
+            .filter(([c]) => c !== table.key && !(table.captures ?? []).some((x) => x.column === c))
             .map(([c, type]) => (
               <div key={`${generation}:${c}`}>
                 <FormField
