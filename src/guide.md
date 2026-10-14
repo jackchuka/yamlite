@@ -82,7 +82,7 @@ Any rule's column, and `split`, may be a field path into a JSON column: `metadat
 | `indexes`     | queries you actually run on large tables; `unique: true` to catch duplicates                                  | small tables, speculative queries                 |
 | `expand`      | lists of maps you want to query as rows (read-only views named `<table>__<field>`)                            | lists of scalars you only filter with `json_each` |
 | `group`       | a sidebar section in the web UI                                                                               | anything else: it never changes the database      |
-| `split`       | browsing one table by category in the web UI's sidebar (a column declared in `columns`)                       | splitting the data: it never changes the database |
+| `split`       | browsing one table by category in the web UI's sidebar (a column declared in `columns`, or a field path)      | splitting the data: it never changes the database |
 
 ```yaml
 tables:
@@ -150,22 +150,22 @@ tables:
 
 Keys of a table under `tables:`. Details: https://github.com/jackchuka/yamlite#configuration
 
-| Key          | Value                                                                                                                        |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `path`       | a YAML file holding a list of records                                                                                        |
-| `files`      | a glob of files, one record each, ending in `*.yaml`, `*.yml`, `*.{yaml,yml}`, `*.md` or `*.mdx`; may start outside the root |
-| `key`        | the key column (default `id`)                                                                                                |
-| `body`       | Markdown tables only: the column for the text below the front matter (default `body`)                                        |
-| `columns`    | `{ column: INTEGER \| REAL \| TEXT \| BOOLEAN \| JSON }`                                                                     |
-| `formats`    | `{ column: markdown \| date \| datetime }` on TEXT columns, `{ column: list \| map }` on JSON columns                        |
-| `values`     | `{ column: [allowed, values] }`                                                                                              |
-| `required`   | `[column, …]`                                                                                                                |
-| `min`        | `{ column: number or date }`, bound included                                                                                 |
-| `max`        | `{ column: number or date }`, bound included                                                                                 |
-| `references` | `{ column: table }` or `{ column: table.column }`                                                                            |
-| `indexes`    | `[a, b]` (composite), `{ columns: a, unique: true }`, `{ expr: "json_extract(meta, '$.ja')" }`                               |
-| `expand`     | `{ field: { columns, formats, references, values, required, min, max, expand } }`                                            |
-| `group`      | the web UI's sidebar section                                                                                                 |
-| `split`      | a column (declared in `columns`, not the key or body) whose values the sidebar lists under the table                         |
+| Key          | Value                                                                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`       | a YAML file holding a list of records                                                                                                                                           |
+| `files`      | a glob of files, one record each, ending in `*.yaml`, `*.yml`, `*.{yaml,yml}`, `*.md` or `*.mdx`; may start outside the root; a `<name>` folder becomes a read-only TEXT column |
+| `key`        | the key column (default `id`)                                                                                                                                                   |
+| `body`       | Markdown tables only: the column for the text below the front matter (default `body`)                                                                                           |
+| `columns`    | `{ column: INTEGER \| REAL \| TEXT \| BOOLEAN \| JSON }`                                                                                                                        |
+| `formats`    | `{ column: markdown \| date \| datetime }` on TEXT columns, `{ column: list \| map }` on JSON columns                                                                           |
+| `values`     | `{ column: [allowed, values] }`; here and in `required`, `min`, `max` and `references` a column may be a field path (`metadata.status`)                                         |
+| `required`   | `[column, …]`                                                                                                                                                                   |
+| `min`        | `{ column: number or date }`, bound included                                                                                                                                    |
+| `max`        | `{ column: number or date }`, bound included                                                                                                                                    |
+| `references` | `{ column: table }` or `{ column: table.column }`                                                                                                                               |
+| `indexes`    | `[a, b]` (composite), `{ columns: a, unique: true }`, `{ expr: "json_extract(meta, '$.ja')" }`                                                                                  |
+| `expand`     | `{ field: { columns, formats, references, values, required, min, max, expand } }`                                                                                               |
+| `group`      | the web UI's sidebar section                                                                                                                                                    |
+| `split`      | a column (declared in `columns`, not the key or body) or a field path whose values the sidebar lists under the table                                                            |
 
 The top-level `pages:` key adds custom pages to the web UI; see the README's Pages section.
