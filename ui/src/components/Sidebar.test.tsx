@@ -59,6 +59,7 @@ const table = (name: string, group: string | null, split: TableMeta["split"] = n
   inDb: true,
   group,
   split,
+  captures: [],
 });
 const meta: Snapshot["meta"] = {
   root: "data",

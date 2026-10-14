@@ -89,3 +89,18 @@ describe("required", () => {
     await y.close();
   });
 });
+
+test("a field path skips a JSON column holding invalid JSON instead of failing the sync", async () => {
+  const root = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    "tables:\n  tasks:\n    columns: { meta: JSON }\n    required: [meta.owner]\n    min: { meta.n: 1 }\n",
+  );
+  write(join(root, "tasks/a.yaml"), "meta: { owner: ana, n: 2 }\n");
+  const y = await open({ root });
+  await y.sync();
+  sql(join(root, ".yamlite", "db.sqlite"), "UPDATE tasks SET meta = '{bad'");
+  const results = await y.sync();
+  expect(results.find((r) => r.table === "tasks")?.ok).toBe(true);
+  await y.close();
+});

@@ -43,6 +43,7 @@ test("discovers tables by convention", () => {
     expand: [],
     group: null,
     split: null,
+    captures: [],
   });
   expect(cfg.db).toBe(join(root, ".yamlite", "db.sqlite"));
   expect(cfg.stateDir).toBe(join(root, ".yamlite"));
@@ -709,4 +710,87 @@ test.each([
   write(join(root, "tasks.yaml"), "[]\n");
   write(join(root, "yamlite.yaml"), `tables:\n  tasks:\n    ${body}\n`);
   expect(() => resolveConfig({ root })).toThrow(error);
+});
+
+const notesRoot = (config: string) => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), config);
+  return root;
+};
+const notesTable = (root: string) => resolveConfig({ root }).tables.find((x) => x.name === "notes") as TableSpec;
+
+test("captures in files become TEXT columns and match like *", () => {
+  const root = notesRoot(
+    'tables:\n  notes:\n    files: "notes/<team>/<project>/*.md"\n    columns: { project: TEXT }\n',
+  );
+  const t = notesTable(root);
+  expect(t.path).toBe(join(root, "notes"));
+  expect(t.glob).toBe("*/*/*.md");
+  expect(t.captures).toEqual([
+    { column: "team", segment: 0 },
+    { column: "project", segment: 1 },
+  ]);
+  expect(t.columns.team).toBe("TEXT");
+  expect(t.columns.project).toBe("TEXT");
+  expect(filesOf(root, t)).toBe("notes/<team>/<project>/*.md");
+});
+
+test("a capture after a fixed folder counts segments from the glob", () => {
+  const t = notesTable(notesRoot('tables:\n  notes:\n    files: "notes/*/<team>/*.md"\n'));
+  expect(t.glob).toBe("*/*/*.md");
+  expect(t.captures).toEqual([{ column: "team", segment: 1 }]);
+});
+
+test("a table without captures has none", () => {
+  const t = notesTable(notesRoot('tables:\n  notes:\n    files: "notes/**/*.md"\n'));
+  expect(t.captures).toEqual([]);
+});
+
+test("rejects bad captures", () => {
+  const bad = (files: string) => () => notesTable(notesRoot(`tables:\n  notes:\n    files: "${files}"\n`));
+  expect(bad("notes/<team>-x/*.md")).toThrow('table "notes": files segment "<team>-x" must be exactly <name>');
+  expect(bad("notes/<1team>/*.md")).toThrow('table "notes": files segment "<1team>" must be exactly <name>');
+  expect(bad("notes/<team>.md")).toThrow('table "notes": files cannot capture the file name');
+  expect(bad("notes/**/<team>/*.md")).toThrow('table "notes": files cannot capture after **');
+  expect(bad("notes/<team>/<team>/*.md")).toThrow('table "notes": files captures "team" twice');
+  expect(bad("notes/<id>/*.md")).toThrow('table "notes": capture "id" is the key column');
+  expect(bad("notes/<body>/*.md")).toThrow('table "notes": capture "body" is the body column');
+  expect(() =>
+    notesTable(notesRoot('tables:\n  notes:\n    files: "notes/<year>/*.md"\n    columns: { year: INTEGER }\n')),
+  ).toThrow('table "notes": capture "year" is a folder name and must be TEXT, not INTEGER');
+});
+
+test("rules and split accept a path through a JSON column", () => {
+  const t = notesTable(
+    notesRoot(
+      'tables:\n  notes:\n    files: "notes/*.md"\n    columns: { metadata: JSON }\n    split: metadata.status\n' +
+        "    values:\n      metadata.status: [draft, done]\n    required: [metadata.reviewer]\n" +
+        "    min: { metadata.priority: 1 }\n    references:\n      metadata.team: teams\n",
+    ),
+  );
+  expect(t.split).toBe("metadata.status");
+  expect(t.values["metadata.status"]).toEqual(["draft", "done"]);
+  expect(t.required).toEqual(["metadata.reviewer"]);
+  expect(t.min["metadata.priority"]).toBe(1);
+  expect(t.references).toEqual([{ column: "metadata.team", table: "teams" }]);
+});
+
+test("rejects a path whose head is not a JSON column", () => {
+  const cfg = (rules: string) => () =>
+    notesTable(
+      notesRoot(`tables:\n  notes:\n    files: "notes/*.md"\n    columns: { title: TEXT, metadata: JSON }\n${rules}`),
+    );
+  expect(cfg("    values:\n      title.x: [a]\n")).toThrow(
+    'table "notes": values "title.x": title is not a JSON column',
+  );
+  expect(cfg("    split: other.x\n")).toThrow('table "notes": split "other.x": other is not a JSON column');
+  expect(cfg('    min: { metadata.at: "2026-01-01" }\n')).toThrow(
+    'table "notes": min.metadata.at: a field path takes a number',
+  );
+  expect(cfg("    required: [metadata..x]\n")).toThrow(
+    'table "notes": required "metadata..x": metadata is not a JSON column',
+  );
+  expect(cfg("    references:\n      title.x: teams\n")).toThrow(
+    'table "notes": references "title.x": title is not a JSON column',
+  );
 });

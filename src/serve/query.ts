@@ -1,3 +1,4 @@
+import { fieldEach, fieldSql, isPath, resolveField } from "../fieldpath.ts";
 import { q } from "../ident.ts";
 import type { ColumnType, DbValue } from "../types.ts";
 import { encode } from "../value.ts";
@@ -67,9 +68,10 @@ export function buildWhere(query: RowQuery, columns: Map<string, ColumnType>): {
   const parts: string[] = [];
   const params: DbValue[] = [];
   for (const f of query.filters) {
-    const type = columns.get(f.col);
-    if (type === undefined) throw new HttpError(400, `unknown column: ${f.col}`);
-    const c = q(f.col);
+    const ref = resolveField(f.col, columns);
+    if (ref === null) throw new HttpError(400, `unknown column: ${f.col}`);
+    const type = isPath(ref) ? undefined : columns.get(f.col);
+    const c = fieldSql("", ref);
     const compare = COMPARE[f.op];
     if (compare) {
       parts.push(`${c} ${compare} ?`);
@@ -78,8 +80,9 @@ export function buildWhere(query: RowQuery, columns: Map<string, ColumnType>): {
       parts.push(`instr(${c}, ?) > 0`);
       params.push(String(f.value ?? ""));
     } else if (f.op === "has") {
-      if (type !== "JSON") throw new HttpError(400, `"has" needs a JSON column; ${f.col} is ${type}`);
-      parts.push(`EXISTS (SELECT 1 FROM json_each(${c}) WHERE json_each.value = ?)`);
+      if (!isPath(ref) && type !== "JSON") throw new HttpError(400, `"has" needs a JSON column; ${f.col} is ${type}`);
+      const each = isPath(ref) ? fieldEach("", ref) : `json_each(${c})`;
+      parts.push(`EXISTS (SELECT 1 FROM ${each} WHERE json_each.value = ?)`);
       params.push(encode(fromWire(f.value, undefined)));
     } else {
       parts.push(`${c} IS ${f.op === "null" ? "" : "NOT "}NULL`);

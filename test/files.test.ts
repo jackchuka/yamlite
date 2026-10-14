@@ -431,3 +431,46 @@ describe("FilesSource globs", () => {
     expect(claims(folder, "/r/a")).toBe(false);
   });
 });
+
+describe("captures", () => {
+  const capture = () => {
+    const dir = join(tmpRoot(), "notes");
+    return { dir, src: new FilesSource(dir, "*/*.yaml", "id", [], undefined, [{ column: "team", segment: 0 }]) };
+  };
+
+  test("read fills a capture from the folder", () => {
+    const { dir, src } = capture();
+    write(join(dir, "platform/a.yaml"), "title: A\n");
+    expect(src.read().records.get("platform/a")).toEqual({ title: "A", team: "platform" });
+  });
+
+  test("a file field named like a capture loses to the folder, with a warning when it differs", () => {
+    const { dir, src } = capture();
+    write(join(dir, "platform/a.yaml"), "team: sales\n");
+    write(join(dir, "platform/b.yaml"), "team: platform\n");
+    const r = src.read();
+    expect(r.records.get("platform/a")).toEqual({ team: "platform" });
+    expect(r.records.get("platform/b")).toEqual({ team: "platform" });
+    expect(r.warnings).toEqual([
+      expect.stringMatching(/a\.yaml: field "team" differs from the folder name; the folder name wins$/),
+    ]);
+  });
+
+  test("write never puts a capture into a file, keeps a file's own field, and returns the folder's value", () => {
+    const { dir, src } = capture();
+    write(join(dir, "platform/old.yaml"), "team: sales\ntitle: Old\n");
+    const r = src.read();
+    const out = src.apply(
+      [
+        { kind: "put", key: "platform/new", record: { title: "New", team: "sales" } },
+        { kind: "put", key: "platform/old", record: { title: "Old 2", team: "platform" } },
+      ],
+      r.stamps,
+    );
+    expect(out.skipped).toEqual([]);
+    expect(read(join(dir, "platform/new.yaml"))).toBe("title: New\n");
+    expect(read(join(dir, "platform/old.yaml"))).toBe("team: sales\ntitle: Old 2\n");
+    expect(out.written.get("platform/new")).toEqual({ title: "New", team: "platform" });
+    expect(out.written.get("platform/old")).toEqual({ title: "Old 2", team: "platform" });
+  });
+});

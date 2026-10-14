@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { SplitMeta, TableMeta } from "./types";
-import { isSplitActive, seedValues, splitFilter } from "./split";
+import { isSplitActive, seedKey, seedValues, splitFilter } from "./split";
 
 const scalar: SplitMeta = { column: "type", json: false, items: [] };
 const json: SplitMeta = { column: "tags", json: true, items: [] };
@@ -43,4 +43,37 @@ test("eq and has filters on the table's non-key columns seed a new record", () =
     ]),
   ).toEqual({ type: "idea", tags: ["a"] });
   expect(seedValues(table, [])).toEqual({});
+});
+
+const notes = {
+  key: "id",
+  columns: { id: "TEXT", team: "TEXT", project: "TEXT", metadata: "JSON" },
+  captures: [
+    { column: "team", segment: 0 },
+    { column: "project", segment: 1 },
+  ],
+} as unknown as TableMeta;
+
+test("eq filters on leading captures seed the key", () => {
+  expect(seedKey(notes, [{ col: "team", op: "eq", value: "platform" }])).toBe("platform/");
+  expect(
+    seedKey(notes, [
+      { col: "project", op: "eq", value: "search" },
+      { col: "team", op: "eq", value: "platform" },
+    ]),
+  ).toBe("platform/search/");
+  expect(seedKey(notes, [{ col: "project", op: "eq", value: "search" }])).toBe("");
+  const gap = { ...notes, captures: [{ column: "team", segment: 1 }] } as TableMeta;
+  expect(seedKey(gap, [{ col: "team", op: "eq", value: "platform" }])).toBe("");
+  expect(seedKey(table, [])).toBe("");
+});
+
+test("captures are not seeded as values; field paths seed their nested map", () => {
+  expect(
+    seedValues(notes, [
+      { col: "team", op: "eq", value: "platform" },
+      { col: "metadata.status", op: "has", value: "draft" },
+      { col: "metadata.owner", op: "eq", value: "ana" },
+    ]),
+  ).toEqual({ metadata: { status: "draft", owner: "ana" } });
 });

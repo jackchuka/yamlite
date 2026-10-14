@@ -33,6 +33,7 @@ const table: TableMeta = {
   inDb: true,
   group: null,
   split: null,
+  captures: [],
 };
 const snapshot: Snapshot = {
   version: 1,

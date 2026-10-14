@@ -71,6 +71,13 @@ export interface Claim {
   tie: boolean;
 }
 
+// a folder of a files table's path read as a column: "notes/<team>/*.md" → { column: "team", segment: 0 }
+export interface Capture {
+  column: string;
+  // the index into the record key's "/"-separated segments
+  segment: number;
+}
+
 export interface TableSpec {
   name: string;
   // files: the folder the glob starts from; list: the one file
@@ -103,6 +110,8 @@ export interface TableSpec {
   group: string | null;
   // the column whose values the sidebar lists under the table
   split: string | null;
+  // files tables: columns read from the record's folders, never written to its file
+  captures: Capture[];
 }
 
 export type PageAccess = "read" | "write";

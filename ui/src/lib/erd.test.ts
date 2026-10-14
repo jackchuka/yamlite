@@ -23,6 +23,7 @@ const table = (
   inDb: true,
   group: null,
   split: null,
+  captures: [],
 });
 
 const view = (

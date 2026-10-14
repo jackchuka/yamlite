@@ -11,7 +11,7 @@ import {
 import { dirname, isAbsolute, join, matchesGlob, relative, resolve, sep } from "node:path";
 import { type FileStamp, sameStamp, stamp, writeAtomic } from "../fsutil.ts";
 import { hashContent } from "../hash.ts";
-import type { Claim, Rec } from "../types.ts";
+import type { Capture, Claim, Rec } from "../types.ts";
 import { type Codec, emptyRead, type FileOp, type Source, type SourceApply, type SourceRead } from "./types.ts";
 import { yamlCodec } from "./yamldoc.ts";
 
@@ -52,6 +52,17 @@ interface RecordFile {
 const skipName = (name: string) => name.startsWith(".") || name === "node_modules";
 
 const lastSegment = (key: string) => key.slice(key.lastIndexOf("/") + 1);
+
+// "platform/a" with { column: "team", segment: 0 } → { team: "platform" }
+export function capturedValues(key: string, captures: readonly Capture[]): Record<string, string> {
+  const segments = key.split("/");
+  const out: Record<string, string> = {};
+  for (const c of captures) {
+    const value = segments[c.segment];
+    if (value !== undefined) out[c.column] = value;
+  }
+  return out;
+}
 
 // "a/b/c" → ["a/", "a/b/"]
 function prefixes(key: string): string[] {
@@ -108,7 +119,12 @@ export class FilesSource implements Source {
     private readonly keyField: string,
     private readonly exclude: readonly Claim[] = [],
     private readonly codec: Codec = yamlCodec,
+    private readonly captures: readonly Capture[] = [],
   ) {}
+
+  private isCapture(field: string): boolean {
+    return this.captures.some((c) => c.column === field);
+  }
 
   read(): SourceRead {
     const res = emptyRead();
@@ -145,7 +161,14 @@ export class FilesSource implements Source {
       if (inFile !== undefined && inFile !== null && String(inFile) !== key && String(inFile) !== lastSegment(key)) {
         res.warnings.push(`${path}: field "${this.keyField}" differs from the file name; the file name wins`);
       }
-      res.records.set(key, record);
+      const captured = capturedValues(key, this.captures);
+      for (const [column, value] of Object.entries(captured)) {
+        const own = record[column];
+        if (own !== undefined && own !== null && String(own) !== value) {
+          res.warnings.push(`${path}: field "${column}" differs from the folder name; the folder name wins`);
+        }
+      }
+      res.records.set(key, { ...record, ...captured });
       res.mtimes.set(key, mtimeMs);
     }
     return res;
@@ -212,13 +235,14 @@ export class FilesSource implements Source {
     this.paths.set(op.key, path);
     lower.set(op.key.toLowerCase(), op.key);
     for (const p of prefixes(op.key)) dirs.set(p.toLowerCase(), p);
-    out.written.set(op.key, record);
+    out.written.set(op.key, { ...record, ...capturedValues(op.key, this.captures) });
     return null;
   }
 
   private write(path: string, record: Rec): string {
     const current = existsSync(path) ? readFileSync(path, "utf8") : null;
-    const content = this.codec.write(current, record, (field) => field === this.keyField);
+    const own = Object.fromEntries(Object.entries(record).filter(([field]) => !this.isCapture(field)));
+    const content = this.codec.write(current, own, (field) => field === this.keyField || this.isCapture(field));
     writeAtomic(path, content);
     return content;
   }

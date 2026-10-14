@@ -1,7 +1,8 @@
+import { fieldSql, resolveField } from "./fieldpath.ts";
 import { boundProblem, formatProblem } from "./rules.ts";
 import { q, type Store } from "./store.ts";
 import { sample } from "./text.ts";
-import { isShape, type Bound, type ColumnFormat, type DbValue, type TableSpec } from "./types.ts";
+import { isShape, type Bound, type ColumnFormat, type ColumnType, type DbValue, type TableSpec } from "./types.ts";
 import { decode } from "./value.ts";
 import { declaredViews } from "./views.ts";
 
@@ -15,7 +16,7 @@ interface Rules {
 
 interface Target {
   name: string;
-  columns: Set<string>;
+  columns: Map<string, ColumnType>;
   // the columns that name a row in warnings, joined with "/"
   label: string[];
   rules: Rules;
@@ -34,7 +35,7 @@ function targets(store: Store, spec: TableSpec, pick: (r: Rules) => string[]): T
   if (pick(spec).length > 0 && store.tableExists(spec.name)) {
     found.push({
       name: spec.name,
-      columns: new Set(store.columns(spec.name).keys()),
+      columns: store.columns(spec.name),
       label: [spec.key],
       rules: spec,
       prefix: "",
@@ -45,7 +46,7 @@ function targets(store: Store, spec: TableSpec, pick: (r: Rules) => string[]): T
     if (!record || store.objectType(view.name) !== "view") continue;
     found.push({
       name: view.name,
-      columns: new Set(Object.keys(record.columns)),
+      columns: new Map(Object.entries(record.columns)),
       label: record.identity,
       rules: view,
       prefix: `${view.name}: `,
@@ -65,10 +66,12 @@ function scan(
   problem: (v: unknown) => string | null,
   read: (v: DbValue) => unknown = (v) => v,
 ): string[] {
-  if (!t.columns.has(column)) return [];
+  const ref = resolveField(column, t.columns);
+  if (ref === null) return [];
+  const value = fieldSql("src", ref);
   const label = t.label.map((col) => `COALESCE(CAST(src.${q(col)} AS TEXT), '')`).join(" || '/' || ");
   const rows = store.query(
-    `SELECT ${label} AS k, src.${q(column)} AS v FROM ${q(t.name)} AS src WHERE src.${q(column)} IS NOT NULL ORDER BY v, k`,
+    `SELECT ${label} AS k, ${value} AS v FROM ${q(t.name)} AS src WHERE ${value} IS NOT NULL ORDER BY v, k`,
   );
   const grouped = new Map<string, string[]>();
   for (const row of rows) {

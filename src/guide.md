@@ -32,12 +32,14 @@ Every folder and YAML file directly under the root is a table, with no configura
 | One YAML file holding a list (`people.yaml`)          | nothing                                  | the `id` field                                              |
 | Files outside the root, or a narrower glob            | `files: "<folder>/**/*.yaml"`            | the path below the folder                                   |
 | Markdown with YAML front matter                       | `files: "<folder>/**/*.md"` (or `*.mdx`) | the path; the text below the front matter goes in `body`    |
+| Folders that carry meaning (`notes/platform/a.md`)    | `files: "notes/<team>/*.md"`             | the path; `<team>` is a read-only column (`platform`)       |
 
 How to choose:
 
 - **One file per record** when records are edited separately, are long, or hold nested data. Diffs, reviews and conflicts stay per record.
 - **A list file** for small, flat lookup tables (tens of rows) such as people, labels or projects.
 - **`path:`** is only for a list file. A folder takes `files:`; `path:` on a folder is an error.
+- **`<name>` in `files:`** when a folder level means something (team, year, language). It matches one folder like `*` and becomes a column that is never written to a file. Don't repeat that value inside each file.
 - **`key:`** for a list table: the field that identifies a record uniquely and stably (default `id`). Choose it once: the key column's type can never change later without rebuilding the database.
 
 ```yaml
@@ -68,6 +70,8 @@ A field must be always a scalar or always a map/list across records. `min` / `ma
 
 Rules are checked on every sync. A broken rule is a warning, never a failed sync, but `yamlite check` fails on it. Use them for real invariants; a rule that half the data breaks is noise.
 
+Any rule's column, and `split`, may be a field path into a JSON column: `metadata.status` checks the `status` field of a `metadata` map (`metadata` must be declared `JSON` in `columns`). A list at the path is checked item by item; `min` / `max` on a path take numbers.
+
 | Key           | Use it for                                                                                                    | Avoid it for                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | `formats`     | `date` / `datetime` on TEXT dates; `markdown` on long prose; `list` / `map` on JSON columns of one shape      | other column types (an error)                     |
@@ -78,7 +82,7 @@ Rules are checked on every sync. A broken rule is a warning, never a failed sync
 | `indexes`     | queries you actually run on large tables; `unique: true` to catch duplicates                                  | small tables, speculative queries                 |
 | `expand`      | lists of maps you want to query as rows (read-only views named `<table>__<field>`)                            | lists of scalars you only filter with `json_each` |
 | `group`       | a sidebar section in the web UI                                                                               | anything else: it never changes the database      |
-| `split`       | browsing one table by category in the web UI's sidebar (a column declared in `columns`)                       | splitting the data: it never changes the database |
+| `split`       | browsing one table by category in the web UI's sidebar (a column declared in `columns`, or a field path)      | splitting the data: it never changes the database |
 
 ```yaml
 tables:
@@ -114,6 +118,8 @@ tables:
 - `body:` on a non-Markdown table, or a `body` named like the key column.
 - `values` on a column with a `formats` entry: an error. So are `min` / `max` on a `list` or `map` column.
 - Splitting one table into several to browse it by category: keep one table and use `split`.
+- Editing a captured column (`<team>` in `files:`) to move a record: the edit is undone; move the file.
+- A field path whose first part is not a JSON column in `columns` (an error).
 
 ## Full example
 
@@ -144,22 +150,22 @@ tables:
 
 Keys of a table under `tables:`. Details: https://github.com/jackchuka/yamlite#configuration
 
-| Key          | Value                                                                                                                        |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `path`       | a YAML file holding a list of records                                                                                        |
-| `files`      | a glob of files, one record each, ending in `*.yaml`, `*.yml`, `*.{yaml,yml}`, `*.md` or `*.mdx`; may start outside the root |
-| `key`        | the key column (default `id`)                                                                                                |
-| `body`       | Markdown tables only: the column for the text below the front matter (default `body`)                                        |
-| `columns`    | `{ column: INTEGER \| REAL \| TEXT \| BOOLEAN \| JSON }`                                                                     |
-| `formats`    | `{ column: markdown \| date \| datetime }` on TEXT columns, `{ column: list \| map }` on JSON columns                        |
-| `values`     | `{ column: [allowed, values] }`                                                                                              |
-| `required`   | `[column, …]`                                                                                                                |
-| `min`        | `{ column: number or date }`, bound included                                                                                 |
-| `max`        | `{ column: number or date }`, bound included                                                                                 |
-| `references` | `{ column: table }` or `{ column: table.column }`                                                                            |
-| `indexes`    | `[a, b]` (composite), `{ columns: a, unique: true }`, `{ expr: "json_extract(meta, '$.ja')" }`                               |
-| `expand`     | `{ field: { columns, formats, references, values, required, min, max, expand } }`                                            |
-| `group`      | the web UI's sidebar section                                                                                                 |
-| `split`      | a column (declared in `columns`, not the key or body) whose values the sidebar lists under the table                         |
+| Key          | Value                                                                                                                                                                           |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`       | a YAML file holding a list of records                                                                                                                                           |
+| `files`      | a glob of files, one record each, ending in `*.yaml`, `*.yml`, `*.{yaml,yml}`, `*.md` or `*.mdx`; may start outside the root; a `<name>` folder becomes a read-only TEXT column |
+| `key`        | the key column (default `id`)                                                                                                                                                   |
+| `body`       | Markdown tables only: the column for the text below the front matter (default `body`)                                                                                           |
+| `columns`    | `{ column: INTEGER \| REAL \| TEXT \| BOOLEAN \| JSON }`                                                                                                                        |
+| `formats`    | `{ column: markdown \| date \| datetime }` on TEXT columns, `{ column: list \| map }` on JSON columns                                                                           |
+| `values`     | `{ column: [allowed, values] }`; here and in `required`, `min`, `max` and `references` a column may be a field path (`metadata.status`)                                         |
+| `required`   | `[column, …]`                                                                                                                                                                   |
+| `min`        | `{ column: number or date }`, bound included                                                                                                                                    |
+| `max`        | `{ column: number or date }`, bound included                                                                                                                                    |
+| `references` | `{ column: table }` or `{ column: table.column }`                                                                                                                               |
+| `indexes`    | `[a, b]` (composite), `{ columns: a, unique: true }`, `{ expr: "json_extract(meta, '$.ja')" }`                                                                                  |
+| `expand`     | `{ field: { columns, formats, references, values, required, min, max, expand } }`                                                                                               |
+| `group`      | the web UI's sidebar section                                                                                                                                                    |
+| `split`      | a column (declared in `columns`, not the key or body) or a field path whose values the sidebar lists under the table                                                            |
 
 The top-level `pages:` key adds custom pages to the web UI; see the README's Pages section.

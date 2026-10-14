@@ -112,3 +112,24 @@ describe("values", () => {
     await y.close();
   });
 });
+
+describe("values on field paths", () => {
+  test("a list at the path is checked item by item", async () => {
+    const root = setup("tables:\n  tasks:\n    columns: { meta: JSON }\n    values:\n      meta.tags: [a, b]\n", {
+      "tasks/x.yaml": "meta:\n  tags: [a, z]\n",
+      "tasks/y.yaml": "meta:\n  tags: b\n",
+    });
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "tasks")).toEqual(['meta.tags "z" not in values (x)']);
+    await y.close();
+  });
+
+  test("a column literally named a.b is a column, not a path", async () => {
+    const root = setup('tables:\n  tasks:\n    columns: { "a.b": TEXT }\n    values:\n      a.b: [ok]\n', {
+      "tasks/x.yaml": '"a.b": bad\n',
+    });
+    const y = await open({ root });
+    expect(warningsOf(await y.sync(), "tasks")).toEqual(['a.b "bad" not in values (x)']);
+    await y.close();
+  });
+});

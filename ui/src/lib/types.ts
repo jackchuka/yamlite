@@ -28,6 +28,12 @@ export interface SplitMeta {
   items: SplitItem[];
 }
 
+// files tables: a column read from the record's folders, "notes/<team>/*.md" → { column: "team", segment: 0 }
+export interface Capture {
+  column: string;
+  segment: number;
+}
+
 export interface TableMeta {
   name: string;
   mode: "files" | "list";
@@ -46,6 +52,7 @@ export interface TableMeta {
   inDb: boolean;
   group: string | null;
   split: SplitMeta | null;
+  captures: Capture[];
 }
 
 export interface ViewMeta {
