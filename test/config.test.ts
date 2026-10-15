@@ -2,7 +2,7 @@ import { mkdirSync, symlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
-import { expandPath, filesOf, resolveConfig } from "../src/config.ts";
+import { expandPath, filesOf, parseConfig, readsFile, resolveConfig, type TableLocation } from "../src/config.ts";
 import type { TableSpec } from "../src/types.ts";
 import { browserFs, dataRoot, read, tmpRoot, write } from "./helpers.ts";
 
@@ -793,4 +793,62 @@ test("rejects a path whose head is not a JSON column", () => {
   expect(cfg("    references:\n      title.x: teams\n")).toThrow(
     'table "notes": references "title.x": title is not a JSON column',
   );
+});
+
+test("parseConfig reads where each table's files are from the config text alone", () => {
+  const text = [
+    "tables:",
+    "  people: { files: ../shared/people/*.yaml }",
+    "  teams: { files: '../shared/<org>/teams/**/*.yaml' }",
+    "  top: { files: '*.yaml' }",
+    "  tags: { path: ../lists/tags.yaml }",
+    "  plain: { columns: { title: TEXT } }",
+  ].join("\n");
+  expect(parseConfig(text).tables.map((t) => [t.name, t.location])).toEqual([
+    ["people", { kind: "files", base: "../shared/people", glob: "*.yaml", captures: [] }],
+    [
+      "teams",
+      { kind: "files", base: "../shared", glob: "*/teams/**/*.yaml", captures: [{ column: "org", segment: 0 }] },
+    ],
+    ["top", { kind: "files", base: ".", glob: "*.yaml", captures: [] }],
+    ["tags", { kind: "file", path: "../lists/tags.yaml" }],
+    ["plain", { kind: "default" }],
+  ]);
+  expect(parseConfig(text).tables.find((t) => t.name === "teams")?.columns).toEqual({ org: "TEXT" });
+  expect(parseConfig("")).toEqual({ tables: [], pages: [] });
+});
+
+test("parseConfig keeps page paths as written", () => {
+  const { pages } = parseConfig("pages:\n  board: { path: pages/board.html, access: { tasks: read } }\n");
+  expect(pages).toEqual([
+    { name: "board", path: "pages/board.html", title: "board", access: { tasks: "read" }, sql: false, network: [] },
+  ]);
+});
+
+test("parseConfig refuses what opening the folder refuses for the same text", () => {
+  const refused = [
+    ["tables:\n  a: { path: a.yaml, files: a/*.yaml }\n", /either path or files/],
+    ["tables:\n  a: { pathh: a.yaml }\n", /unknown key "pathh"/],
+    ["tables:\n  a: { files: x/*.txt }\n", /files must end in/],
+    ["tables:\n  a: { columns: { n: NOPE } }\n", /NOPE/],
+    ["tables: [\n", /invalid yamlite.yaml/],
+  ] as const;
+  for (const [text, error] of refused) {
+    expect(() => parseConfig(text)).toThrow(error);
+    const root = tmpRoot();
+    write(join(root, "yamlite.yaml"), text);
+    expect(() => resolveConfig({ root })).toThrow(error);
+  }
+});
+
+test("readsFile matches the files a table reads, relative to the config's folder", () => {
+  const teams: TableLocation = { kind: "files", base: "../shared", glob: "*/teams/**/*.{yaml,yml}", captures: [] };
+  expect(readsFile(teams, "../shared/acme/teams/a/b.YML")).toBe(true);
+  expect(readsFile(teams, "../shared/acme/other/b.yaml")).toBe(false);
+  expect(readsFile(teams, "../shared/acme/teams/.draft/b.yaml")).toBe(false);
+  expect(readsFile(teams, "../shared/acme/teams/node_modules/b.yaml")).toBe(false);
+  expect(readsFile({ kind: "files", base: ".", glob: "*.yaml", captures: [] }, "a.yaml")).toBe(true);
+  expect(readsFile({ kind: "file", path: "./lists/tags.yaml" }, "lists/tags.yaml")).toBe(true);
+  expect(readsFile({ kind: "file", path: "lists/tags.yaml" }, "lists/more.yaml")).toBe(false);
+  expect(readsFile({ kind: "default" }, "people.yaml")).toBe(false);
 });
