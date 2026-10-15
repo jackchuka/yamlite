@@ -1,6 +1,6 @@
 import { type Dirent, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
 import { parse } from "yaml";
 import { instant, isDate, isDatetime } from "./datetime.ts";
 import { claims } from "./source/files.ts";
@@ -68,7 +68,7 @@ export interface ResolvedConfig {
   pages: PageSpec[];
 }
 
-const CONFIG_NAMES = ["yamlite.yaml", "yamlite.yml"];
+export const CONFIG_NAMES = ["yamlite.yaml", "yamlite.yml"];
 
 export function expandPath(p: string, base: string): string {
   if (p === "~") return homedir();
@@ -104,27 +104,60 @@ export function splitFiles(where: string, files: string): { base: string; glob: 
   return { base: parts.slice(0, i).join("/"), glob: glob.join("/"), captures };
 }
 
+// where a table's config puts its files, as written: a path is relative to the config's folder unless absolute
+// or under ~. A table that gives neither path nor files has its default place, which only the folder can tell:
+// <name>.yaml or <name>.yml when there is one, else the folder <name>/
+export type TableLocation =
+  | { kind: "file"; path: string }
+  | { kind: "files"; base: string; glob: string; captures: Capture[] }
+  | { kind: "default" };
+
+// a table as yamlite.yaml declares it, checked as far as the text alone allows
+export type DeclaredTable = Omit<TableSpec, "path" | "mode" | "glob" | "captures" | "persisted" | "exclude"> & {
+  location: TableLocation;
+};
+
+// yamlite.yaml read from its text, with no file system; page paths are as written
+export interface Config {
+  tables: DeclaredTable[];
+  pages: PageSpec[];
+}
+
 class FolderPathError extends Error {}
 
+function written(where: string, t: { path?: string; files?: string }): TableLocation {
+  if (t.path !== undefined && t.files !== undefined) throw new Error(`${where}use either path or files, not both`);
+  if (t.files !== undefined) {
+    const { base, glob, captures } = splitFiles(where, t.files);
+    return { kind: "files", base: base === "" ? "." : base, glob, captures };
+  }
+  if (t.path !== undefined) return { kind: "file", path: t.path };
+  return { kind: "default" };
+}
+
+// whether a table reads a file, the file relative to the config's folder like the location; like a walk of the
+// folder, it never reads dot files or node_modules. A table at its default place reads nothing it can tell
+export function readsFile(l: TableLocation, file: string): boolean {
+  const f = normalize(file);
+  if (l.kind === "default") return false;
+  if (l.kind === "file") return f === normalize(l.path);
+  const base = normalize(l.base);
+  const rel = relative(base, f);
+  if (rel.split(sep).some((s) => s.startsWith(".") || s === "node_modules")) return false;
+  return claims({ owner: "", path: base, glob: l.glob, tie: false }, f);
+}
+
+// a declared location against the folder it is relative to
 function locate(
   where: string,
-  t: { path?: string; files?: string },
+  l: Exclude<TableLocation, { kind: "default" }>,
   base: string,
   conventional?: { name: string; root: string },
 ): { path: string; glob: string | null; captures: Capture[] } {
-  if (t.path !== undefined && t.files !== undefined) throw new Error(`${where}use either path or files, not both`);
-  if (t.files !== undefined) {
-    const split = splitFiles(where, t.files);
-    return {
-      path: expandPath(split.base === "" ? "." : split.base, base),
-      glob: split.glob,
-      captures: split.captures,
-    };
-  }
-  if (t.path === undefined) throw new Error(`${where}needs path or files`);
-  const path = expandPath(t.path, base);
+  if (l.kind === "files") return { path: expandPath(l.base, base), glob: l.glob, captures: l.captures };
+  const path = expandPath(l.path, base);
   if ((existsSync(path) && statSync(path).isDirectory()) || !YAML_EXT.test(path)) {
-    const dir = t.path.replace(/^\.\//, "").replace(/^\.$/, "").replace(/\/+$/, "");
+    const dir = l.path.replace(/^\.\//, "").replace(/^\.$/, "").replace(/\/+$/, "");
     const glob = dir === "" ? YAML_GLOB : `${dir}/${YAML_GLOB}`;
     const isDefault = conventional !== undefined && path === join(conventional.root, conventional.name);
     throw new FolderPathError(
@@ -134,6 +167,14 @@ function locate(
     );
   }
   return { path, glob: null, captures: [] };
+}
+
+// a table passed in code: it must say where its files are
+function locateInput(t: TableInput, base: string): Located {
+  const where = `table "${t.name}": `;
+  const l = written(where, t);
+  if (l.kind === "default") throw new Error(`${where}needs path or files`);
+  return { ...t, ...locate(where, l, base) };
 }
 
 // how yamlite.yaml writes a files table: relative to the root inside it, absolute outside
@@ -264,23 +305,65 @@ const TABLE_KEYS = [
   "split",
 ];
 
-function readRootConfig(root: string, text?: string): { tables: Array<{ name: string } & RawTable>; pages: unknown } {
+function readRootConfig(root: string, text?: string): Config {
   const path = configPath(root) ?? (text === undefined ? null : "yamlite.yaml");
-  if (path === null) return { tables: [], pages: undefined };
+  if (path === null) return { tables: [], pages: [] };
+  return parseConfig(text ?? readFileSync(path, "utf8"), basename(path));
+}
+
+// everything yamlite.yaml says that does not depend on the files around it: the same checks, and the same
+// errors, as opening the folder; what only the folder can tell (a default place, a path that is a folder, page
+// access to a table found by convention) is checked when it is opened
+export function parseConfig(text: string, name = "yamlite.yaml"): Config {
   let raw: { tables?: Record<string, RawTable | null>; pages?: unknown } | null;
   try {
-    raw = parse(text ?? readFileSync(path, "utf8"));
+    raw = parse(text);
   } catch (e) {
     const first = (e instanceof Error ? e.message : String(e)).split("\n")[0];
-    throw new Error(`invalid ${path}: ${first}`);
+    throw new Error(`invalid ${name}: ${first}`);
   }
-  const tables = Object.entries(raw?.tables ?? {}).map(([name, t]) => {
+  const tables = Object.entries(raw?.tables ?? {}).map(([tableName, t]): DeclaredTable => {
     const unknown = Object.keys(t ?? {}).find((k) => !TABLE_KEYS.includes(k));
-    if (unknown !== undefined) throw new Error(`table "${name}" has an unknown key "${unknown}"`);
-    return { name, ...t };
+    if (unknown !== undefined) throw new Error(`table "${tableName}" has an unknown key "${unknown}"`);
+    const location = written(`table "${tableName}": `, t ?? {});
+    const { path: _p, files: _f, group, split, ...rest } = t ?? {};
+    // a table at its default place is a YAML list or a folder of YAML files: either way its codec is yaml
+    const spec = toSpec(
+      {
+        ...rest,
+        group: group as string | undefined,
+        split: split as string | undefined,
+        name: tableName,
+        path: "",
+        glob: location.kind === "files" ? location.glob : null,
+        captures: location.kind === "files" ? location.captures : [],
+      },
+      true,
+    );
+    const {
+      path: _path,
+      mode: _mode,
+      glob: _glob,
+      captures: _captures,
+      persisted: _persisted,
+      exclude: _exclude,
+      ...declared
+    } = spec;
+    return { ...declared, location };
   });
-  return { tables, pages: raw?.pages };
+  checkViewNames(tables.map((t) => ({ ...t, ...placeholder(t) })));
+  return { tables, pages: toPages(raw?.pages, (p) => p) };
 }
+
+// a declared table as a spec with no files, for the checks that look at specs alone
+const placeholder = (t: DeclaredTable) => ({
+  path: "",
+  mode: (t.location.kind === "files" ? "files" : "list") as TableSpec["mode"],
+  glob: t.location.kind === "files" ? t.location.glob : null,
+  captures: t.location.kind === "files" ? t.location.captures : [],
+  persisted: true,
+  exclude: [],
+});
 
 function toSpec(t: Located, persisted: boolean): TableSpec {
   if (!t.name || t.name.startsWith("_yamlite") || /[/\\\0]/.test(t.name) || t.name === "." || t.name.includes("..")) {
@@ -588,11 +671,9 @@ function toOrigin(where: string, raw: unknown): string {
   return url.origin;
 }
 
-function toPages(raw: unknown, root: string, tables: TableSpec[]): PageSpec[] {
+function toPages(raw: unknown, place: (path: string) => string): PageSpec[] {
   if (raw === undefined || raw === null) return [];
   if (typeof raw !== "object" || Array.isArray(raw)) throw new Error("pages must be a map of page names");
-  const tableNames = new Set(tables.map((t) => t.name));
-  const viewNames = new Set(tables.flatMap((t) => declaredViews(t).map((d) => d.spec.name)));
   return Object.entries(raw).map(([name, value]) => {
     if (!PAGE_NAME.test(name)) {
       throw new Error(`invalid page name: "${name}"; use lowercase letters, digits, - and _`);
@@ -620,22 +701,34 @@ function toPages(raw: unknown, root: string, tables: TableSpec[]): PageSpec[] {
         throw new Error(`${where}${target} is YAMLite's bookkeeping and cannot be in access`);
       }
       if (level !== "read" && level !== "write") throw new Error(`${where}access.${target} must be read or write`);
-      if (viewNames.has(target)) {
-        if (level === "write") throw new Error(`${where}view "${target}" can only be read`);
-      } else if (!tableNames.has(target)) {
-        throw new Error(`${where}unknown table or view "${target}" in access`);
-      }
       access[target] = level;
     }
     return {
       name,
-      path: expandPath(v.path, root),
+      path: place(v.path),
       title: (v.title as string | undefined) ?? name,
       access,
       sql: v.sql === true,
       network: ((v.network ?? []) as unknown[]).map((o) => toOrigin(where, o)),
     };
   });
+}
+
+// the tables a folder holds include those found by convention, so page access is checked once they are known
+function checkAccess(pages: PageSpec[], tables: TableSpec[]): PageSpec[] {
+  const tableNames = new Set(tables.map((t) => t.name));
+  const viewNames = new Set(tables.flatMap((t) => declaredViews(t).map((d) => d.spec.name)));
+  for (const p of pages) {
+    for (const [target, level] of Object.entries(p.access)) {
+      const where = `page "${p.name}": `;
+      if (viewNames.has(target)) {
+        if (level === "write") throw new Error(`${where}view "${target}" can only be read`);
+      } else if (!tableNames.has(target)) {
+        throw new Error(`${where}unknown table or view "${target}" in access`);
+      }
+    }
+  }
+  return pages;
 }
 
 const isStringList = (v: unknown): v is string[] =>
@@ -666,59 +759,44 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
     const scanned = scanRoot(root);
-    const raw = readRootConfig(root, opts.configText);
-    const declared = new Map<string, Located>();
+    const config = readRootConfig(root, opts.configText);
+    const declared = new Map<string, Located | TableSpec>();
     const pathErrors: string[] = [];
-    for (const o of raw.tables) {
-      const where = `table "${o.name}": `;
-      const prev = scanned.find((s) => s.name === o.name);
-      let loc: { path: string; glob: string | null; captures?: Capture[] };
+    for (const t of config.tables) {
+      const where = `table "${t.name}": `;
+      const prev = scanned.find((s) => s.name === t.name);
+      let loc: { path: string; glob: string | null; captures: Capture[] };
       try {
         loc =
-          o.path !== undefined || o.files !== undefined
-            ? locate(where, o, root, { name: o.name, root })
-            : prev
-              ? { path: prev.path, glob: prev.glob }
-              : defaultLocation(root, o.name);
+          t.location.kind !== "default"
+            ? locate(where, t.location, root, { name: t.name, root })
+            : { ...(prev ?? defaultLocation(root, t.name)), captures: [] };
       } catch (e) {
         if (!(e instanceof FolderPathError)) throw e;
         pathErrors.push(e.message);
         continue;
       }
-      declared.set(o.name, {
-        name: o.name,
+      const { location: _location, ...rest } = t;
+      declared.set(t.name, {
+        ...rest,
         ...loc,
-        key: o.key,
-        body: o.body,
-        columns: o.columns,
-        formats: o.formats,
-        indexes: o.indexes,
-        references: o.references,
-        values: o.values,
-        required: o.required,
-        min: o.min,
-        max: o.max,
-        expand: o.expand,
-        group: o.group as string | undefined,
-        split: o.split as string | undefined,
+        mode: loc.glob === null ? "list" : "files",
+        persisted: true,
+        exclude: [],
       });
     }
     if (pathErrors.length > 0) throw new Error(pathErrors.join("\n"));
-    const inCode = new Set<string>();
-    for (const t of opts.tables ?? []) {
-      declared.set(t.name, { ...t, ...locate(`table "${t.name}": `, t, root) });
-      inCode.add(t.name);
-    }
+    for (const t of opts.tables ?? []) declared.set(t.name, toSpec(locateInput(t, root), false));
     // a declared files table covering a folder or file keeps the conventions from making it a table of its own
     const codecOf = (glob: string | null) => (markdownExt(glob) !== null ? "markdown" : "yaml");
     const globs = [...declared.values()].filter((d) => d.glob !== null);
-    const covered = (s: Located) =>
+    const covered = (s: Located | TableSpec) =>
       s.glob !== null
         ? globs.some(
             (d) => codecOf(d.glob) === codecOf(s.glob) && (s.path === d.path || s.path.startsWith(d.path + sep)),
           )
         : globs.some((d) => claims({ owner: "", path: d.path, glob: d.glob, tie: false }, s.path));
-    const merged = new Map<string, Located>();
+    const merged = new Map<string, Located | TableSpec>();
     for (const s of scanned) {
       const d = declared.get(s.name);
       if (d) merged.set(s.name, d);
@@ -728,7 +806,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     const configFiles = CONFIG_NAMES.map((name) => join(root, name));
     const tables = checkViewNames(
       withClaims(
-        [...merged.values()].map((t) => toSpec(t, !inCode.has(t.name))),
+        [...merged.values()].map((t) => ("mode" in t ? t : toSpec(t, true))),
         configFiles,
       ),
     );
@@ -736,7 +814,10 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
       db: opts.db ? expandPath(opts.db, process.cwd()) : join(root, ".yamlite", "db.sqlite"),
       stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(root, ".yamlite"),
       tables,
-      pages: toPages(raw.pages, root, tables),
+      pages: checkAccess(
+        config.pages.map((p) => ({ ...p, path: expandPath(p.path, root) })),
+        tables,
+      ),
     };
   }
   if (!opts.db) throw new Error("either root or db is required");
@@ -746,7 +827,7 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     stateDir: opts.stateDir ? expandPath(opts.stateDir, process.cwd()) : join(dirname(db), ".yamlite"),
     tables: checkViewNames(
       withClaims(
-        (opts.tables ?? []).map((t) => toSpec({ ...t, ...locate(`table "${t.name}": `, t, process.cwd()) }, false)),
+        (opts.tables ?? []).map((t) => toSpec(locateInput(t, process.cwd()), false)),
         [],
       ),
     ),

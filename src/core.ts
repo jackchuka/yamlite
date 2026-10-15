@@ -1,5 +1,7 @@
 // the engine and one data root's server, without the CLI or the HTTP listener; runs in Node or, with browserAliases, in a browser worker
 export * from "./index.ts";
+export { type Config, CONFIG_NAMES, type DeclaredTable, parseConfig, readsFile, type TableLocation } from "./config.ts";
+export type { Capture } from "./types.ts";
 export type { Credentials } from "./agent/providers.ts";
 export { type AiOptions, createWorkspace, type Workspace, type WorkspaceOptions } from "./serve/workspace.ts";
 export type { ApiContext } from "./serve/context.ts";
