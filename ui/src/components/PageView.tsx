@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { PageHost } from "@/lib/pages/host";
 import { injectPage } from "@/lib/pages/inject";
+import { hashLocation, memoryLocation } from "@/lib/pages/location";
 import { pageFrame } from "@/lib/pageFrame";
 import { useEventStore, useMeta } from "@/lib/providers";
 import { useTheme } from "@/lib/theme";
@@ -23,6 +24,8 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const themeRef = useRef(theme);
   themeRef.current = theme;
   const hostRef = useRef<PageHost | null>(null);
+  // an app's place inside the page is its address's; a rebuilt frame starts where the page last was
+  const [place] = useState(() => (app ? hashLocation(window) : memoryLocation()));
   const { data: meta } = useMeta();
   const store = useEventStore();
   const page = meta?.pages.find((p) => p.name === name);
@@ -40,9 +43,9 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const srcDoc = useMemo(
     () =>
       network !== undefined && html.data !== undefined
-        ? injectPage(html.data, network ? network.split(" ") : [], themeRef.current)
+        ? injectPage(html.data, network ? network.split(" ") : [], themeRef.current, place.path)
         : undefined,
-    [network, html.data, rebuild],
+    [network, html.data, rebuild, place],
   );
   // the frame is rebuilt only when its document changes, not on every refetch
   const frameKey = `${rebuild}:${srcDoc}`;
@@ -67,6 +70,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
         readOnly: isReadOnly(),
         open: (table, key) => setOpened({ table, key }),
         theme: () => themeRef.current,
+        location: place,
         // the page may post these at any time; only while the user is in it do they stand for the user's input
         escape: () => {
           if (focused()) document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -91,7 +95,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
       window.removeEventListener("message", host.handle);
       off();
     };
-  }, [ready, srcDoc, navigated, store]);
+  }, [ready, srcDoc, navigated, store, place]);
 
   useEffect(() => {
     hostRef.current?.theme(theme);

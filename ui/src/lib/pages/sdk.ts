@@ -24,6 +24,7 @@ interface WireError {
 export function pageSdk(
   win: SdkWindow = window as unknown as SdkWindow,
   initialTheme: "light" | "dark" = "light",
+  initialPath = "/",
 ): void {
   class YamliteError extends Error {
     readonly status: number;
@@ -41,6 +42,29 @@ export function pageSdk(
   let theme: "light" | "dark" = initialTheme === "dark" ? "dark" : "light";
   win.document.documentElement.dataset.theme = theme;
   const themeListeners = new Set<(data: { theme: "light" | "dark" }) => void>();
+  // yamlite.history follows the history package's shape, which routers such as React Router take
+  type To = string | { pathname?: string; search?: string; hash?: string };
+  type Location = { pathname: string; search: string; hash: string; state: null; key: string };
+  type Action = "POP" | "PUSH" | "REPLACE";
+  const historyListeners = new Set<(update: { action: Action; location: Location }) => void>();
+  let keys = 0;
+  const at = (path: string): Location => {
+    const u = new URL(path, "http://page");
+    return { pathname: u.pathname, search: u.search, hash: u.hash, state: null, key: String(keys++) };
+  };
+  let location = at(initialPath);
+  let action: Action = "POP";
+  const href = (to: To) => {
+    const text = typeof to === "string" ? to : `${to.pathname ?? location.pathname}${to.search ?? ""}${to.hash ?? ""}`;
+    const u = new URL(text, `http://page${location.pathname}`);
+    if (u.origin !== "http://page") throw new Error(`${text} is not a path inside the page`);
+    return u.pathname + u.search + u.hash;
+  };
+  const moved = (a: Action, path: string) => {
+    action = a;
+    location = at(path);
+    for (const listener of historyListeners) listener({ action, location });
+  };
   let next = 0;
   const call = (method: string, ...args: unknown[]) =>
     new Promise<any>((resolve, reject) => {
@@ -53,6 +77,10 @@ export function pageSdk(
     if (e.source !== parent || m === null || typeof m !== "object" || m.yamlite !== 1) return;
     if (m.event === "change") {
       for (const listener of listeners) listener(m.data);
+      return;
+    }
+    if (m.event === "location") {
+      if (typeof m.data?.path === "string") moved("POP", m.data.path);
       return;
     }
     if (m.event === "theme") {
@@ -94,6 +122,32 @@ export function pageSdk(
     remove: (table: string, key: string) => call("remove", table, key),
     sql: (sql: string) => call("sql", sql),
     open: (table: string, key: string) => call("open", table, key),
+    history: Object.freeze({
+      get action() {
+        return action;
+      },
+      get location() {
+        return location;
+      },
+      push(to: To) {
+        const path = href(to);
+        moved("PUSH", path);
+        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, false] }, "*");
+      },
+      replace(to: To) {
+        const path = href(to);
+        moved("REPLACE", path);
+        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, true] }, "*");
+      },
+      go: (delta: number) => parent.postMessage({ yamlite: 1, method: "go", args: [delta] }, "*"),
+      back: () => parent.postMessage({ yamlite: 1, method: "go", args: [-1] }, "*"),
+      forward: () => parent.postMessage({ yamlite: 1, method: "go", args: [1] }, "*"),
+      createHref: href,
+      listen(listener: (update: { action: Action; location: Location }) => void) {
+        historyListeners.add(listener);
+        return () => historyListeners.delete(listener);
+      },
+    }),
     get theme() {
       return theme;
     },

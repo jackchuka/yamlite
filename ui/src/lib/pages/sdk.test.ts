@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { pageSdk } from "./sdk";
 
-function fake(theme?: "light" | "dark") {
+function fake(theme?: "light" | "dark", path?: string) {
   const sent: Array<Record<string, unknown>> = [];
   let onMessage: (e: { source: unknown; data: unknown }) => void = () => {};
   let onViolation: (e: { blockedURI: string }) => void = () => {};
@@ -17,7 +17,7 @@ function fake(theme?: "light" | "dark") {
       t === "keydown" ? (onKey = fn) : t === "click" ? (onClick = fn) : (onMessage = fn),
     document: { addEventListener: (_t: string, fn: typeof onViolation) => (onViolation = fn), documentElement: root },
   } as Record<string, any>;
-  pageSdk(win as never, theme);
+  pageSdk(win as never, theme, path);
   return {
     yamlite: win.yamlite,
     sent,
@@ -163,4 +163,45 @@ test("a click in the page is passed to the parent", () => {
   const f = fake();
   f.click();
   expect(f.sent.filter((m) => m.method === "click")).toEqual([{ yamlite: 1, method: "click", args: [] }]);
+});
+
+test("history starts where the host says the page stands", () => {
+  const { location, action } = fake("light", "/orders/42?tab=1").yamlite.history;
+  expect(action).toBe("POP");
+  expect(location).toMatchObject({ pathname: "/orders/42", search: "?tab=1", hash: "", state: null });
+  expect(fake().yamlite.history.location.pathname).toBe("/");
+});
+
+test("push and replace move the page at once and tell the host, relative to where it is", () => {
+  const f = fake("light", "/orders/42");
+  const { history } = f.yamlite;
+  const seen: string[] = [];
+  history.listen(({ action, location }: any) => seen.push(`${action} ${location.pathname}${location.search}`));
+  history.push("43");
+  history.replace({ search: "?tab=2" });
+  expect(seen).toEqual(["PUSH /orders/43", "REPLACE /orders/43?tab=2"]);
+  expect(f.sent.filter((m) => m.method === "navigate").map((m) => m.args)).toEqual([
+    ["/orders/43", false],
+    ["/orders/43?tab=2", true],
+  ]);
+  expect(history.createHref("/x y")).toBe("/x%20y");
+  expect(() => history.push("https://example.com/")).toThrow("is not a path inside the page");
+});
+
+test("go, back and forward ask the host, and its answer moves the page", () => {
+  const f = fake();
+  const { history } = f.yamlite;
+  const seen: string[] = [];
+  const off = history.listen(({ action, location }: any) => seen.push(`${action} ${location.pathname}`));
+  history.back();
+  history.forward();
+  history.go(-2);
+  expect(f.sent.filter((m) => m.method === "go").map((m) => m.args)).toEqual([[-1], [1], [-2]]);
+  expect(seen).toEqual([]);
+  f.reply({ yamlite: 1, event: "location", data: { path: "/a" } });
+  f.fromOther({ yamlite: 1, event: "location", data: { path: "/b" } });
+  off();
+  f.reply({ yamlite: 1, event: "location", data: { path: "/c" } });
+  expect(seen).toEqual(["POP /a"]);
+  expect(history.location.pathname).toBe("/c");
 });

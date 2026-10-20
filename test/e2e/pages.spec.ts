@@ -129,3 +129,28 @@ test("a page follows the UI's theme and the record panel resizes over it", async
   await page.waitForTimeout(300);
   await expect(drawer).toBeVisible();
 });
+
+test("an app keeps where its page stands in the address, through reload and back", async ({ page }) => {
+  app = await launch({
+    "yamlite.yaml": config(""),
+    ".pages/board.html": `<p id="at"></p><button id="go">next</button><script>
+      const show = () => (document.getElementById("at").textContent = "at " + yamlite.history.location.pathname);
+      yamlite.history.listen(show);
+      show();
+      document.getElementById("go").onclick = () => yamlite.history.push("/orders/43");
+    </script>`,
+  });
+  const entry = new URL(app.url);
+  entry.pathname = "/-/apps/board/";
+  await page.goto(`${entry}#/orders/42`);
+  const frame = page.frameLocator('iframe[title="Board"]');
+  await expect(frame.locator("#at")).toHaveText("at /orders/42");
+  await frame.locator("#go").click();
+  await expect(frame.locator("#at")).toHaveText("at /orders/43");
+  await expect.poll(() => new URL(page.url()).hash).toBe("#/orders/43");
+  await page.reload();
+  await expect(frame.locator("#at")).toHaveText("at /orders/43");
+  await page.goBack();
+  await expect(frame.locator("#at")).toHaveText("at /orders/42");
+  expect(new URL(page.url()).hash).toBe("#/orders/42");
+});

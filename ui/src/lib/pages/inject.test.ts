@@ -50,3 +50,8 @@ test("the theme style follows the policy and the sdk is told the initial theme",
   expect(style?.id).toBe("yamlite-theme");
   expect(script?.textContent).toContain('"dark"');
 });
+
+test("the sdk is told where the page stands, escaped like the theme", () => {
+  const script = parse(injectPage("<p>x</p>", [], "light", "/a?q=</script>")).head.children[2];
+  expect(script?.textContent).toContain('"/a?q=\\u003c/script>"');
+});
