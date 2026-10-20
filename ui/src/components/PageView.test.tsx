@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
+import { setAppLinkBuilder } from "@/lib/appMode";
 import { enterStatic } from "@/lib/mode";
 import { setPageFrame } from "@/lib/pageFrame";
 import type { Snapshot } from "@/lib/types";
@@ -47,14 +49,56 @@ afterEach(() => {
   setPageFrame(undefined);
 });
 
-async function show(name: string) {
+async function show(name: string, app = false) {
   const { Providers } = await import("@/lib/providers");
   return render(
     <Providers>
-      <PageView name={name} />
+      <PageView name={name} app={app} />
     </Providers>,
   );
 }
+
+test("the editor's page header copies a link that opens only the page", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  await show("board");
+  fireEvent.click(await screen.findByRole("button", { name: "Copy app link" }));
+  expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/-\/apps\/board\/$/));
+});
+
+test("without a clipboard, copying the app link says so and shows the link", async () => {
+  // plain http on a LAN address has no navigator.clipboard
+  Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  const error = vi.spyOn(toast, "error");
+  await show("board");
+  fireEvent.click(await screen.findByRole("button", { name: "Copy app link" }));
+  await waitFor(() =>
+    expect(error).toHaveBeenCalledWith(
+      expect.stringMatching(/^Couldn't copy\. Copy this link yourself: .*\/-\/apps\/board\/$/),
+      expect.anything(),
+    ),
+  );
+  error.mockRestore();
+});
+
+test("a host that gave no app link has no Copy app link", async () => {
+  setAppLinkBuilder(null);
+  try {
+    await show("board");
+    expect(await screen.findByTitle("Board")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy app link" })).toBeNull();
+  } finally {
+    setAppLinkBuilder(undefined);
+  }
+});
+
+test("an app's header names the page and leaves out its access and the link", async () => {
+  await show("board", true);
+  expect(await screen.findByRole("heading", { name: "Board" })).toBeTruthy();
+  expect(await screen.findByTitle("Board")).toBeTruthy();
+  expect(screen.queryByText("write 1 · SQL · 1 origin")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Copy app link" })).toBeNull();
+});
 
 test("the page runs in a sandboxed frame behind the injected policy", async () => {
   await show("board");

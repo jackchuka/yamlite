@@ -34,7 +34,7 @@ export async function startServe(
   if (config) write(join(root, "yamlite.yaml"), config);
   for (const [path, content] of Object.entries(files)) write(join(root, path), content);
   const uiDir = tmpRoot();
-  write(join(uiDir, "index.html"), "<!doctype html><title>yamlite</title>");
+  write(join(uiDir, "index.html"), "<!doctype html><html><head><title>yamlite</title></head><body></body></html>");
   write(join(uiDir, "assets/app.js"), "console.log(1)");
   const s = await serve({ port: 0, uiDir, watch: fast, ...opts, root });
   const base = `http://127.0.0.1:${s.port}`;

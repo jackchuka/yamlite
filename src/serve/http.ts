@@ -1,6 +1,6 @@
-import { createReadStream, statSync } from "node:fs";
+import { createReadStream, readFileSync, statSync } from "node:fs";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { extname, resolve, sep } from "node:path";
+import { extname, join, resolve, sep } from "node:path";
 import { pipeline, Readable } from "node:stream";
 import { BusyError, isConstraintError } from "../store.ts";
 import { type AccessPolicy, checkAccess, loginCookie } from "./security.ts";
@@ -220,6 +220,25 @@ export function serveStatic(uiDir: string, pathname: string, res: ServerResponse
   pipeline(createReadStream(file), res, () => {});
 }
 
+// an app's address sits three folders below the UI (-/apps/<name>/); the base sends its relative assets and data back to the UI root
+export const withBase = (html: string, href: string): string =>
+  html.replace("<head>", `<head>\n    <base href="${href}" />`);
+
+const APP_ENTRY = /^\/-\/apps\/[^/]+\/?$/;
+
+function serveAppEntry(uiDir: string, res: ServerResponse): void {
+  let html: string;
+  try {
+    html = readFileSync(join(uiDir, "index.html"), "utf8");
+  } catch {
+    res.writeHead(503, { "content-type": "text/plain; charset=utf-8" });
+    res.end("the UI is not built; run pnpm build\n");
+    return;
+  }
+  res.writeHead(200, { "content-type": TYPES[".html"], "cache-control": "no-cache" });
+  res.end(withBase(html, "/"));
+}
+
 export function createHandler(router: Router, policy: () => AccessPolicy, uiDir: string) {
   const handle = handleRequest(router, policy, uiDir);
   // no request may reject this promise: an unhandled rejection would end the process
@@ -250,8 +269,9 @@ function handleRequest(router: Router, policy: () => AccessPolicy, uiDir: string
     }
     const method = req.method ?? "GET";
     if (!url.pathname.startsWith("/api/")) {
-      if (method === "GET" || method === "HEAD") serveStatic(uiDir, url.pathname, res);
-      else sendJson(res, 405, { error: "method not allowed" });
+      if (method !== "GET" && method !== "HEAD") sendJson(res, 405, { error: "method not allowed" });
+      else if (APP_ENTRY.test(url.pathname)) serveAppEntry(uiDir, res);
+      else serveStatic(uiDir, url.pathname, res);
       return;
     }
     const ac = new AbortController();
