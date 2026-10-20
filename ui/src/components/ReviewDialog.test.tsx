@@ -31,6 +31,7 @@ const git: GitState = {
   branch: "main",
   defaultBranch: "main",
   upstream: "origin/main",
+  namesBranch: true,
   changes: [
     {
       path: "people.yaml",
@@ -145,13 +146,13 @@ test("sends the title, the description and only the checked files, then links th
   fireEvent.change(screen.getByRole("textbox", { name: "Description (optional)" }), { target: { value: "why" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Include yamlite.yaml" }));
   fireEvent.click(send);
-  await waitFor(() => expect(screen.getByRole("link", { name: "Open the pull request" })).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole("link", { name: "Open the review" })).toBeTruthy());
   expect(gitApi.review).toHaveBeenCalledWith({
     title: "Update tasks",
     body: "why",
     paths: ["people.yaml", "tasks/a.yaml", "tasks/b.yaml"],
   });
-  expect(screen.getByText("Pushed to yamlite/review-20261008-070509.")).toBeTruthy();
+  expect(screen.getByText("Sent for review.")).toBeTruthy();
 });
 
 test("a failed step shows git's message", async () => {
@@ -193,5 +194,11 @@ test("a branch name is sent from the default branch, and the field is hidden els
   );
   unmount();
   renderDialog({ ...git, branch: "work" });
+  expect(screen.queryByRole("textbox", { name: /^Branch name/ })).toBeNull();
+});
+
+test("a host that names the branch itself is not asked for one", () => {
+  renderDialog({ ...git, namesBranch: false });
+  expect(screen.getByRole("textbox", { name: "Title" })).toBeTruthy();
   expect(screen.queryByRole("textbox", { name: /^Branch name/ })).toBeNull();
 });

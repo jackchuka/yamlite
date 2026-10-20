@@ -32,6 +32,7 @@ test("shows the branch and the number of changes, and opens the dialog", () => {
     branch: "main",
     defaultBranch: "main",
     upstream: "origin/main",
+    namesBranch: true,
     changes: [change, { ...change, path: "tasks/b.yaml" }],
   };
   render(<GitFooter />);
@@ -42,12 +43,12 @@ test("shows the branch and the number of changes, and opens the dialog", () => {
 });
 
 test("the button is disabled without changes and on a detached HEAD", () => {
-  gitState = { branch: "main", defaultBranch: "main", upstream: null, changes: [] };
+  gitState = { branch: "main", defaultBranch: "main", upstream: null, namesBranch: true, changes: [] };
   const { unmount } = render(<GitFooter />);
   expect(screen.getByText("no changes")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Send for review" }) as HTMLButtonElement).disabled).toBe(true);
   unmount();
-  gitState = { branch: null, defaultBranch: "main", upstream: null, changes: [change] };
+  gitState = { branch: null, defaultBranch: "main", upstream: null, namesBranch: true, changes: [change] };
   render(<GitFooter />);
   expect(screen.getByText("no branch")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Send for review" }) as HTMLButtonElement).disabled).toBe(true);

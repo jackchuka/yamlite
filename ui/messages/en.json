@@ -495,14 +495,20 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "Git · {count} step", "n=other": "Git · {count} steps" }
+      "match": {
+        "n=one": "Git · {count} step",
+        "n=other": "Git · {count} steps"
+      }
     }
   ],
   "git_run": [
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "Run {count} step", "n=other": "Run {count} steps" }
+      "match": {
+        "n=one": "Run {count} step",
+        "n=other": "Run {count} steps"
+      }
     }
   ],
   "git_create_branch": "Create branch {name} and switch to it",
@@ -582,22 +588,28 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "{count} change", "n=other": "{count} changes" }
+      "match": {
+        "n=one": "{count} change",
+        "n=other": "{count} changes"
+      }
     }
   ],
   "git_no_changes": "no changes",
   "git_send_review": "Send for review",
   "review_title": "Send for review",
-  "review_new_branch": "The selected files are committed to a new branch, pushed, and opened as a draft pull request. You stay on the new branch; {branch} is not changed.",
-  "review_same_branch": "The selected files are committed to {branch} and pushed. Its pull request is updated, or opened as a draft if it has none.",
-  "review_sent": "Pushed to {branch}.",
-  "review_open_pr": "Open the pull request",
-  "review_create_pr": "Create the pull request on GitHub",
+  "review_new": "The selected changes go out as a new review. You keep working on them while it is reviewed.",
+  "review_add": "The selected changes are added to the review you are working on, or open one if there is none yet.",
+  "review_sent": "Sent for review.",
+  "review_open_pr": "Open the review",
+  "review_create_pr": "Create the review",
   "review_files": [
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "{count} file selected", "n=other": "{count} files selected" }
+      "match": {
+        "n=one": "{count} file selected",
+        "n=other": "{count} files selected"
+      }
     }
   ],
   "review_other_files": "Other files",
@@ -622,7 +634,10 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "Put {count} record back as committed", "n=other": "Put {count} records back as committed" }
+      "match": {
+        "n=one": "Put {count} record back as committed",
+        "n=other": "Put {count} records back as committed"
+      }
     }
   ],
   "review_undo": "Undo",
@@ -630,7 +645,10 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=one": "Put back {count} record", "n=other": "Put back {count} records" }
+      "match": {
+        "n=one": "Put back {count} record",
+        "n=other": "Put back {count} records"
+      }
     }
   ]
 }
