@@ -8,6 +8,7 @@ import { useEvents } from "@/lib/providers";
 import { SIDEBAR_BOUNDS, usePanelWidth } from "@/lib/panelWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
 import { AgentPanel } from "./AgentPanel";
+import { AppFooter } from "./AppFooter";
 import { CommandMenu } from "./CommandMenu";
 import { SessionBanner } from "./SessionBanner";
 import { ConflictToasts } from "./ConflictToasts";
@@ -42,7 +43,7 @@ function ConfigError() {
 function AppShell() {
   const mobile = useIsMobile();
   return (
-    <div className="grid h-[var(--y-shell-h,100dvh)] grid-cols-1 grid-rows-[auto_1fr]">
+    <div className="grid h-[var(--y-shell-h,100dvh)] grid-cols-1 grid-rows-[auto_1fr_auto]">
       <div>
         <SessionBanner />
         <ConfigError />
@@ -50,6 +51,7 @@ function AppShell() {
       <main className="flex min-h-0 min-w-0">
         <Outlet />
       </main>
+      <AppFooter />
       <Toaster position={mobile ? "top-center" : "bottom-right"} />
       <ConflictToasts />
     </div>

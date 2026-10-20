@@ -23,6 +23,7 @@ vi.mock("./components/NewTableDialog", () => ({ NewTableDialog: () => null }));
 vi.mock("./components/MobileNav", () => ({ MobileNav: () => null }));
 vi.mock("./components/Sidebar", () => ({ Sidebar: () => <nav aria-label="sidebar" /> }));
 vi.mock("./components/StatusBar", () => ({ StatusBar: () => <footer aria-label="status" /> }));
+vi.mock("./components/AppFooter", () => ({ AppFooter: () => null }));
 vi.mock("./components/AgentPanel", () => ({ AgentPanel: () => null }));
 
 const transport = { fetch: vi.fn(), eventSource: vi.fn() } as never;

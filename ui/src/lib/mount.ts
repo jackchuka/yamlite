@@ -1,4 +1,4 @@
-import { setAppLinkBuilder } from "./appMode";
+import { setAppFooter, setAppLinkBuilder } from "./appMode";
 import { setEmbedded } from "./embedded";
 import { setReadOnly } from "./mode";
 import { setPageFrame } from "./pageFrame";
@@ -16,6 +16,8 @@ export interface MountOptions {
   appLink?: (page: string) => string;
   // opens this page as an app: the editor stays out of reach, whatever the address says
   app?: string;
+  // the host's own part of an app's bar, placed at its left; the edits and Send for review are on its right
+  appFooter?: HTMLElement;
 }
 
 export function applyMountOptions(el: HTMLElement, o: MountOptions): void {
@@ -23,6 +25,7 @@ export function applyMountOptions(el: HTMLElement, o: MountOptions): void {
   setEmbedded(o.embedded ?? false);
   setPageFrame(o.pageFrame);
   setAppLinkBuilder(o.appLink ?? null);
+  setAppFooter(o.appFooter);
   if (o.fit === "container") el.style.setProperty("--y-shell-h", "100%");
   else el.style.removeProperty("--y-shell-h");
   // yamlite's own page sets the theme in index.html before it loads; an embedding page has no such script
