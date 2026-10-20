@@ -41,7 +41,13 @@ export const gitRoutes: Routes = (router, ctx) => {
     );
     changes.sort((a, b) => a.path.localeCompare(b.path));
     return {
-      git: { branch: status.branch, defaultBranch: await git.defaultBranch(), upstream: status.upstream, changes },
+      git: {
+        branch: status.branch,
+        defaultBranch: await git.defaultBranch(),
+        upstream: status.upstream,
+        namesBranch: git.namesBranch === true,
+        changes,
+      },
     };
   });
 
@@ -77,6 +83,8 @@ export const gitRoutes: Routes = (router, ctx) => {
     if (!git || !(await git.hasRemote()))
       throw new HttpError(404, "the data folder is not in a git repository with an origin");
     const req = reviewBody(body);
+    if (req.branch !== undefined && !git.namesBranch)
+      throw new HttpError(400, "this host names the branch for a review itself", { field: "branch" });
     const target = objectBody(body, "body").target;
     if (target !== undefined && target !== null && typeof target !== "string")
       throw new HttpError(400, "target must be a branch name or null", { field: "target" });

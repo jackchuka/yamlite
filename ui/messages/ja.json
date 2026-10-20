@@ -362,6 +362,9 @@
   "page_access": "アクセス",
   "page_blocked": "ブロック: {list}",
   "page_navigated": "ページが別の URL に移動したため、接続を切りました。",
+  "page_copy_app_link": "アプリのリンクをコピー",
+  "page_app_link_copied": "このページだけを開くリンクをコピーしました",
+  "page_app_link_copy_failed": "コピーできませんでした。次のリンクを手動でコピーしてください: {link}",
   "page_reload": "再読み込み",
   "agent_tool_schema": "テーブル構成を確認",
   "agent_tool_query": "検索",
@@ -456,14 +459,18 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "Git · {count} 件の手順" }
+      "match": {
+        "n=other": "Git · {count} 件の手順"
+      }
     }
   ],
   "git_run": [
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "{count} 件の手順を実行" }
+      "match": {
+        "n=other": "{count} 件の手順を実行"
+      }
     }
   ],
   "git_create_branch": "ブランチ {name} を作成して切り替える",
@@ -543,22 +550,26 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "{count} 件の変更" }
+      "match": {
+        "n=other": "{count} 件の変更"
+      }
     }
   ],
   "git_no_changes": "変更なし",
   "git_send_review": "レビューに出す",
   "review_title": "レビューに出す",
-  "review_new_branch": "選んだファイルを新しいブランチに commit して push し、draft のプルリクエストを作成します。作業はそのまま新しいブランチで続きます。{branch} は変更されません。",
-  "review_same_branch": "選んだファイルを {branch} に commit して push します。プルリクエストがあれば更新され、なければ draft で作成されます。",
-  "review_sent": "{branch} に push しました。",
-  "review_open_pr": "プルリクエストを開く",
-  "review_create_pr": "GitHub でプルリクエストを作成する",
+  "review_new": "選んだ変更を新しいレビューとして送ります。レビューの間も、送った変更の上で作業を続けられます。",
+  "review_add": "選んだ変更を作業中のレビューに追加します。レビューがまだなければ新しく作成します。",
+  "review_sent": "レビューに送りました。",
+  "review_open_pr": "レビューを開く",
+  "review_create_pr": "レビューを作成する",
   "review_files": [
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "{count} 件のファイルを選択中" }
+      "match": {
+        "n=other": "{count} 件のファイルを選択中"
+      }
     }
   ],
   "review_other_files": "その他のファイル",
@@ -583,7 +594,9 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "{count} 件のレコードをコミット時点に戻しました" }
+      "match": {
+        "n=other": "{count} 件のレコードをコミット時点に戻しました"
+      }
     }
   ],
   "review_undo": "取り消す",
@@ -591,7 +604,9 @@
     {
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
-      "match": { "n=other": "{count} 件をコミット時点に戻す" }
+      "match": {
+        "n=other": "{count} 件をコミット時点に戻す"
+      }
     }
   ]
 }

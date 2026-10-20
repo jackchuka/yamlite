@@ -302,15 +302,11 @@ export function ReviewDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-[18px]">{m.review_title()}</DialogTitle>
-          <DialogDescription className="text-[14px]">
-            {onDefault
-              ? m.review_new_branch({ branch: git.branch ?? "" })
-              : m.review_same_branch({ branch: git.branch ?? "" })}
-          </DialogDescription>
+          <DialogDescription className="text-[14px]">{onDefault ? m.review_new() : m.review_add()}</DialogDescription>
         </DialogHeader>
         {result ? (
           <div className="flex flex-col gap-3 text-[15px]">
-            {!result.error && <p>{m.review_sent({ branch: result.branch })}</p>}
+            {!result.error && <p>{m.review_sent()}</p>}
             {result.url && (
               <a
                 href={result.url}
@@ -348,7 +344,7 @@ export function ReviewDialog({
                 </div>
               ))}
             </fieldset>
-            {onDefault && (
+            {onDefault && git.namesBranch && (
               <Input
                 aria-label={m.review_branch()}
                 placeholder={m.review_branch()}

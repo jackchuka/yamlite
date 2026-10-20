@@ -16,6 +16,7 @@ import { useTheme } from "@/lib/theme";
 import type { AllowedValue, Bound, ColumnFormat, ColumnType, MetaReference } from "@/lib/types";
 import { ChipsInput } from "./ChipsInput";
 import { RefLink } from "./RefLink";
+import { useAppMode } from "@/lib/appMode";
 import { m } from "@/paraglide/messages.js";
 
 export interface FieldProps {
@@ -126,6 +127,8 @@ function ValuesField({ path, value, allowed, onChange, readOnly }: FieldProps & 
 }
 
 function RefField({ path, value, type, reference, onChange }: FieldProps) {
+  // an app shows no way into the editor's tables
+  const app = useAppMode();
   const target = reference?.table ?? "";
   const column = reference?.key;
   const { data } = useQuery({
@@ -150,7 +153,7 @@ function RefField({ path, value, type, reference, onChange }: FieldProps) {
             onChange(type === "INTEGER" && INTEGER.test(t) && Number.isSafeInteger(n) ? n : t);
           }}
         />
-        {reference && text !== "" && (
+        {reference && text !== "" && !app && (
           <RefLink
             reference={reference}
             value={text}

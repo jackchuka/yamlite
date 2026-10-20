@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { createHashHistory, createRoute, createRouter, lazyRouteComponent, Navigate } from "@tanstack/react-router";
+import {
+  createHashHistory,
+  createMemoryHistory,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+  Navigate,
+} from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { GroupButton } from "./components/GroupButton";
 import { NewRecordDialog } from "./components/NewRecordDialog";
@@ -16,7 +23,7 @@ import { isReadOnly } from "./lib/mode";
 import { useEvents, useMeta } from "./lib/providers";
 import { useIsMobile } from "./lib/useIsMobile";
 import type { TableMeta } from "./lib/types";
-import { erdRoute, pageRoute, rootRoute, searchRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
+import { appRoute, erdRoute, pageRoute, rootRoute, searchRoute, sqlRoute, syncRoute, tableRoute } from "./routes";
 import { m } from "@/paraglide/messages.js";
 
 function Home() {
@@ -114,23 +121,47 @@ function PagePage() {
   return <LazyPageView key={page} name={page} />;
 }
 
+function AppPage() {
+  const { page } = appRoute.useParams();
+  return <LazyPageView key={page} name={page} app />;
+}
+
 rootRoute.update({ component: Shell });
 tableRoute.update({ component: TablePage });
 sqlRoute.update({ component: SqlConsole });
 searchRoute.update({ component: SearchView });
 pageRoute.update({ component: PagePage });
+appRoute.update({ component: AppPage });
 syncRoute.update({ component: () => (isReadOnly() ? <Navigate to="/" /> : <SyncView />) });
 // React Flow and dagre load only when the ERD opens
 erdRoute.update({ component: lazyRouteComponent(() => import("./components/ErdView"), "ErdView") });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Home });
 
-export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, tableRoute, sqlRoute, syncRoute, erdRoute, pageRoute, searchRoute]),
-  history: createHashHistory(),
-});
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  tableRoute,
+  sqlRoute,
+  syncRoute,
+  erdRoute,
+  pageRoute,
+  appRoute,
+  searchRoute,
+]);
+
+// an app keeps its route in memory, so nothing typed into the address bar can lead from it into the editor
+export function createAppRouter(app?: string) {
+  return createRouter({
+    routeTree,
+    history:
+      app === undefined
+        ? createHashHistory()
+        : createMemoryHistory({ initialEntries: [`/app/${encodeURIComponent(app)}`] }),
+    context: { app },
+  });
+}
 
 declare module "@tanstack/react-router" {
   interface Register {
-    router: typeof router;
+    router: ReturnType<typeof createAppRouter>;
   }
 }

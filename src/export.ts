@@ -22,7 +22,7 @@ import { Store } from "./store.ts";
 import { type ApiContext, displayPath } from "./serve/context.ts";
 import { EventHub } from "./serve/events.ts";
 import { PageSql } from "./serve/pagesql.ts";
-import { Router } from "./serve/http.ts";
+import { Router, withBase } from "./serve/http.ts";
 import { ROUTES } from "./serve/routes/index.ts";
 import { readPageHtml } from "./serve/routes/pages.ts";
 import { recordFile } from "./serve/routes/rows.ts";
@@ -353,13 +353,18 @@ export async function exportSite(opts: ExportOptions): Promise<ExportResult> {
     cpSync(uiDir, staging, { recursive: true });
     const html = readFileSync(indexPath, "utf8");
     if (!html.includes("<head>")) throw new Error(`${indexPath} has no <head>`);
-    writeFileSync(join(staging, "index.html"), html.replace("<head>", `<head>\n    ${STATIC_META}\n    ${FILE_GUARD}`));
+    const index = html.replace("<head>", `<head>\n    ${STATIC_META}\n    ${FILE_GUARD}`);
+    writeFileSync(join(staging, "index.html"), index);
     const { tables, warnings, pages, skippedPages } = await writeSnapshotData({
       root: opts.root,
       tables: opts.tables,
       dir: staging,
       now: opts.now,
     });
+    for (const name of pages) {
+      mkdirSync(join(staging, "-", "apps", name), { recursive: true });
+      writeFileSync(join(staging, "-", "apps", name, "index.html"), withBase(index, "../../../"));
+    }
     if (existsSync(out)) {
       const old = `${staging}-old`;
       renameSync(out, old);

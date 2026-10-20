@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { LoadFailure } from "./components/LoadFailure";
 import { renderApp } from "./app";
 import { setBackend } from "./lib/api";
+import { appEntry } from "./lib/appMode";
 import { enterStatic, isStaticPage } from "./lib/mode";
 import { getLocale } from "./paraglide/runtime.js";
 import "./styles.css";
@@ -21,7 +22,7 @@ async function boot() {
       return;
     }
   }
-  renderApp(el);
+  renderApp(el, { app: appEntry(location.href, document.baseURI) });
 }
 
 void boot();

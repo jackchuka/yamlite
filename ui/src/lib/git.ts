@@ -38,6 +38,8 @@ export interface GitState {
   branch: string | null;
   defaultBranch: string | null;
   upstream: string | null;
+  // the host takes a branch name for a new review
+  namesBranch: boolean;
   changes: GitChange[];
 }
 

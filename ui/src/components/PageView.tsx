@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { type SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { appLink } from "@/lib/appMode";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { PageHost } from "@/lib/pages/host";
@@ -12,9 +14,11 @@ import type { Meta, PageMeta } from "@/lib/types";
 import { accessBrief, accessSummary } from "../../../src/pages/access.ts";
 import { RecordDrawer } from "./RecordDrawer";
 import { HintPopover } from "./HintPopover";
+import { SendForReview } from "./SendForReview";
 import { m } from "@/paraglide/messages.js";
 
-export function PageView({ name }: { name: string }) {
+// app: the page is the whole screen, opened from a shared link, so its header names it and offers only sending edits
+export function PageView({ name, app = false }: { name: string; app?: boolean }) {
   const theme = useTheme();
   // a new document bakes in the theme of that moment; later switches and hello arrive as messages
   const themeRef = useRef(theme);
@@ -23,6 +27,7 @@ export function PageView({ name }: { name: string }) {
   const { data: meta } = useMeta();
   const store = useEventStore();
   const page = meta?.pages.find((p) => p.name === name);
+  const link = appLink(name);
   const html = useQuery({ queryKey: ["page", name], queryFn: () => api.pageHtml(name), enabled: page !== undefined });
   const frame = useRef<HTMLIFrameElement>(null);
   const counted = useRef<{ el: EventTarget | null; n: number }>({ el: null, n: 0 });
@@ -108,16 +113,38 @@ export function PageView({ name }: { name: string }) {
   };
   return (
     <div className="relative flex min-w-0 flex-1 flex-col">
-      <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-[18px] py-2.5 max-md:px-3">
-        <h1 className="shrink-0 whitespace-nowrap text-[15px] font-semibold max-md:sr-only">{page.title}</h1>
-        <HintPopover
-          label={m.page_access()}
-          hint={`${page.path}\n${accessSummary(page)}`}
-          className="min-w-0 truncate text-left font-mono text-[11px] text-muted-foreground max-md:text-[12px]"
-        >
-          {accessBrief(page)}
-        </HintPopover>
-      </header>
+      {app ? (
+        <header className="flex min-w-0 items-center gap-3 border-b px-[18px] py-2.5 max-md:px-3">
+          <h1 className="min-w-0 truncate text-[16px] font-semibold">{page.title}</h1>
+          <span className="flex-1" />
+          <SendForReview />
+        </header>
+      ) : (
+        <header className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-[18px] py-2.5 max-md:px-3">
+          <h1 className="shrink-0 whitespace-nowrap text-[15px] font-semibold max-md:sr-only">{page.title}</h1>
+          <HintPopover
+            label={m.page_access()}
+            hint={`${page.path}\n${accessSummary(page)}`}
+            className="min-w-0 truncate text-left font-mono text-[11px] text-muted-foreground max-md:text-[12px]"
+          >
+            {accessBrief(page)}
+          </HintPopover>
+          {link !== null && (
+            <button
+              type="button"
+              className="ml-auto shrink-0 text-[12px] text-muted-foreground hover:text-foreground max-md:text-[13px]"
+              onClick={() => {
+                // plain http on a LAN address has no clipboard; the link stays up long enough to be copied by hand
+                const failed = () => toast.error(m.page_app_link_copy_failed({ link }), { duration: 30_000 });
+                if (!navigator.clipboard) return failed();
+                void navigator.clipboard.writeText(link).then(() => toast.success(m.page_app_link_copied()), failed);
+              }}
+            >
+              {m.page_copy_app_link()}
+            </button>
+          )}
+        </header>
+      )}
       {blocked.length > 0 && (
         <div role="alert" className="border-b bg-warn-soft px-[18px] py-1.5 text-[12px] text-warn">
           {m.page_blocked({ list: blocked.join(", ") })}

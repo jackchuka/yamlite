@@ -431,6 +431,31 @@ test("pages are written next to the data, and pages that cannot be exported are 
   });
 });
 
+test("each exported page gets an app entry under -/apps/, with a base back to the UI root", async () => {
+  const root = setup({
+    "yamlite.yaml":
+      files["yamlite.yaml"] +
+      "pages:\n  board:\n    path: .pages/board.html\n    access: { projects: read }\n" +
+      "  people-page:\n    path: .pages/people.html\n    access: { people: read }\n",
+    ".pages/board.html": "<p>board</p>",
+    ".pages/people.html": "<p>people</p>",
+  });
+  const out = join(tmpRoot(), "site");
+  await exportSite({ root, out, uiDir: ui(), tables: ["projects"] });
+  const index = readFileSync(join(out, "index.html"), "utf8");
+  const app = readFileSync(join(out, "-/apps/board/index.html"), "utf8");
+  expect(index).not.toContain("<base");
+  expect(app).toBe(index.replace("<head>", '<head>\n    <base href="../../../" />'));
+  expect(existsSync(join(out, "-/apps/people-page"))).toBe(false);
+  expect(readdirSync(join(out, "-/apps"))).toEqual(["board"]);
+});
+
+test("an export without pages has no -/apps folder", async () => {
+  const out = join(tmpRoot(), "site");
+  await exportSite({ root: setup(), out, uiDir: ui() });
+  expect(existsSync(join(out, "-"))).toBe(false);
+});
+
 test("a files table outside the root keeps only its folder name in the files pattern", async () => {
   const outside = tmpRoot();
   write(join(outside, "n.yaml"), "body: hi\n");

@@ -4,6 +4,11 @@ import { agentPanel } from "@/lib/agent";
 import { Shell } from "./Shell";
 
 let ai: import("@/lib/ai").AiProvider[] | null = null;
+let appRoute = false;
+vi.mock("@/lib/appMode", async (orig) => ({
+  ...(await orig<typeof import("@/lib/appMode")>()),
+  useAppRoute: () => appRoute,
+}));
 vi.mock("@/lib/ai", async (orig) => ({ ...(await orig<typeof import("@/lib/ai")>()), useAiProviders: () => ai }));
 vi.mock("@tanstack/react-router", () => ({ Outlet: () => <div>outlet</div> }));
 vi.mock("@/lib/providers", () => ({ useEvents: () => ({ configError: null }) }));
@@ -14,12 +19,13 @@ vi.mock("./SessionBanner", () => ({ SessionBanner: () => null }));
 vi.mock("./ConflictToasts", () => ({ ConflictToasts: () => null }));
 vi.mock("./NewTableDialog", () => ({ NewTableDialog: () => null }));
 vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
-vi.mock("./Sidebar", () => ({ Sidebar: () => null }));
-vi.mock("./StatusBar", () => ({ StatusBar: () => null }));
+vi.mock("./Sidebar", () => ({ Sidebar: () => <nav aria-label="sidebar" /> }));
+vi.mock("./StatusBar", () => ({ StatusBar: () => <footer aria-label="status" /> }));
 vi.mock("./AgentPanel", () => ({ AgentPanel: () => <aside aria-label="Ask AI" /> }));
 
 afterEach(() => {
   ai = null;
+  appRoute = false;
   act(() => agentPanel.close());
 });
 
@@ -53,4 +59,16 @@ test("dragging the sidebar's right edge widens it and the width is remembered", 
   fireEvent.doubleClick(handle);
   expect(grid.style.gridTemplateColumns).toBe("220px 1fr");
   expect(localStorage.getItem("yamlite-sidebar-width")).toBeNull();
+});
+
+test("an app shows only its page: no sidebar, status bar or Ask AI", () => {
+  appRoute = true;
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  act(() => agentPanel.open());
+  render(<Shell />);
+  expect(screen.getByText("outlet")).toBeTruthy();
+  expect(screen.queryByRole("navigation", { name: "sidebar" })).toBeNull();
+  expect(screen.queryByRole("contentinfo", { name: "status" })).toBeNull();
+  expect(screen.queryByRole("complementary", { name: "Ask AI" })).toBeNull();
+  expect(screen.queryByRole("separator", { name: "Resize sidebar" })).toBeNull();
 });

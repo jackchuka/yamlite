@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 import { beforeAll, expect, test, vi } from "vitest";
 import { setMobile } from "@/test/media";
 import { api } from "@/lib/api";
+import { AppModeContext } from "@/lib/appMode";
 import { FormField } from "./FormField";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -151,6 +152,17 @@ test("a reference field links to the record it names once it has a value", () =>
     table: "people",
     search: JSON.stringify({ key: "ann" }),
   });
+});
+
+test("inside an app a reference shows its value with no link into the editor", () => {
+  render(
+    wrap(
+      <AppModeContext.Provider value>
+        <FormField path={["owner"]} value="ann" reference={{ column: "owner", table: "people" }} onChange={() => {}} />
+      </AppModeContext.Provider>,
+    ),
+  );
+  expect(screen.queryByRole("link")).toBeNull();
 });
 
 test("a reference field suggests the target column's values", async () => {

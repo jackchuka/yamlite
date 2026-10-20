@@ -76,6 +76,33 @@ test("static files are served only from the UI directory", async () => {
   expect((await raw(t.s.port, { path: "/nope.js", headers: { cookie: t.cookie } })).status).toBe(404);
 });
 
+test("an app address serves the UI's index with a base at the UI root, and the login keeps the path", async () => {
+  t = await startServe();
+  for (const path of ["/-/apps/board/", "/-/apps/board", "/-/apps/team%20board/"]) {
+    const page = await raw(t.s.port, { path, headers: { cookie: t.cookie } });
+    expect(page.status, path).toBe(200);
+    expect(page.headers["content-type"]).toContain("text/html");
+    expect(page.body).toContain('<head>\n    <base href="/" />');
+    expect(page.body).toContain("<title>yamlite</title>");
+  }
+  const login = await raw(t.s.port, { path: `/-/apps/board/?token=${t.s.token}` });
+  expect(login.status).toBe(302);
+  expect(login.headers.location).toBe("/-/apps/board/");
+  expect((await raw(t.s.port, { path: "/-/apps/board/" })).status).toBe(401);
+  expect(
+    (await raw(t.s.port, { path: "/-/apps/board/", headers: { cookie: t.cookie, host: "evil.example" } })).status,
+  ).toBe(403);
+  expect((await raw(t.s.port, { path: "/-/apps/a/b/", headers: { cookie: t.cookie } })).status).toBe(404);
+  const index = await raw(t.s.port, { path: "/", headers: { cookie: t.cookie } });
+  expect(index.body).not.toContain("<base");
+});
+
+test("apps/<name>/ without the -/ is not an app entry", async () => {
+  t = await startServe();
+  expect((await raw(t.s.port, { path: "/apps/board/", headers: { cookie: t.cookie } })).status).toBe(404);
+  expect((await raw(t.s.port, { path: "/apps/board", headers: { cookie: t.cookie } })).status).toBe(404);
+});
+
 test("unknown API routes are 404", async () => {
   t = await startServe();
   expect((await t.api("/api/nope")).status).toBe(404);

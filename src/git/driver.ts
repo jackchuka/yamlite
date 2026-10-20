@@ -27,6 +27,8 @@ export interface GitDriver {
     req: ReviewRequest & { target: string | null },
     o: { afterTreeChange: () => Promise<void> },
   ): Promise<ReviewOutcome>;
+  // true: a review from the default branch goes to the branch name the user gives; otherwise the host names it
+  readonly namesBranch?: boolean;
   // present only where arbitrary git steps can run (a local checkout);
   // absent: no git tools for the agent, and applying a git proposal answers 404
   readonly steps?: StepRunner;
@@ -97,6 +99,7 @@ export async function localDriver(root: string, gh: () => Promise<string | null>
   };
   await lookup();
   return {
+    namesBranch: true,
     get steps() {
       return found?.steps;
     },
