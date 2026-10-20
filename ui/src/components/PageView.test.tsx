@@ -92,10 +92,10 @@ test("a host that gave no app link has no Copy app link", async () => {
   }
 });
 
-test("an app's header names the page and leaves out its access and the link", async () => {
+test("an app is the page alone, with no header of yamlite's", async () => {
   await show("board", true);
-  expect(await screen.findByRole("heading", { name: "Board" })).toBeTruthy();
   expect(await screen.findByTitle("Board")).toBeTruthy();
+  expect(screen.queryByRole("heading", { name: "Board" })).toBeNull();
   expect(screen.queryByText("write 1 · SQL · 1 origin")).toBeNull();
   expect(screen.queryByRole("button", { name: "Copy app link" })).toBeNull();
 });

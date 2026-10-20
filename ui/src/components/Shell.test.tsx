@@ -21,6 +21,7 @@ vi.mock("./NewTableDialog", () => ({ NewTableDialog: () => null }));
 vi.mock("./MobileNav", () => ({ MobileNav: () => null }));
 vi.mock("./Sidebar", () => ({ Sidebar: () => <nav aria-label="sidebar" /> }));
 vi.mock("./StatusBar", () => ({ StatusBar: () => <footer aria-label="status" /> }));
+vi.mock("./AppFooter", () => ({ AppFooter: () => null }));
 vi.mock("./AgentPanel", () => ({ AgentPanel: () => <aside aria-label="Ask AI" /> }));
 
 afterEach(() => {

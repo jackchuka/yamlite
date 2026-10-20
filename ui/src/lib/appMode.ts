@@ -16,6 +16,13 @@ export const setAppLinkBuilder = (fn: ((page: string) => string) | null | undefi
   appLinkBuilder = fn;
 };
 
+// an element of the host's, shown at the left of the app's bar; the host renders into it whatever it adds there
+let appFooterHost: HTMLElement | undefined;
+export const setAppFooter = (el: HTMLElement | undefined): void => {
+  appFooterHost = el;
+};
+export const appFooter = (): HTMLElement | undefined => appFooterHost;
+
 export function appLink(page: string, base: string = document.baseURI): string | null {
   if (appLinkBuilder === null) return null;
   if (appLinkBuilder) return appLinkBuilder(page);

@@ -380,3 +380,8 @@
     cursor: pointer;
   }
 }
+
+/* an app's bar shows only while the host's part or the edits have something in it */
+.app-footer:not(:has(> .app-footer-host > * > *)):not(:has(> :not(.app-footer-host))) {
+  display: none;
+}
