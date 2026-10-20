@@ -1,6 +1,7 @@
 import { canRead, canWrite, notInAccess, writesAnything } from "../../../../src/pages/access.ts";
 import { type Api, ApiError } from "../api";
 import type { Filter, Meta, PageMeta, Row } from "../types";
+import { type PageLocation, pagePath } from "./location";
 
 export const READ_ONLY = "this page is read-only here";
 
@@ -12,6 +13,7 @@ export interface HostDeps {
   escape(): void;
   click(): void;
   theme(): "light" | "dark";
+  location: PageLocation;
 }
 
 interface PageRequest {
@@ -52,13 +54,16 @@ function toWireError(e: unknown) {
 // the page's only way to the data: every call is checked against the page's access before it reaches the api
 export class PageHost {
   private disposed = false;
+  private readonly unlisten: () => void;
 
   constructor(
     private readonly frame: () => Window | null,
     private readonly page: () => PageMeta,
     private readonly meta: () => Meta,
     private readonly deps: HostDeps,
-  ) {}
+  ) {
+    this.unlisten = deps.location.listen((path) => this.post({ yamlite: 1, event: "location", data: { path } }));
+  }
 
   readonly handle = (e: MessageEvent): void => {
     const frame = this.frame();
@@ -70,6 +75,16 @@ export class PageHost {
     }
     if (method === "escape" || method === "click") {
       this.deps[method]();
+      return;
+    }
+    // the page has already moved; these only keep the address with it
+    if (method === "navigate") {
+      const path = pagePath(args[0]);
+      if (path !== null) this.deps.location.navigate(path, args[1] === true);
+      return;
+    }
+    if (method === "go") {
+      if (Number.isInteger(args[0])) this.deps.location.go(args[0] as number);
       return;
     }
     void this.answer(method, args).then(
@@ -95,6 +110,7 @@ export class PageHost {
 
   dispose(): void {
     this.disposed = true;
+    this.unlisten();
   }
 
   private post(message: unknown): void {

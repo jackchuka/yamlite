@@ -2,6 +2,7 @@ import { expect, test, vi } from "vitest";
 import { ApiError } from "../api";
 import type { Meta, PageMeta } from "../types";
 import { type HostDeps, PageHost, READ_ONLY } from "./host";
+import { memoryLocation } from "./location";
 
 const meta = {
   tables: [{ name: "tasks" }, { name: "people" }],
@@ -34,6 +35,7 @@ function setup(page: PageMeta = board, readOnly = false) {
     escape: vi.fn(),
     click: vi.fn(),
     theme: () => "dark",
+    location: memoryLocation(),
   };
   const host = new PageHost(
     () => frame,
@@ -201,4 +203,28 @@ test("escape and click from the frame are passed on without an answer", () => {
   expect(deps.escape).toHaveBeenCalledTimes(1);
   expect(deps.click).toHaveBeenCalledTimes(1);
   expect(posted).toHaveLength(0);
+});
+
+test("the page's moves are kept without an answer, and a path that leaves the page is dropped", () => {
+  const { host, frame, posted, deps } = setup();
+  const send = (method: string, args: unknown[]) =>
+    host.handle({ source: frame, data: { yamlite: 1, method, args } } as MessageEvent);
+  send("navigate", ["/orders/42", false]);
+  send("navigate", ["https://example.com/", false]);
+  send("navigate", ["/orders/43", true]);
+  expect(deps.location.path).toBe("/orders/43");
+  send("go", ["-1"]);
+  expect(deps.location.path).toBe("/orders/43");
+  send("go", [-1]);
+  expect(deps.location.path).toBe("/");
+  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/" } }]);
+});
+
+test("a move from outside the page is told to it until the host is disposed", () => {
+  const { host, posted, deps } = setup();
+  deps.location.navigate("/a", false);
+  deps.location.go(-1);
+  host.dispose();
+  deps.location.go(1);
+  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/" } }]);
 });
