@@ -69,6 +69,10 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
       {
         api,
         readOnly: isReadOnly(),
+        ai: () => {
+          const p = current.current.meta?.ai?.providers.find((x) => x.hasKey);
+          return p ? { provider: p.id, models: p.models } : null;
+        },
         open: (table, key) => setOpened({ table, key }),
         theme: () => themeRef.current,
         location: place,

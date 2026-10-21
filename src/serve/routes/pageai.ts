@@ -110,7 +110,7 @@ export const pageAiRoutes: Routes = (router, ctx) => {
     const release = ctx.agent.pageSlot();
     const call = {
       model: languageModel,
-      ...(ask.system === undefined ? {} : { instructions: ask.system }),
+      ...(ask.system === undefined || ask.system.trim() === "" ? {} : { instructions: ask.system }),
       prompt: ask.prompt,
       maxOutputTokens: Math.min(
         ask.maxOutputTokens ?? page.ai.maxOutputTokens,

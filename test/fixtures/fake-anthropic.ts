@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 
-export type FakeReply = { say?: string; tools?: { name: string; args?: Record<string, unknown> }[] };
+// pace: milliseconds between the streamed words of say
+export type FakeReply = { say?: string; pace?: number; tools?: { name: string; args?: Record<string, unknown> }[] };
 
 const ev = (type: string, data: Record<string, unknown>) =>
   `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`;
 
-// the Messages API, streamed: the n-th request gets the n-th reply; requests without the browser-access header fail
+// the Messages API, streamed or not as the request asks: the n-th request gets the n-th reply; requests without the browser-access header fail
 export async function fakeAnthropic(replies: FakeReply[]): Promise<{ url: string; requests: unknown[] }> {
   const requests: unknown[] = [];
   let n = 0;
@@ -24,8 +25,32 @@ export async function fakeAnthropic(replies: FakeReply[]): Promise<{ url: string
         );
         return;
       }
-      requests.push(JSON.parse(body));
+      const asked = JSON.parse(body) as { stream?: boolean };
+      requests.push(asked);
       const r = replies[n++] ?? { say: "" };
+      if (asked.stream !== true) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({
+            id: `msg_${n}`,
+            type: "message",
+            role: "assistant",
+            model: "fake",
+            content: [
+              ...(r.say ? [{ type: "text", text: r.say }] : []),
+              ...(r.tools ?? []).map((t, i) => ({
+                type: "tool_use",
+                id: `toolu_${n}_${i}`,
+                name: t.name,
+                input: t.args ?? {},
+              })),
+            ],
+            stop_reason: r.tools?.length ? "tool_use" : "end_turn",
+            usage: { input_tokens: 1, output_tokens: 1 },
+          }),
+        );
+        return;
+      }
       const out = [
         ev("message_start", {
           message: {
@@ -43,7 +68,9 @@ export async function fakeAnthropic(replies: FakeReply[]): Promise<{ url: string
       if (r.say) {
         out.push(
           ev("content_block_start", { index: i, content_block: { type: "text", text: "" } }),
-          ev("content_block_delta", { index: i, delta: { type: "text_delta", text: r.say } }),
+          ...(r.say.match(/\S+\s*|\s+/g) ?? []).map((text) =>
+            ev("content_block_delta", { index: i, delta: { type: "text_delta", text } }),
+          ),
           ev("content_block_stop", { index: i }),
         );
         i++;
@@ -70,7 +97,16 @@ export async function fakeAnthropic(replies: FakeReply[]): Promise<{ url: string
         ev("message_stop", {}),
       );
       res.writeHead(200, { "content-type": "text/event-stream" });
-      res.end(out.join(""));
+      if (!r.pace) {
+        res.end(out.join(""));
+        return;
+      }
+      const send = (k: number) => {
+        if (k >= out.length) return res.end();
+        res.write(out[k]);
+        setTimeout(() => send(k + 1), r.pace);
+      };
+      send(0);
     });
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", () => done()));

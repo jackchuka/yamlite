@@ -275,3 +275,93 @@ test("a state that cannot be cloned is refused before the page moves", () => {
   expect(history.location.pathname).toBe("/a");
   expect(f.sent.filter((m) => m.method === "navigate")).toEqual([]);
 });
+
+test("ai.generate asks the parent and resolves with its answer", async () => {
+  const f = fake();
+  const p = f.yamlite.ai.generate({ prompt: "hi", schema: { type: "object" } });
+  expect(f.sent.at(-1)).toEqual({
+    yamlite: 1,
+    id: 2,
+    method: "ai",
+    args: [{ prompt: "hi", schema: { type: "object" } }],
+  });
+  f.reply({ yamlite: 1, id: 2, ok: true, value: { object: { n: 1 } } });
+  await expect(p).resolves.toEqual({ object: { n: 1 } });
+});
+
+test("ai.generate rejects with a YamliteError", async () => {
+  const f = fake();
+  const p = f.yamlite.ai.generate({ prompt: "hi" });
+  f.reply({ yamlite: 1, id: 2, ok: false, error: { status: 503, message: "no key", extra: { code: "no_key" } } });
+  const err = await p.catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(f.yamlite.YamliteError);
+  expect(err).toMatchObject({ status: 503, extra: { code: "no_key" } });
+});
+
+test("ai.stream yields the deltas for its own call until the answer", async () => {
+  const f = fake();
+  const stream = f.yamlite.ai.stream({ prompt: "hi" });
+  expect(f.sent.at(-1)).toEqual({ yamlite: 1, id: 2, method: "ai-stream", args: [{ prompt: "hi" }] });
+  const seen: string[] = [];
+  const done = (async () => {
+    for await (const t of stream) seen.push(t);
+  })();
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "Hel" } });
+  f.reply({ yamlite: 1, event: "ai-delta", id: 9, data: { text: "other" } });
+  f.fromOther({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "forged" } });
+  await Promise.resolve();
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "lo" } });
+  f.reply({ yamlite: 1, id: 2, ok: true, value: null });
+  await done;
+  expect(seen).toEqual(["Hel", "lo"]);
+});
+
+test("a delta does not settle the stream's call", async () => {
+  const f = fake();
+  const it = f.yamlite.ai.stream({ prompt: "hi" })[Symbol.asyncIterator]();
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "a" } });
+  await expect(it.next()).resolves.toEqual({ value: "a", done: false });
+  let settled = false;
+  const next = it.next().then((r: unknown) => {
+    settled = true;
+    return r;
+  });
+  await new Promise((r) => setTimeout(r, 10));
+  expect(settled).toBe(false);
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "b" } });
+  await expect(next).resolves.toEqual({ value: "b", done: false });
+  f.reply({ yamlite: 1, id: 2, ok: true, value: null });
+  await expect(it.next()).resolves.toEqual({ value: undefined, done: true });
+});
+
+test("ai.stream rejects with a YamliteError once its deltas are read", async () => {
+  const f = fake();
+  const seen: string[] = [];
+  const stream = f.yamlite.ai.stream({ prompt: "hi" });
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "a" } });
+  f.reply({ yamlite: 1, id: 2, ok: false, error: { status: 429, message: "slow", extra: { retryAfter: 2 } } });
+  const err = await (async () => {
+    for await (const t of stream) seen.push(t);
+  })().catch((e: unknown) => e);
+  expect(seen).toEqual(["a"]);
+  expect(err).toBeInstanceOf(f.yamlite.YamliteError);
+  expect(err).toMatchObject({ status: 429, extra: { retryAfter: 2 } });
+});
+
+test("leaving a stream early cancels it with the call's id, and later messages for it are dropped", async () => {
+  const f = fake();
+  const stream = f.yamlite.ai.stream({ prompt: "hi" });
+  const seen: string[] = [];
+  const done = (async () => {
+    for await (const t of stream) {
+      seen.push(t);
+      break;
+    }
+  })();
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "a" } });
+  await done;
+  expect(f.sent.filter((m) => m.method === "ai-cancel")).toEqual([{ yamlite: 1, method: "ai-cancel", args: [2] }]);
+  f.reply({ yamlite: 1, event: "ai-delta", id: 2, data: { text: "b" } });
+  f.reply({ yamlite: 1, id: 2, ok: false, error: { status: 500, message: "aborted" } });
+  expect(seen).toEqual(["a"]);
+});

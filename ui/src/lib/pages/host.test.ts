@@ -18,7 +18,11 @@ const board: PageMeta = {
   ai: null,
 };
 
-function setup(page: PageMeta = board, readOnly = false) {
+function setup(
+  page: PageMeta = board,
+  readOnly = false,
+  ai: HostDeps["ai"] = () => ({ provider: "anthropic", models: ["m1", "m2"] }),
+) {
   const posted: Array<Record<string, any>> = [];
   const frame = { postMessage: (m: Record<string, any>) => posted.push(m) } as unknown as Window;
   const deps: HostDeps = {
@@ -29,7 +33,12 @@ function setup(page: PageMeta = board, readOnly = false) {
       update: vi.fn(async () => ({ ok: true as const })),
       remove: vi.fn(async () => ({ ok: true as const })),
       pageSql: vi.fn(async () => ({ columns: ["x"], rows: [{ x: 1 }], truncated: false, ms: 0 })),
+      pageAi: vi.fn(async () => ({ text: "answer" })),
+      pageAiStream: vi.fn((_page: string, _body: unknown, _signal: AbortSignal): AsyncIterable<string> => {
+        throw new Error("not set");
+      }),
     },
+    ai,
     readOnly,
     open: vi.fn(),
     blocked: vi.fn(),
@@ -48,8 +57,9 @@ function setup(page: PageMeta = board, readOnly = false) {
   const ask = async (method: string, ...args: unknown[]) => {
     const mine = ++id;
     host.handle({ source: frame, data: { yamlite: 1, id: mine, method, args } } as MessageEvent);
-    await vi.waitFor(() => expect(posted.some((m) => m.id === mine)).toBe(true));
-    return posted.find((m) => m.id === mine) as Record<string, any>;
+    const answered = (m: Record<string, any>) => m.id === mine && "ok" in m;
+    await vi.waitFor(() => expect(posted.some(answered)).toBe(true));
+    return posted.find(answered) as Record<string, any>;
   };
   return { host, frame, posted, deps, ask };
 }
@@ -70,6 +80,7 @@ test("hello describes the page", async () => {
     sql: false,
     network: [],
     readOnly: false,
+    ai: null,
   });
   expect((await setup(board, true).ask("hello")).value.readOnly).toBe(true);
   expect((await setup({ ...board, access: { people: "read" } }).ask("hello")).value.readOnly).toBe(true);
@@ -239,4 +250,159 @@ test("a move from outside the page is told to it until the host is disposed", ()
   host.dispose();
   deps.location.go(1);
   expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/", state: null } }]);
+});
+
+const writer = { ...board, ai: { maxOutputTokens: 1024 } };
+
+// a stream the test feeds by hand, ending when its signal aborts unless it is deaf to it, as a buffering transport is
+function controlled(deaf = false) {
+  const queue: Array<IteratorResult<string>> = [];
+  let wake: (() => void) | null = null;
+  let signal: AbortSignal | undefined;
+  const push = (r: IteratorResult<string>) => {
+    queue.push(r);
+    wake?.();
+  };
+  const stream = (_page: string, _body: unknown, s: AbortSignal): AsyncIterable<string> => {
+    signal = s;
+    s.addEventListener("abort", () => wake?.());
+    return {
+      [Symbol.asyncIterator]: () => ({
+        async next() {
+          for (;;) {
+            if (signal?.aborted && !deaf) throw new DOMException("aborted", "AbortError");
+            const r = queue.shift();
+            if (r) return r;
+            await new Promise<void>((resolve) => (wake = resolve));
+          }
+        },
+      }),
+    };
+  };
+  return {
+    stream,
+    delta: (text: string) => push({ value: text, done: false }),
+    end: () => push({ value: undefined, done: true }),
+    signal: () => signal,
+  };
+}
+
+test("hello offers the host's provider only to a page that declares ai, on a host with a key", async () => {
+  expect((await setup().ask("hello")).value.ai).toBeNull();
+  expect((await setup(writer, false, () => null).ask("hello")).value.ai).toBeNull();
+  expect((await setup(writer).ask("hello")).value.ai).toEqual({ provider: "anthropic", models: ["m1", "m2"] });
+});
+
+test("ai needs the page's ai, and goes to the api with the page's name", async () => {
+  const denied = setup();
+  expect((await denied.ask("ai", { prompt: "hi" })).error).toEqual({
+    status: 403,
+    message: "page board may not use AI",
+    extra: {},
+  });
+  expect((await denied.ask("ai-stream", { prompt: "hi" })).error).toMatchObject({ status: 403 });
+  expect(denied.deps.api.pageAi).not.toHaveBeenCalled();
+  expect(denied.deps.api.pageAiStream).not.toHaveBeenCalled();
+  const { ask, deps } = setup(writer);
+  expect(await ask("ai", { prompt: "hi" })).toMatchObject({ ok: true, value: { text: "answer" } });
+  expect(deps.api.pageAi).toHaveBeenCalledWith("board", { prompt: "hi" }, expect.any(AbortSignal));
+  expect((await ask("ai", "hi")).error).toMatchObject({ status: 400, message: "input must be an object" });
+});
+
+test("an ai error keeps its code, provider and retryAfter", async () => {
+  const { ask, deps } = setup(writer);
+  vi.mocked(deps.api.pageAi).mockRejectedValueOnce(
+    new ApiError(429, "slow down", { error: "slow down", provider: "anthropic", retryAfter: 3 }),
+  );
+  expect((await ask("ai", { prompt: "hi" })).error).toEqual({
+    status: 429,
+    message: "slow down",
+    extra: { provider: "anthropic", retryAfter: 3 },
+  });
+});
+
+test("a stream's deltas reach the page in order, then its answer", async () => {
+  const { ask, deps, posted } = setup(writer);
+  const c = controlled();
+  vi.mocked(deps.api.pageAiStream).mockImplementation(c.stream);
+  const answer = ask("ai-stream", { prompt: "hi" });
+  await vi.waitFor(() => expect(c.signal()).toBeDefined());
+  c.delta("Hel");
+  c.delta("lo");
+  c.end();
+  const reply = await answer;
+  expect(reply).toEqual({ yamlite: 1, id: 1, ok: true, value: null });
+  expect(posted).toEqual([
+    { yamlite: 1, event: "ai-delta", id: 1, data: { text: "Hel" } },
+    { yamlite: 1, event: "ai-delta", id: 1, data: { text: "lo" } },
+    reply,
+  ]);
+  expect(deps.api.pageAiStream).toHaveBeenCalledWith("board", { prompt: "hi" }, expect.any(AbortSignal));
+});
+
+test("ai-cancel aborts that stream", async () => {
+  const { host, frame, deps } = setup(writer);
+  const c = controlled();
+  vi.mocked(deps.api.pageAiStream).mockImplementation(c.stream);
+  host.handle({
+    source: frame,
+    data: { yamlite: 1, id: 7, method: "ai-stream", args: [{ prompt: "hi" }] },
+  } as MessageEvent);
+  await vi.waitFor(() => expect(c.signal()).toBeDefined());
+  host.handle({ source: frame, data: { yamlite: 1, method: "ai-cancel", args: [8] } } as MessageEvent);
+  expect(c.signal()?.aborted).toBe(false);
+  host.handle({ source: frame, data: { yamlite: 1, method: "ai-cancel", args: [7] } } as MessageEvent);
+  expect(c.signal()?.aborted).toBe(true);
+});
+
+test("a cancelled stream that keeps going is not passed on", async () => {
+  const { host, frame, deps, posted } = setup(writer);
+  const c = controlled(true);
+  vi.mocked(deps.api.pageAiStream).mockImplementation(c.stream);
+  host.handle({
+    source: frame,
+    data: { yamlite: 1, id: 7, method: "ai-stream", args: [{ prompt: "hi" }] },
+  } as MessageEvent);
+  await vi.waitFor(() => expect(c.signal()).toBeDefined());
+  host.handle({ source: frame, data: { yamlite: 1, method: "ai-cancel", args: [7] } } as MessageEvent);
+  c.delta("late");
+  c.end();
+  await vi.waitFor(() => expect(posted.some((m) => m.id === 7 && "ok" in m)).toBe(true));
+  expect(posted.filter((m) => m.event === "ai-delta")).toEqual([]);
+});
+
+test("dispose aborts open streams, and nothing more reaches the page", async () => {
+  const { host, frame, deps, posted } = setup(writer);
+  const c = controlled(true);
+  vi.mocked(deps.api.pageAiStream).mockImplementation(c.stream);
+  host.handle({
+    source: frame,
+    data: { yamlite: 1, id: 7, method: "ai-stream", args: [{ prompt: "hi" }] },
+  } as MessageEvent);
+  await vi.waitFor(() => expect(c.signal()).toBeDefined());
+  c.delta("a");
+  await vi.waitFor(() => expect(posted).toHaveLength(1));
+  host.dispose();
+  expect(c.signal()?.aborted).toBe(true);
+  c.delta("b");
+  await new Promise((r) => setTimeout(r, 10));
+  expect(posted).toEqual([{ yamlite: 1, event: "ai-delta", id: 7, data: { text: "a" } }]);
+});
+
+test("dispose aborts a generate in flight, and its answer is not posted", async () => {
+  const { host, frame, deps, posted } = setup(writer);
+  let seen: AbortSignal | undefined;
+  let finish: (v: { text: string }) => void = () => {};
+  vi.mocked(deps.api.pageAi).mockImplementation(((_p: string, _b: unknown, signal?: AbortSignal) => {
+    seen = signal;
+    return new Promise((resolve) => (finish = resolve));
+  }) as typeof deps.api.pageAi);
+  host.handle({ source: frame, data: { yamlite: 1, id: 3, method: "ai", args: [{ prompt: "hi" }] } } as MessageEvent);
+  await vi.waitFor(() => expect(seen).toBeDefined());
+  expect(seen?.aborted).toBe(false);
+  host.dispose();
+  expect(seen?.aborted).toBe(true);
+  finish({ text: "late" });
+  await new Promise((r) => setTimeout(r, 10));
+  expect(posted).toEqual([]);
 });

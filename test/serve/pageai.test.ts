@@ -140,6 +140,16 @@ test("text answers carry the system and the messages", async () => {
   expect(sent).toContain("again");
 });
 
+test("a blank system is the same as none", async () => {
+  const { made } = await serve(() => scripted([{ say: "a" }, { say: "b" }]));
+  for (const system of ["", "  \n"]) {
+    expect((await ask({ system, prompt: "hi" })).status).toBe(200);
+  }
+  for (const m of made) {
+    expect((m.doGenerateCalls[0]?.prompt ?? []).some((p) => p.role === "system")).toBe(false);
+  }
+});
+
 test("a schema gives an object", async () => {
   await serve(() => scripted([{ say: '{"n":2}' }]));
   const res = await ask({

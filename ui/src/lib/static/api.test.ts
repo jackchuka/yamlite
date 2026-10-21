@@ -332,6 +332,14 @@ test("writes are refused", async () => {
   }
 });
 
+test("a page's AI calls answer that the snapshot has no key", async () => {
+  const api = make();
+  const noKey = { status: 503, body: { code: "no_key" } };
+  await expect(api.pageAi("board", { prompt: "hi" })).rejects.toMatchObject(noKey);
+  const stream = api.pageAiStream("board", { prompt: "hi" }, new AbortController().signal);
+  await expect(stream[Symbol.asyncIterator]().next()).rejects.toMatchObject(noKey);
+});
+
 test("integer filters match on columns without affinity like the server", async () => {
   const api = make();
   const has = await api.rows("nums", {

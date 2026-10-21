@@ -67,19 +67,90 @@ export async function request<T>(
       await new Promise((r) => setTimeout(r, delay * 2 ** attempt));
       continue;
     }
-    if (res.status === 401) markExpired();
-    const text = await res.text();
-    let data: Record<string, unknown> | null = null;
-    try {
-      data = text ? (JSON.parse(text) as Record<string, unknown>) : null;
-    } catch {
-      // proxies and plain-text errors are not JSON
-      if (res.ok) throw new ApiError(res.status, "invalid response from server", {});
-      data = { error: text || res.statusText };
-    }
-    if (!res.ok) throw new ApiError(res.status, String(data?.error ?? res.statusText), data ?? {});
-    return data as T;
+    return answer<T>(res);
   }
+}
+
+async function answer<T>(res: Response): Promise<T> {
+  if (res.status === 401) markExpired();
+  const text = await res.text();
+  let data: Record<string, unknown> | null = null;
+  try {
+    data = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+  } catch {
+    // proxies and plain-text errors are not JSON
+    if (res.ok) throw new ApiError(res.status, "invalid response from server", {});
+    data = { error: text || res.statusText };
+  }
+  if (!res.ok) throw new ApiError(res.status, String(data?.error ?? res.statusText), data ?? {});
+  return data as T;
+}
+
+export interface PageAiInput {
+  system?: string;
+  prompt: unknown;
+  schema?: Record<string, unknown>;
+  model?: string;
+  maxOutputTokens?: number;
+}
+
+// a model's answer is not a busy database: a page's AI call is sent once, never retried
+const postPageAi = (path: string, body: unknown, signal?: AbortSignal) =>
+  transport().fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+function sseEvent(block: string): { event: string; data: string } | null {
+  let event = "message";
+  const data: string[] = [];
+  for (const line of block.split("\n")) {
+    if (line === "" || line.startsWith(":")) continue;
+    const at = line.indexOf(":");
+    const field = at === -1 ? line : line.slice(0, at);
+    const value = at === -1 ? "" : line.slice(at + 1).replace(/^ /, "");
+    if (field === "event") event = value;
+    else if (field === "data") data.push(value);
+  }
+  return data.length === 0 ? null : { event, data: data.join("\n") };
+}
+
+function cutShort(): ApiError {
+  const message = "the AI answer ended before it was complete";
+  return new ApiError(502, message, { error: message });
+}
+
+async function* streamPageAi(path: string, body: unknown, signal: AbortSignal): AsyncGenerator<string> {
+  const res = await postPageAi(path, body, signal);
+  if (!res.ok) await answer(res);
+  if (res.body === null) throw cutShort();
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer = (buffer + value).replace(/\r\n?/g, "\n");
+      for (let end = buffer.indexOf("\n\n"); end !== -1; end = buffer.indexOf("\n\n")) {
+        const e = sseEvent(buffer.slice(0, end));
+        buffer = buffer.slice(end + 2);
+        if (e === null) continue;
+        const data = JSON.parse(e.data) as Record<string, unknown>;
+        if (e.event === "delta" && typeof data.text === "string") yield data.text;
+        else if (e.event === "done") return;
+        else if (e.event === "error") {
+          const { status, ...rest } = data;
+          throw new ApiError(typeof status === "number" ? status : 502, String(rest.error), rest);
+        }
+      }
+    }
+  } finally {
+    void reader.cancel().catch(() => {});
+  }
+  throw cutShort();
 }
 
 const enc = encodeURIComponent;
@@ -142,6 +213,12 @@ export const httpApi = {
     request<RulesPreview & { base: string }>("PUT", "/api/rules", { target, rules, base, ...edit }),
   pageHtml: (name: string) => request<{ html: string }>("GET", `/api/pages/${enc(name)}/html`).then((r) => r.html),
   pageSql: (name: string, sql: string) => request<SqlResult>("POST", "/api/sql", { sql, page: name }),
+  pageAi: (name: string, body: PageAiInput, signal?: AbortSignal) =>
+    postPageAi(`/api/pages/${enc(name)}/ai`, body, signal).then((res) =>
+      answer<{ text: string } | { object: unknown }>(res),
+    ),
+  pageAiStream: (name: string, body: PageAiInput, signal: AbortSignal): AsyncIterable<string> =>
+    streamPageAi(`/api/pages/${enc(name)}/ai/stream`, body, signal),
   conflicts: () => request<{ conflicts: ConflictEntry[] }>("GET", "/api/conflicts"),
   conflict: (id: string) => request<ConflictDetail>("GET", `/api/conflicts/${enc(id)}`),
   restore: (id: string, expected?: Row | null) =>
@@ -181,6 +258,8 @@ export const api: Api = {
   sql: (sql) => backend.sql(sql),
   pageHtml: (name) => backend.pageHtml(name),
   pageSql: (name, sql) => backend.pageSql(name, sql),
+  pageAi: (name, body, signal) => backend.pageAi(name, body, signal),
+  pageAiStream: (name, body, signal) => backend.pageAiStream(name, body, signal),
   conflicts: () => backend.conflicts(),
   conflict: (id) => backend.conflict(id),
   restore: (id, expected) => backend.restore(id, expected),
