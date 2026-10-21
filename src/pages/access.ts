@@ -5,7 +5,11 @@ export interface PageRules {
   access: Record<string, PageAccess>;
   sql: boolean;
   network: string[];
+  ai: { maxOutputTokens: number } | null;
 }
+
+export const PAGE_AI_DEFAULT_TOKENS = 1024;
+export const PAGE_AI_MAX_TOKENS = 8192;
 
 export const canRead = (page: PageRules, name: string): boolean => Object.hasOwn(page.access, name);
 
@@ -46,6 +50,7 @@ export function accessSummary(page: PageRules): string {
   const parts = Object.entries(page.access).map(([name, level]) => `${name}: ${level}`);
   if (page.sql) parts.push("sql");
   for (const origin of page.network) parts.push(new URL(origin).host);
+  if (page.ai) parts.push("AI");
   return parts.length > 0 ? parts.join(" · ") : "no access";
 }
 
@@ -60,5 +65,6 @@ export function accessBrief(page: PageRules): string {
   if (page.sql) parts.push("SQL");
   const n = page.network.length;
   if (n > 0) parts.push(`${n} ${n === 1 ? "origin" : "origins"}`);
+  if (page.ai) parts.push("AI");
   return parts.length > 0 ? parts.join(" · ") : "no access";
 }

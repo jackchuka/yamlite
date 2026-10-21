@@ -1,13 +1,15 @@
 import { canRead, canWrite, notInAccess, writesAnything } from "../../../../src/pages/access.ts";
-import { type Api, ApiError } from "../api";
+import { type Api, ApiError, type PageAiInput } from "../api";
 import type { Filter, Meta, PageMeta, Row } from "../types";
 import { type PageLocation, pagePath } from "./location";
 
 export const READ_ONLY = "this page is read-only here";
 
 export interface HostDeps {
-  api: Pick<Api, "rows" | "record" | "create" | "update" | "remove" | "pageSql">;
+  api: Pick<Api, "rows" | "record" | "create" | "update" | "remove" | "pageSql" | "pageAi" | "pageAiStream">;
   readOnly: boolean;
+  // the provider that answers a page's AI calls, or null when the host holds no key
+  ai(): { provider: string; models: string[] } | null;
   open(table: string, key: string): void;
   blocked(url: string): void;
   escape(): void;
@@ -55,6 +57,8 @@ function toWireError(e: unknown) {
 export class PageHost {
   private disposed = false;
   private readonly unlisten: () => void;
+  private readonly streams = new Map<number, AbortController>();
+  private readonly generating = new AbortController();
 
   constructor(
     private readonly frame: () => Window | null,
@@ -89,7 +93,11 @@ export class PageHost {
       if (Number.isInteger(args[0])) this.deps.location.go(args[0] as number);
       return;
     }
-    void this.answer(method, args).then(
+    if (method === "ai-cancel") {
+      if (typeof args[0] === "number") this.streams.get(args[0])?.abort();
+      return;
+    }
+    void this.answer(method, args, id).then(
       (value) => {
         this.post({ yamlite: 1, id, ok: true, value });
         if (method === "hello") this.theme(this.deps.theme());
@@ -113,6 +121,9 @@ export class PageHost {
   dispose(): void {
     this.disposed = true;
     this.unlisten();
+    for (const stream of this.streams.values()) stream.abort();
+    this.streams.clear();
+    this.generating.abort();
   }
 
   private post(message: unknown): void {
@@ -139,11 +150,38 @@ export class PageHost {
     return table;
   }
 
-  private async answer(method: string, args: unknown[]): Promise<unknown> {
+  private aiInput(args: unknown[]): PageAiInput {
+    const page = this.page();
+    if (!page.ai) throw fail(403, `page ${page.name} may not use AI`);
+    return record(args[0], "input") as unknown as PageAiInput;
+  }
+
+  // deltas go to the page as they come; a cancelled stream that still delivers is not passed on
+  private async stream(id: unknown, args: unknown[]): Promise<null> {
+    const input = this.aiInput(args);
+    if (typeof id !== "number") throw fail(400, "a stream needs an id");
+    const stop = new AbortController();
+    this.streams.get(id)?.abort();
+    this.streams.set(id, stop);
+    try {
+      for await (const text of this.deps.api.pageAiStream(this.page().name, input, stop.signal)) {
+        if (stop.signal.aborted) break;
+        this.post({ yamlite: 1, event: "ai-delta", id, data: { text } });
+      }
+    } catch (e) {
+      if (!stop.signal.aborted) throw e;
+    } finally {
+      if (this.streams.get(id) === stop) this.streams.delete(id);
+    }
+    return null;
+  }
+
+  private async answer(method: string, args: unknown[], id: unknown): Promise<unknown> {
     const { api } = this.deps;
     const page = this.page();
     switch (method) {
-      case "hello":
+      case "hello": {
+        const ai = page.ai ? this.deps.ai() : null;
         return {
           page: page.name,
           title: page.title,
@@ -151,7 +189,9 @@ export class PageHost {
           sql: page.sql,
           network: page.network,
           readOnly: this.deps.readOnly || !writesAnything(page),
+          ai,
         };
+      }
       case "rows": {
         const table = this.readable(args[0]);
         const o = record(args[1], "options");
@@ -183,6 +223,10 @@ export class PageHost {
       case "sql":
         if (!page.sql) throw fail(403, `page ${page.name} may not run SQL`);
         return api.pageSql(page.name, text(args[0], "sql"));
+      case "ai":
+        return api.pageAi(page.name, this.aiInput(args), this.generating.signal);
+      case "ai-stream":
+        return this.stream(id, args);
       case "open": {
         const table = this.table(args[0]);
         this.deps.open(table, text(args[1], "key"));

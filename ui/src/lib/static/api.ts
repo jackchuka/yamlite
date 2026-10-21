@@ -12,6 +12,9 @@ import type { ConflictDetail, RecordDetail, RowsPage, Snapshot, SqlResult, Table
 export const READ_ONLY_MESSAGE = "read-only snapshot: only SELECT, EXPLAIN and VALUES run here";
 const MAX_ROWS = 1000;
 
+const NO_AI = "no AI key is configured on this host";
+const noAi = () => new ApiError(503, NO_AI, { error: NO_AI, code: "no_key" });
+
 const refuse = (): Promise<never> => Promise.reject(new ApiError(403, READ_ONLY_MESSAGE, { error: READ_ONLY_MESSAGE }));
 
 // sql.js binds bigint as a double: safe integers go as numbers, which compare like the server's native integers
@@ -154,6 +157,10 @@ export function createStaticApi(opts: {
         if (!isRead(sql)) throw new HttpError(403, "a page can only run SELECT");
         return select(sql);
       }),
+    pageAi: () => Promise.reject(noAi()),
+    pageAiStream: () => ({
+      [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(noAi()) }),
+    }),
     conflicts: async () => ({ conflicts: [] }),
     history: async () => ({ state: "nogit" as const }),
     historyDiff: () =>

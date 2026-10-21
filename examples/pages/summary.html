@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-yamlite-ui>
+  <head>
+    <meta charset="utf-8" />
+    <title>Summary</title>
+    <style>
+      body {
+        font-size: 16px;
+        line-height: 1.6;
+      }
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      select {
+        font-size: 16px;
+        padding: 6px 8px;
+        color: var(--y-fg);
+        background: var(--y-bg);
+        border: 1px solid var(--y-line);
+        border-radius: 6px;
+      }
+      .record {
+        background: var(--y-panel);
+        border: 1px solid var(--y-line);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      .summary {
+        font-size: 18px;
+        white-space: pre-wrap;
+      }
+      .error {
+        color: var(--y-err);
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="error" class="error" hidden></div>
+    <div class="controls">
+      <select id="pick" aria-label="Record"></select>
+      <button id="go" hidden>Summarize</button>
+    </div>
+    <div id="record" class="record" hidden></div>
+    <div id="summary" class="summary" aria-live="polite"></div>
+    <script>
+      // fit these to your table
+      const TABLE = "tasks";
+      const KEY = "id";
+      const TITLE = "title";
+      const SYSTEM = "Summarize the record in two or three sentences. Reply with the summary only.";
+
+      const pick = document.getElementById("pick");
+      const go = document.getElementById("go");
+      const record = document.getElementById("record");
+      const summary = document.getElementById("summary");
+      const error = document.getElementById("error");
+      let rows = [];
+      let shown = null;
+      let running = false;
+
+      function showError(message) {
+        error.textContent = message;
+        error.hidden = !message;
+      }
+
+      async function load() {
+        const page = await yamlite.rows(TABLE, { limit: 500 });
+        rows = page.rows;
+        pick.replaceChildren(
+          ...rows.map((row) => {
+            const option = document.createElement("option");
+            option.value = row[KEY];
+            option.textContent = row[TITLE] ?? row[KEY];
+            return option;
+          }),
+        );
+        await show();
+      }
+
+      async function show() {
+        summary.textContent = "";
+        showError("");
+        if (!pick.value) {
+          shown = null;
+          record.hidden = true;
+          return;
+        }
+        shown = (await yamlite.get(TABLE, pick.value)).row;
+        record.textContent = JSON.stringify(shown, null, 2);
+        record.hidden = false;
+      }
+
+      async function summarize() {
+        if (running || !shown) return;
+        running = true;
+        go.disabled = true;
+        pick.disabled = true;
+        summary.textContent = "";
+        showError("");
+        try {
+          for await (const text of yamlite.ai.stream({ system: SYSTEM, prompt: JSON.stringify(shown) })) {
+            summary.textContent += text;
+          }
+        } catch (e) {
+          showError(e.message);
+        } finally {
+          running = false;
+          go.disabled = false;
+          pick.disabled = false;
+        }
+      }
+
+      pick.addEventListener("change", () => void show().catch((e) => showError(e.message)));
+      go.addEventListener("click", () => void summarize());
+
+      yamlite.ready
+        .then(async (me) => {
+          go.hidden = me.ai === null;
+          await load();
+        })
+        .catch((e) => showError(e.message));
+    </script>
+  </body>
+</html>

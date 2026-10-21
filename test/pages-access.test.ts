@@ -16,6 +16,7 @@ const page = (access: PageRules["access"], extra: Partial<PageRules> = {}): Page
   access,
   sql: false,
   network: [],
+  ai: null,
   ...extra,
 });
 
@@ -82,4 +83,11 @@ test("the brief counts writes, reads, sql and origins", () => {
   expect(accessBrief(page({ people: "read" }, { network: ["https://a.example"] }))).toBe("read 1 · 1 origin");
   expect(accessBrief(page({}, { sql: true }))).toBe("SQL");
   expect(accessBrief(page({}))).toBe("no access");
+});
+
+test("the summary and brief mention AI when the page has it", () => {
+  const ai = { maxOutputTokens: 1024 };
+  expect(accessSummary(page({ tasks: "read" }, { ai }))).toBe("tasks: read · AI");
+  expect(accessBrief(page({ tasks: "read" }, { ai }))).toBe("read 1 · AI");
+  expect(accessBrief(page({}, { ai }))).toBe("AI");
 });

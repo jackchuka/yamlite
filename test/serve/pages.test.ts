@@ -24,6 +24,7 @@ test("meta lists pages with their permissions and a root-relative path", async (
       access: { tasks: "write" },
       sql: true,
       network: ["https://cdn.example.com"],
+      ai: null,
     },
   ]);
 });

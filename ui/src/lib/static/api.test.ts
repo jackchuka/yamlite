@@ -117,6 +117,7 @@ const snapshot: Snapshot = {
         access: { tasks: "read" },
         sql: true,
         network: [],
+        ai: null,
       },
       {
         name: "plain",
@@ -125,6 +126,7 @@ const snapshot: Snapshot = {
         access: { tasks: "read" },
         sql: false,
         network: [],
+        ai: null,
       },
     ],
   },
@@ -328,6 +330,14 @@ test("writes are refused", async () => {
   ]) {
     await expect(call()).rejects.toMatchObject({ status: 403 });
   }
+});
+
+test("a page's AI calls answer that the snapshot has no key", async () => {
+  const api = make();
+  const noKey = { status: 503, body: { code: "no_key" } };
+  await expect(api.pageAi("board", { prompt: "hi" })).rejects.toMatchObject(noKey);
+  const stream = api.pageAiStream("board", { prompt: "hi" }, new AbortController().signal);
+  await expect(stream[Symbol.asyncIterator]().next()).rejects.toMatchObject(noKey);
 });
 
 test("integer filters match on columns without affinity like the server", async () => {

@@ -1,9 +1,12 @@
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 
-// one model answer: text, tool calls, or an error the provider call throws
+// one model answer: text, tool calls, or an error the provider call throws;
+// deltas stream the text in pieces, and fail ends the stream with an error after them
 export type Reply =
   | {
       say?: string;
+      deltas?: string[];
+      fail?: Error;
       tools?: { name: string; args?: Record<string, unknown> }[];
       sources?: { url: string; title?: string }[];
     }
@@ -17,17 +20,32 @@ const usage = {
 export function scripted(replies: Reply[]): MockLanguageModelV4 {
   let n = 0;
   return new MockLanguageModelV4({
+    doGenerate: async () => {
+      const r = replies[n++] ?? { say: "" };
+      if (r instanceof Error) throw r;
+      return {
+        content: [{ type: "text", text: r.say ?? r.deltas?.join("") ?? "" }],
+        finishReason: { unified: "stop", raw: undefined },
+        usage,
+        warnings: [],
+      };
+    },
     doStream: async () => {
       const r = replies[n++] ?? { say: "" };
       if (r instanceof Error) throw r;
       const parts: unknown[] = [{ type: "stream-start", warnings: [] }];
       (r.sources ?? []).forEach((s, i) => parts.push({ type: "source", sourceType: "url", id: `src_${n}_${i}`, ...s }));
-      if (r.say)
+      const deltas = r.deltas ?? (r.say ? [r.say] : []);
+      if (deltas.length)
         parts.push(
           { type: "text-start", id: "t" },
-          { type: "text-delta", id: "t", delta: r.say },
+          ...deltas.map((delta) => ({ type: "text-delta", id: "t", delta })),
           { type: "text-end", id: "t" },
         );
+      if (r.fail) {
+        parts.push({ type: "error", error: r.fail });
+        return { stream: convertArrayToReadableStream(parts) as never };
+      }
       (r.tools ?? []).forEach((t, i) =>
         parts.push({
           type: "tool-call",

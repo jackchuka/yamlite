@@ -25,6 +25,7 @@ import {
 } from "./types.ts";
 import { resolveField } from "./fieldpath.ts";
 import { declaredViews } from "./views.ts";
+import { PAGE_AI_DEFAULT_TOKENS, PAGE_AI_MAX_TOKENS } from "./pages/access.ts";
 
 export interface TableInput {
   name: string;
@@ -654,7 +655,7 @@ function checkViewNames(tables: TableSpec[]): TableSpec[] {
   return tables;
 }
 
-const PAGE_KEYS = ["path", "title", "access", "sql", "network"];
+const PAGE_KEYS = ["path", "title", "access", "sql", "network", "ai"];
 const PAGE_NAME = /^[a-z0-9][a-z0-9_-]*$/;
 
 function toOrigin(where: string, raw: unknown): string {
@@ -669,6 +670,20 @@ function toOrigin(where: string, raw: unknown): string {
   }
   if ((url.protocol !== "https:" && url.protocol !== "http:") || raw.replace(/\/$/, "") !== url.origin) throw invalid();
   return url.origin;
+}
+
+function toPageAi(where: string, raw: unknown): PageSpec["ai"] {
+  if (raw === undefined || raw === null || raw === false) return null;
+  if (raw === true) return { maxOutputTokens: PAGE_AI_DEFAULT_TOKENS };
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new Error(`${where}ai must be true, false or a map`);
+  const { maxOutputTokens, ...rest } = raw as Record<string, unknown>;
+  const unknown = Object.keys(rest)[0];
+  if (unknown !== undefined) throw new Error(`${where}unknown key "ai.${unknown}"`);
+  if (maxOutputTokens === undefined) return { maxOutputTokens: PAGE_AI_DEFAULT_TOKENS };
+  if (typeof maxOutputTokens !== "number" || !Number.isInteger(maxOutputTokens) || maxOutputTokens < 1) {
+    throw new Error(`${where}ai.maxOutputTokens must be a positive integer`);
+  }
+  return { maxOutputTokens: Math.min(maxOutputTokens, PAGE_AI_MAX_TOKENS) };
 }
 
 function toPages(raw: unknown, place: (path: string) => string): PageSpec[] {
@@ -710,6 +725,7 @@ function toPages(raw: unknown, place: (path: string) => string): PageSpec[] {
       access,
       sql: v.sql === true,
       network: ((v.network ?? []) as unknown[]).map((o) => toOrigin(where, o)),
+      ai: toPageAi(where, v.ai),
     };
   });
 }

@@ -70,12 +70,78 @@ export function pageSdk(
     for (const listener of historyListeners) listener({ action, location });
   };
   let next = 0;
-  const call = (method: string, ...args: unknown[]) =>
-    new Promise<any>((resolve, reject) => {
-      const id = ++next;
+  const send = (method: string, args: unknown[]) => {
+    const id = ++next;
+    const answer = new Promise<any>((resolve, reject) => {
       pending.set(id, { resolve, reject });
       parent.postMessage({ yamlite: 1, id, method, args }, "*");
     });
+    return { id, answer };
+  };
+  const call = (method: string, ...args: unknown[]) => send(method, args).answer;
+  const streams = new Map<number, (text: string) => void>();
+  // built by hand: compiled down, an async generator would call helpers from outside this function's body
+  const stream = (input: unknown) => {
+    const { id, answer } = send("ai-stream", [input]);
+    const queue: string[] = [];
+    let waiting: { resolve: (r: IteratorResult<string>) => void; reject: (e: unknown) => void } | null = null;
+    let ended = false;
+    let failure: { error: unknown } | null = null;
+    const finish = () => {
+      ended = true;
+      streams.delete(id);
+    };
+    streams.set(id, (text) => {
+      if (waiting) {
+        const w = waiting;
+        waiting = null;
+        w.resolve({ value: text, done: false });
+      } else queue.push(text);
+    });
+    answer.then(
+      () => {
+        finish();
+        if (waiting) waiting.resolve({ value: undefined, done: true });
+        waiting = null;
+      },
+      (error: unknown) => {
+        finish();
+        if (waiting) waiting.reject(error);
+        else failure = { error };
+        waiting = null;
+      },
+    );
+    const iterator: AsyncIterableIterator<string> = {
+      next() {
+        if (queue.length > 0) return Promise.resolve({ value: queue.shift() as string, done: false });
+        if (failure) {
+          const { error } = failure;
+          failure = null;
+          return Promise.reject(error);
+        }
+        if (ended) return Promise.resolve({ value: undefined, done: true });
+        return new Promise<IteratorResult<string>>((resolve, reject) => {
+          waiting = { resolve, reject };
+        });
+      },
+      return() {
+        if (!ended) {
+          finish();
+          pending.delete(id);
+          parent.postMessage({ yamlite: 1, method: "ai-cancel", args: [id] }, "*");
+        }
+        queue.length = 0;
+        failure = null;
+        if (waiting) waiting.resolve({ value: undefined, done: true });
+        waiting = null;
+        return Promise.resolve({ value: undefined, done: true });
+      },
+      [Symbol.asyncIterator]() {
+        return iterator;
+      },
+    };
+    return iterator;
+  };
   win.addEventListener("message", (e) => {
     const m = e.data;
     if (e.source !== parent || m === null || typeof m !== "object" || m.yamlite !== 1) return;
@@ -94,6 +160,11 @@ export function pageSdk(
       theme = m.data.theme;
       win.document.documentElement.dataset.theme = theme;
       for (const listener of themeListeners) listener({ theme });
+      return;
+    }
+    // a stream's deltas carry its call's id, but only the answer settles the call
+    if (m.event === "ai-delta") {
+      if (typeof m.data?.text === "string") streams.get(m.id)?.(m.data.text);
       return;
     }
     const waiting = pending.get(m.id);
@@ -127,6 +198,10 @@ export function pageSdk(
     remove: (table: string, key: string) => call("remove", table, key),
     sql: (sql: string) => call("sql", sql),
     open: (table: string, key: string) => call("open", table, key),
+    ai: Object.freeze({
+      generate: (input: Record<string, unknown>) => call("ai", input),
+      stream,
+    }),
     history: Object.freeze({
       get action() {
         return action;

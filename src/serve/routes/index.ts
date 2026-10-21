@@ -6,6 +6,7 @@ import { eventRoutes } from "./events.ts";
 import { gitRoutes } from "./git.ts";
 import { historyRoutes } from "./history.ts";
 import { metaRoutes } from "./meta.ts";
+import { pageAiRoutes } from "./pageai.ts";
 import { pageRoutes } from "./pages.ts";
 import { rowRoutes } from "./rows.ts";
 import { rulesRoutes } from "./rules.ts";
@@ -27,6 +28,7 @@ export const ROUTES: Routes[] = [
   rulesRoutes,
   sqlRoutes,
   pageRoutes,
+  pageAiRoutes,
   conflictRoutes,
   agentRoutes,
   gitRoutes,

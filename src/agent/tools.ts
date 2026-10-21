@@ -104,6 +104,7 @@ export function agentTools(ctx: ApiContext, conversationId: string): AgentTool[]
           access: Object.fromEntries(names.map((n) => [n, "read" as const])),
           sql: true,
           network: [],
+          ai: null,
         };
         const r = ctx.pageSql.run(rules, views(), sql, QUERY_ROWS);
         return { columns: r.columns, rows: r.rows.map((row) => toWire(row, new Map())), truncated: r.truncated };

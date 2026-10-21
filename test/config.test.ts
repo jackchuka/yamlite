@@ -821,7 +821,15 @@ test("parseConfig reads where each table's files are from the config text alone"
 test("parseConfig keeps page paths as written", () => {
   const { pages } = parseConfig("pages:\n  board: { path: pages/board.html, access: { tasks: read } }\n");
   expect(pages).toEqual([
-    { name: "board", path: "pages/board.html", title: "board", access: { tasks: "read" }, sql: false, network: [] },
+    {
+      name: "board",
+      path: "pages/board.html",
+      title: "board",
+      access: { tasks: "read" },
+      sql: false,
+      network: [],
+      ai: null,
+    },
   ]);
 });
 
