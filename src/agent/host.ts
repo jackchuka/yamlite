@@ -8,6 +8,7 @@ import { type AgentTool, toolText } from "./tools.ts";
 const MAX_CONVERSATIONS = 20;
 const MAX_STEPS = 20;
 const TITLE_LENGTH = 30;
+const PAGE_SLOTS = 4;
 
 const PREAMBLE = `You are helping a user look up and edit the data in a YAMLite folder (YAML files kept in sync with SQLite).
 Use your tools: start with schema, read with query and get_records.
@@ -111,6 +112,7 @@ export interface HostOptions {
 export class AgentHost {
   private readonly conversations = new Map<string, Conversation>();
   private closed = false;
+  private pageInFlight = 0;
 
   constructor(private readonly opts: HostOptions) {}
 
@@ -145,25 +147,54 @@ export class AgentHost {
     const p = providerOf(input.provider);
     if (input.model !== undefined && typeof input.model !== "string")
       throw new HttpError(400, "model must be a string");
-    const models = this.modelsOf(p);
+    const model = input.model?.trim() || (this.modelsOf(p)[0] as string);
     // any model id goes through: the provider rejects one it does not have
-    const model = input.model?.trim() || (models[0] as string);
-    if (this.fixedModels(p) && !models.includes(model)) throw new HttpError(400, `model ${model} is not allowed here`);
+    if (this.fixedModels(p) && !this.modelsOf(p).includes(model))
+      throw new HttpError(400, `model ${model} is not allowed here`);
     const given = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
     if (given && !this.viewerKeys) throw new HttpError(400, "this host does not take API keys");
     const apiKey = given || this.opts.keys?.[p.id];
     if (!apiKey) throw new HttpError(400, `an API key for ${p.name} is required`, { code: "no_key" });
-    const make = this.opts.createModel ?? createModel;
-    const baseURL = this.opts.baseURL?.(p.id);
-    const c = new Conversation(
-      randomBytes(8).toString("hex"),
-      p.id,
-      model,
-      make({ provider: p.id, model, apiKey, ...(baseURL ? { baseURL } : {}) }),
-    );
+    const c = new Conversation(randomBytes(8).toString("hex"), p.id, model, this.build(p, model, apiKey));
     this.evict();
     this.conversations.set(c.id, c);
     return c;
+  }
+
+  // the first provider the host holds a key for
+  pageProvider(): { provider: string; models: string[] } | null {
+    const p = this.providers().find((x) => x.hasKey);
+    return p ? { provider: p.id, models: p.models } : null;
+  }
+
+  // pages never use a key from the client, only the host's
+  pageModel(model?: string): { provider: string; model: string; languageModel: LanguageModel } {
+    const page = this.pageProvider();
+    if (!page) throw new HttpError(503, "no AI key is configured on this host", { code: "no_key" });
+    const chosen = model?.trim() || (page.models[0] as string);
+    if (!page.models.includes(chosen)) throw new HttpError(400, `model ${chosen} is not allowed here`);
+    const p = providerOf(page.provider);
+    return {
+      provider: page.provider,
+      model: chosen,
+      languageModel: this.build(p, chosen, this.opts.keys?.[p.id] as string),
+    };
+  }
+
+  pageSlot(): () => void {
+    if (this.pageInFlight >= PAGE_SLOTS) throw new HttpError(429, "too many AI requests at once", { retryAfter: 1 });
+    this.pageInFlight++;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.pageInFlight--;
+    };
+  }
+
+  private build(p: Provider, model: string, apiKey: string): LanguageModel {
+    const baseURL = this.opts.baseURL?.(p.id);
+    return (this.opts.createModel ?? createModel)({ provider: p.id, model, apiKey, ...(baseURL ? { baseURL } : {}) });
   }
 
   private listed(p: Provider): string[] | undefined {

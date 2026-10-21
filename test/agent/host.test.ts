@@ -5,6 +5,7 @@ import type { AgentEvent } from "../../src/agent/types.ts";
 import { AgentHost, type Conversation, type HostOptions } from "../../src/agent/host.ts";
 import type { Credentials } from "../../src/agent/providers.ts";
 import type { AgentTool } from "../../src/agent/tools.ts";
+import { HttpError } from "../../src/serve/http.ts";
 import { waitFor } from "../helpers.ts";
 import { hanging, promptText, scripted } from "./model.ts";
 
@@ -358,4 +359,62 @@ test("the pages an answer draws on are passed on as sources", async () => {
     { type: "source", url: "https://a.example/", title: "A" },
     { type: "source", url: "https://b.example/" },
   ]);
+});
+
+const thrown = (fn: () => unknown) => {
+  try {
+    fn();
+  } catch (e) {
+    return e as HttpError;
+  }
+  return undefined;
+};
+
+test("pages have no model without a host key, even when viewers may bring their own", () => {
+  const { host } = makeHost([], { keys: {}, viewerKeys: true });
+  expect(host.pageProvider()).toBeNull();
+  const e = thrown(() => host.pageModel());
+  expect(e).toMatchObject({ status: 503, extra: { code: "no_key" } });
+});
+
+test("pages use the default provider when it has a key", () => {
+  const { host, made } = makeHost([scripted([])], { keys: { anthropic: "a", openai: "o" }, defaultProvider: "openai" });
+  expect(host.pageProvider()?.provider).toBe("openai");
+  const m = host.pageModel();
+  expect(m.provider).toBe("openai");
+  expect(made[0]).toMatchObject({ provider: "openai", apiKey: "o", model: m.model });
+});
+
+test("pages refuse a model outside the suggested list, even with viewer keys", () => {
+  const { host } = makeHost([], { viewerKeys: true });
+  expect(thrown(() => host.pageModel("claude-next"))).toMatchObject({
+    status: 400,
+    message: "model claude-next is not allowed here",
+  });
+});
+
+test("pages build the model with the host key and baseURL", () => {
+  const { host, made } = makeHost([scripted([])], { baseURL: (p) => `https://h/${p}/v1` });
+  const first = host.pageProvider()?.models[0];
+  host.pageModel(first);
+  expect(made[0]).toEqual({
+    provider: "anthropic",
+    model: first,
+    apiKey: "env-key",
+    baseURL: "https://h/anthropic/v1",
+  });
+});
+
+test("pageSlot allows 4 at once and frees one on release", () => {
+  const { host } = makeHost([]);
+  const releases = [host.pageSlot(), host.pageSlot(), host.pageSlot(), host.pageSlot()];
+  expect(thrown(() => host.pageSlot())).toMatchObject({
+    status: 429,
+    message: "too many AI requests at once",
+    extra: { retryAfter: 1 },
+  });
+  releases[0]?.();
+  releases[0]?.();
+  host.pageSlot();
+  expect(thrown(() => host.pageSlot())?.status).toBe(429);
 });
