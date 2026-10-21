@@ -44,14 +44,45 @@ export function createWorkerTransport(port: MessagePort): Transport {
   }
 
   const doFetch = ((input: RequestInfo | URL, init: RequestInit = {}) =>
-    new Promise<Response>((resolve) => {
-      let text = "";
-      let head: Extract<Out, { kind: "head" }> | undefined;
-      send(String(input), init, {
-        head: (h) => (head = h),
-        chunk: (d) => (text += d),
-        end: () => resolve(new Response(text, { status: head?.status ?? 500, headers: head?.headers })),
+    new Promise<Response>((resolve, reject) => {
+      const signal = init.signal;
+      const abortError = () => signal?.reason ?? new DOMException("The operation was aborted.", "AbortError");
+      if (signal?.aborted) return reject(abortError());
+      const enc = new TextEncoder();
+      let body!: ReadableStreamDefaultController<Uint8Array>;
+      let settled = false;
+      const stream = new ReadableStream<Uint8Array>({
+        start: (c) => void (body = c),
+        cancel: () => stop(),
       });
+      const open = (status: number, headers?: [string, string][]) => {
+        settled = true;
+        // these statuses forbid a body, so Response throws if given one
+        const nullBody = [101, 204, 205, 304].includes(status);
+        if (nullBody) void stream.cancel();
+        resolve(new Response(nullBody ? null : stream, { status, headers }));
+      };
+      const onAbort = () => {
+        stop();
+        const err = abortError();
+        if (settled) body.error(err);
+        else reject(err);
+      };
+      const stop = () => {
+        signal?.removeEventListener("abort", onAbort);
+        if (!pending.delete(id)) return;
+        port.postMessage({ id, kind: "abort" });
+      };
+      const id = send(String(input), init, {
+        head: (h) => open(h.status, h.headers),
+        chunk: (d) => body.enqueue(enc.encode(d)),
+        end: () => {
+          signal?.removeEventListener("abort", onAbort);
+          if (!settled) open(500);
+          body.close();
+        },
+      });
+      signal?.addEventListener("abort", onAbort, { once: true });
     })) as typeof fetch;
 
   function eventSource(url: string): EventSource {

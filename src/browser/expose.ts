@@ -23,6 +23,11 @@ export function expose(port: MessagePort, dispatch: (r: Request) => Promise<Resp
           signal: ac.signal,
         }),
       );
+      if (ac.signal.aborted) {
+        // the client already dropped this id, so there is nobody to stream to
+        void res.body?.cancel();
+        return;
+      }
       port.postMessage({ id: m.id, kind: "head", status: res.status, headers: [...res.headers] });
       headSent = true;
       if (res.body) {
