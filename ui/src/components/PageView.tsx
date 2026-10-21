@@ -40,7 +40,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const [opened, setOpened] = useState<{ table: string; key: string } | null>(null);
   const network = page?.network.join(" ");
   // everything but the theme that makes a new frame; the document is rebuilt with it so it bakes in the current theme
-  const rebuild = `${generation}:${JSON.stringify([page?.access, page?.sql, page?.title])}`;
+  const rebuild = `${generation}:${JSON.stringify([page?.access, page?.sql, page?.title, page?.ai])}`;
   const srcDoc = useMemo(
     () =>
       network !== undefined && html.data !== undefined

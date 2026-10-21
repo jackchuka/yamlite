@@ -125,6 +125,8 @@ export interface PageSpec {
   sql: boolean;
   // origins the page may load from and connect to
   network: string[];
+  // null: the page cannot ask AI
+  ai: { maxOutputTokens: number } | null;
 }
 
 export interface SchemaChange {

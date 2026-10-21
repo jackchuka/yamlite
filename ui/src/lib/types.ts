@@ -82,6 +82,7 @@ export interface PageMeta {
   access: Record<string, "read" | "write">;
   sql: boolean;
   network: string[];
+  ai: { maxOutputTokens: number } | null;
 }
 
 export interface Meta {

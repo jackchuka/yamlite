@@ -30,6 +30,7 @@ test("a declared page resolves its path, title and permissions", () => {
       access: { tasks: "write", projects__milestones: "read" },
       sql: true,
       network: ["https://cdn.jsdelivr.net"],
+      ai: null,
     },
   ]);
 });
@@ -40,6 +41,7 @@ test("a page allows nothing unless it says so, and is titled by its name", () =>
     access: {},
     sql: false,
     network: [],
+    ai: null,
   });
 });
 
@@ -119,4 +121,26 @@ test("a reload whose page names a missing table keeps the previous configuration
   } finally {
     await y.close();
   }
+});
+
+test.each([
+  ["    ai: true\n", { maxOutputTokens: 1024 }],
+  ["    ai: false\n", null],
+  ["", null],
+  ["    ai: { maxOutputTokens: 2000 }\n", { maxOutputTokens: 2000 }],
+  ["    ai: { maxOutputTokens: 20000 }\n", { maxOutputTokens: 8192 }],
+  ["    ai: {}\n", { maxOutputTokens: 1024 }],
+])("a page's ai %j resolves to %j", (line, expected) => {
+  expect(pagesOf(`pages:\n  board:\n    path: b.html\n${line}`)[0]?.ai).toEqual(expected);
+});
+
+test.each([
+  ['    ai: "yes"\n', 'page "board": ai must be true, false or a map'],
+  ["    ai: [1]\n", 'page "board": ai must be true, false or a map'],
+  ["    ai: { maxOutputTokens: 0 }\n", 'page "board": ai.maxOutputTokens must be a positive integer'],
+  ["    ai: { maxOutputTokens: 1.5 }\n", 'page "board": ai.maxOutputTokens must be a positive integer'],
+  ['    ai: { maxOutputTokens: "9" }\n', 'page "board": ai.maxOutputTokens must be a positive integer'],
+  ["    ai: { other: 1 }\n", 'page "board": unknown key "ai.other"'],
+])("a bad ai %j is rejected", (line, message) => {
+  expect(() => pagesOf(`pages:\n  board:\n    path: b.html\n${line}`)).toThrow(message);
 });

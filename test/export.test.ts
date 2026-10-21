@@ -422,6 +422,7 @@ test("pages are written next to the data, and pages that cannot be exported are 
       access: { projects: "read", projects__milestones: "read" },
       sql: false,
       network: [],
+      ai: null,
     },
   ]);
   expect(r.pages).toEqual(["board"]);

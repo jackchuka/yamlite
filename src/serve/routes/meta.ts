@@ -55,6 +55,7 @@ export const metaRoutes: Routes = (router, ctx) => {
       access: p.access,
       sql: p.sql,
       network: p.network,
+      ai: p.ai,
     })),
     views: ctx.y.tables.flatMap((t) =>
       declaredViews(t).map(({ spec, parent, depth, path }) => {

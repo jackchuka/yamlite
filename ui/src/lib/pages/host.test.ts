@@ -15,6 +15,7 @@ const board: PageMeta = {
   access: { tasks: "write", people: "read", tasks__tags: "read" },
   sql: false,
   network: [],
+  ai: null,
 };
 
 function setup(page: PageMeta = board, readOnly = false) {

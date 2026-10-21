@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
@@ -32,6 +32,7 @@ const snapshot: Snapshot = {
         access: { tasks: "write" },
         sql: true,
         network: ["https://cdn.example.com"],
+        ai: null,
       },
     ],
   },
@@ -44,7 +45,10 @@ beforeEach(() => {
   vi.mocked(api.meta).mockResolvedValue(snapshot.meta);
   vi.mocked(api.pageHtml).mockResolvedValue("<p>hello page</p>");
 });
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
+  const { queryClient } = await import("@/lib/providers");
+  queryClient.clear();
   enterStatic(null);
   setPageFrame(undefined);
 });
@@ -167,6 +171,15 @@ test("a change to the page's access in the config replaces the frame", async () 
   const { queryClient } = await import("@/lib/providers");
   const page = snapshot.meta.pages[0] as (typeof snapshot.meta.pages)[number];
   queryClient.setQueryData(["meta"], { ...snapshot.meta, pages: [{ ...page, access: { tasks: "read" } }] });
+  await waitFor(() => expect(screen.getByTitle("Board")).not.toBe(frame));
+});
+
+test("a change to only the page's ai in the config replaces the frame", async () => {
+  await show("board");
+  const frame = await screen.findByTitle("Board");
+  const { queryClient } = await import("@/lib/providers");
+  const page = snapshot.meta.pages[0] as (typeof snapshot.meta.pages)[number];
+  queryClient.setQueryData(["meta"], { ...snapshot.meta, pages: [{ ...page, ai: { maxOutputTokens: 1024 } }] });
   await waitFor(() => expect(screen.getByTitle("Board")).not.toBe(frame));
 });
 
