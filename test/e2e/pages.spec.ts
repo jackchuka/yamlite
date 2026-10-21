@@ -133,11 +133,15 @@ test("a page follows the UI's theme and the record panel resizes over it", async
 test("an app keeps where its page stands in the address, through reload and back", async ({ page }) => {
   app = await launch({
     "yamlite.yaml": config(""),
-    ".pages/board.html": `<p id="at"></p><button id="go">next</button><script>
-      const show = () => (document.getElementById("at").textContent = "at " + yamlite.history.location.pathname);
+    ".pages/board.html": `<p id="at"></p><button id="go">next</button><button id="back">back</button><script>
+      const show = () => {
+        const { pathname, state } = yamlite.history.location;
+        document.getElementById("at").textContent = "at " + pathname + (state ? " from " + state.from : "");
+      };
       yamlite.history.listen(show);
       show();
-      document.getElementById("go").onclick = () => yamlite.history.push("/orders/43");
+      document.getElementById("go").onclick = () => yamlite.history.push("/orders/43", { from: "42" });
+      document.getElementById("back").onclick = () => yamlite.history.back();
     </script>`,
   });
   const entry = new URL(app.url);
@@ -146,11 +150,21 @@ test("an app keeps where its page stands in the address, through reload and back
   const frame = page.frameLocator('iframe[title="Board"]');
   await expect(frame.locator("#at")).toHaveText("at /orders/42");
   await frame.locator("#go").click();
-  await expect(frame.locator("#at")).toHaveText("at /orders/43");
+  await expect(frame.locator("#at")).toHaveText("at /orders/43 from 42");
   await expect.poll(() => new URL(page.url()).hash).toBe("#/orders/43");
   await page.reload();
-  await expect(frame.locator("#at")).toHaveText("at /orders/43");
+  await expect(frame.locator("#at")).toHaveText("at /orders/43 from 42");
   await page.goBack();
   await expect(frame.locator("#at")).toHaveText("at /orders/42");
   expect(new URL(page.url()).hash).toBe("#/orders/42");
+  await page.goForward();
+  await expect(frame.locator("#at")).toHaveText("at /orders/43 from 42");
+  await frame.locator("#back").click();
+  await expect(frame.locator("#at")).toHaveText("at /orders/42");
+
+  // the page's back on the app's first entry stays in the app
+  await frame.locator("#back").click();
+  await page.waitForTimeout(300);
+  expect(new URL(page.url()).pathname).toBe("/-/apps/board/");
+  await expect(frame.locator("#at")).toHaveText("at /orders/42");
 });

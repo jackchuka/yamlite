@@ -25,6 +25,9 @@ export function pageSdk(
   win: SdkWindow = window as unknown as SdkWindow,
   initialTheme: "light" | "dark" = "light",
   initialPath = "/",
+  // the host's own path rules, handed over as their source
+  pagePath: (to: unknown, from?: string) => string | null,
+  initialState: unknown = null,
 ): void {
   class YamliteError extends Error {
     readonly status: number;
@@ -44,25 +47,26 @@ export function pageSdk(
   const themeListeners = new Set<(data: { theme: "light" | "dark" }) => void>();
   // yamlite.history follows the history package's shape, which routers such as React Router take
   type To = string | { pathname?: string; search?: string; hash?: string };
-  type Location = { pathname: string; search: string; hash: string; state: null; key: string };
+  type Location = { pathname: string; search: string; hash: string; state: unknown; key: string };
   type Action = "POP" | "PUSH" | "REPLACE";
   const historyListeners = new Set<(update: { action: Action; location: Location }) => void>();
   let keys = 0;
-  const at = (path: string): Location => {
+  const at = (path: string, state: unknown): Location => {
     const u = new URL(path, "http://page");
-    return { pathname: u.pathname, search: u.search, hash: u.hash, state: null, key: String(keys++) };
+    return { pathname: u.pathname, search: u.search, hash: u.hash, state, key: String(keys++) };
   };
-  let location = at(initialPath);
+  let location = at(initialPath, initialState);
   let action: Action = "POP";
+  // a path the host would refuse is refused here, before the page moves to it
   const href = (to: To) => {
     const text = typeof to === "string" ? to : `${to.pathname ?? location.pathname}${to.search ?? ""}${to.hash ?? ""}`;
-    const u = new URL(text, `http://page${location.pathname}`);
-    if (u.origin !== "http://page") throw new Error(`${text} is not a path inside the page`);
-    return u.pathname + u.search + u.hash;
+    const path = pagePath(text, location.pathname + location.search + location.hash);
+    if (path === null) throw new Error(`${text} is not a path inside the page`);
+    return path;
   };
-  const moved = (a: Action, path: string) => {
+  const moved = (a: Action, path: string, state: unknown) => {
     action = a;
-    location = at(path);
+    location = at(path, state);
     for (const listener of historyListeners) listener({ action, location });
   };
   let next = 0;
@@ -80,7 +84,8 @@ export function pageSdk(
       return;
     }
     if (m.event === "location") {
-      if (typeof m.data?.path === "string") moved("POP", m.data.path);
+      const path = pagePath(m.data?.path);
+      if (path !== null) moved("POP", path, m.data.state ?? null);
       return;
     }
     if (m.event === "theme") {
@@ -129,15 +134,16 @@ export function pageSdk(
       get location() {
         return location;
       },
-      push(to: To) {
+      // posted first: a state that cannot be cloned throws there, before the page moves
+      push(to: To, state: unknown = null) {
         const path = href(to);
-        moved("PUSH", path);
-        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, false] }, "*");
+        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, false, state] }, "*");
+        moved("PUSH", path, state);
       },
-      replace(to: To) {
+      replace(to: To, state: unknown = null) {
         const path = href(to);
-        moved("REPLACE", path);
-        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, true] }, "*");
+        parent.postMessage({ yamlite: 1, method: "navigate", args: [path, true, state] }, "*");
+        moved("REPLACE", path, state);
       },
       go: (delta: number) => parent.postMessage({ yamlite: 1, method: "go", args: [delta] }, "*"),
       back: () => parent.postMessage({ yamlite: 1, method: "go", args: [-1] }, "*"),

@@ -26,6 +26,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const hostRef = useRef<PageHost | null>(null);
   // an app's place inside the page is its address's; a rebuilt frame starts where the page last was
   const [place] = useState(() => (app ? hashLocation(window) : memoryLocation()));
+  useEffect(() => () => place.dispose(), [place]);
   const { data: meta } = useMeta();
   const store = useEventStore();
   const page = meta?.pages.find((p) => p.name === name);
@@ -43,7 +44,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const srcDoc = useMemo(
     () =>
       network !== undefined && html.data !== undefined
-        ? injectPage(html.data, network ? network.split(" ") : [], themeRef.current, place.path)
+        ? injectPage(html.data, network ? network.split(" ") : [], themeRef.current, place.path, place.state)
         : undefined,
     [network, html.data, rebuild, place],
   );

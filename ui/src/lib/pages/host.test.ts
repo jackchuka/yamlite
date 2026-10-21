@@ -217,7 +217,18 @@ test("the page's moves are kept without an answer, and a path that leaves the pa
   expect(deps.location.path).toBe("/orders/43");
   send("go", [-1]);
   expect(deps.location.path).toBe("/");
-  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/" } }]);
+  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/", state: null } }]);
+});
+
+test("the state a page moves with is kept with the place and handed back when the page returns to it", () => {
+  const { host, frame, posted, deps } = setup();
+  const send = (method: string, args: unknown[]) =>
+    host.handle({ source: frame, data: { yamlite: 1, method, args } } as MessageEvent);
+  send("navigate", ["/a", false, { tab: 2 }]);
+  expect(deps.location.state).toEqual({ tab: 2 });
+  send("navigate", ["/b", false]);
+  send("go", [-1]);
+  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/a", state: { tab: 2 } } }]);
 });
 
 test("a move from outside the page is told to it until the host is disposed", () => {
@@ -226,5 +237,5 @@ test("a move from outside the page is told to it until the host is disposed", ()
   deps.location.go(-1);
   host.dispose();
   deps.location.go(1);
-  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/" } }]);
+  expect(posted).toEqual([{ yamlite: 1, event: "location", data: { path: "/", state: null } }]);
 });

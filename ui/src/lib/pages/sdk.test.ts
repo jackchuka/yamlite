@@ -1,13 +1,15 @@
 import { afterEach, expect, test, vi } from "vitest";
+import { pagePath } from "./location";
 import { pageSdk } from "./sdk";
 
-function fake(theme?: "light" | "dark", path?: string) {
+function fake(theme?: "light" | "dark", path?: string, state?: unknown) {
   const sent: Array<Record<string, unknown>> = [];
   let onMessage: (e: { source: unknown; data: unknown }) => void = () => {};
   let onViolation: (e: { blockedURI: string }) => void = () => {};
   let onKey: (e: { key: string; defaultPrevented: boolean; isComposing: boolean }) => void = () => {};
   let onClick: () => void = () => {};
-  const parent = { postMessage: (m: Record<string, unknown>) => sent.push(m) };
+  // as a real window's: the message is cloned, and what cannot be is refused
+  const parent = { postMessage: (m: Record<string, unknown>) => sent.push(structuredClone(m)) };
   const root = { dataset: {} as Record<string, string> };
   const win = {
     parent,
@@ -17,7 +19,7 @@ function fake(theme?: "light" | "dark", path?: string) {
       t === "keydown" ? (onKey = fn) : t === "click" ? (onClick = fn) : (onMessage = fn),
     document: { addEventListener: (_t: string, fn: typeof onViolation) => (onViolation = fn), documentElement: root },
   } as Record<string, any>;
-  pageSdk(win as never, theme, path);
+  pageSdk(win as never, theme, path, pagePath, state);
   return {
     yamlite: win.yamlite,
     sent,
@@ -181,8 +183,8 @@ test("push and replace move the page at once and tell the host, relative to wher
   history.replace({ search: "?tab=2" });
   expect(seen).toEqual(["PUSH /orders/43", "REPLACE /orders/43?tab=2"]);
   expect(f.sent.filter((m) => m.method === "navigate").map((m) => m.args)).toEqual([
-    ["/orders/43", false],
-    ["/orders/43?tab=2", true],
+    ["/orders/43", false, null],
+    ["/orders/43?tab=2", true, null],
   ]);
   expect(history.createHref("/x y")).toBe("/x%20y");
   expect(() => history.push("https://example.com/")).toThrow("is not a path inside the page");
@@ -204,4 +206,72 @@ test("go, back and forward ask the host, and its answer moves the page", () => {
   f.reply({ yamlite: 1, event: "location", data: { path: "/c" } });
   expect(seen).toEqual(["POP /a"]);
   expect(history.location.pathname).toBe("/c");
+});
+
+// the host's rules are the page's: each case runs through both, from the same place
+const paths: Array<[string, string, string]> = [
+  ["a full path", "/orders/42?tab=1#note", "/"],
+  ["characters the parser escapes", "/a b", "/"],
+  ["a relative path", "42", "/orders/7?x=1"],
+  ["a query alone", "?tab=2", "/orders/7?x=1#h"],
+  ["a hash alone", "#h", "/orders/7?x=1"],
+  ["a climb", "../up", "/a/b/c"],
+  ["another origin", "https://example.com/x", "/"],
+  ["a protocol-relative address", "//example.com/x", "/"],
+  ["a script", "javascript:alert(1)", "/"],
+  ["too long a path", "/x".repeat(1025), "/"],
+  ["a path too long once escaped", `/${" ".repeat(700)}x`, "/"],
+];
+
+test.each(paths)("the page resolves %s as the host does, refusing what it refuses", (_name, to, from) => {
+  const { history } = fake("light", from).yamlite;
+  const host = pagePath(to, from);
+  if (host === null) expect(() => history.createHref(to)).toThrow("is not a path inside the page");
+  else expect(history.createHref(to)).toBe(host);
+});
+
+test("a path the host would refuse moves neither the page nor the address", () => {
+  const f = fake("light", "/a");
+  const { history } = f.yamlite;
+  const seen: unknown[] = [];
+  history.listen((u: unknown) => seen.push(u));
+  for (const to of ["/x".repeat(1025), "https://example.com/"]) {
+    expect(() => history.push(to)).toThrow("is not a path inside the page");
+    expect(() => history.replace(to)).toThrow("is not a path inside the page");
+  }
+  expect(seen).toEqual([]);
+  expect(history.location.pathname).toBe("/a");
+  expect(f.sent.filter((m) => m.method === "navigate")).toEqual([]);
+});
+
+test("a place the host tells the page is read by the same rules", () => {
+  const f = fake("light", "/a");
+  f.reply({ yamlite: 1, event: "location", data: { path: "https://example.com/x" } });
+  expect(f.yamlite.history.location.pathname).toBe("/a");
+});
+
+test("the state a page moves with is its location's, goes to the host, and comes back with a move to it", () => {
+  const f = fake("light", "/a", { first: true });
+  const { history } = f.yamlite;
+  expect(history.location.state).toEqual({ first: true });
+  history.push("/b", { from: "/a" });
+  expect(history.location.state).toEqual({ from: "/a" });
+  history.replace("/c");
+  expect(history.location.state).toBeNull();
+  expect(f.sent.filter((m) => m.method === "navigate").map((m) => m.args)).toEqual([
+    ["/b", false, { from: "/a" }],
+    ["/c", true, null],
+  ]);
+  f.reply({ yamlite: 1, event: "location", data: { path: "/b", state: { from: "/a" } } });
+  expect(history.location).toMatchObject({ pathname: "/b", state: { from: "/a" } });
+  f.reply({ yamlite: 1, event: "location", data: { path: "/" } });
+  expect(history.location.state).toBeNull();
+});
+
+test("a state that cannot be cloned is refused before the page moves", () => {
+  const f = fake("light", "/a");
+  const { history } = f.yamlite;
+  expect(() => history.push("/b", { fn: () => {} })).toThrow();
+  expect(history.location.pathname).toBe("/a");
+  expect(f.sent.filter((m) => m.method === "navigate")).toEqual([]);
 });

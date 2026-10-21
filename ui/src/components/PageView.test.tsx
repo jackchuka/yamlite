@@ -179,7 +179,7 @@ test("a frame rebuilt after a theme switch starts with the current theme", async
   const page = snapshot.meta.pages[0] as (typeof snapshot.meta.pages)[number];
   queryClient.setQueryData(["meta"], { ...snapshot.meta, pages: [{ ...page, access: { tasks: "read" } }] });
   await waitFor(() => expect(screen.getByTitle("Board")).not.toBe(frame));
-  expect(screen.getByTitle("Board").getAttribute("srcdoc")).toContain('(undefined, "dark", "/")');
+  expect(screen.getByTitle("Board").getAttribute("srcdoc")).toContain('(undefined, "dark", "/", ');
 });
 
 test("a page that cannot be loaded shows why", async () => {
@@ -192,7 +192,7 @@ test("switching the theme tells the page without rebuilding the frame", async ()
   document.documentElement.dataset.theme = "light";
   await show("board");
   const frame = (await screen.findByTitle("Board")) as HTMLIFrameElement;
-  expect(frame.getAttribute("srcdoc")).toContain('(undefined, "light", "/")');
+  expect(frame.getAttribute("srcdoc")).toContain('(undefined, "light", "/", ');
   const posted: unknown[] = [];
   const win = frame.contentWindow as Window;
   const original = win.postMessage.bind(win);
