@@ -49,7 +49,8 @@ const git: GitState = {
       records: [{ key: "a", kind: "modified", fields: ["title"] }],
     },
     { path: "tasks/b.yaml", status: "deleted", table: "tasks", records: [{ key: "b", kind: "deleted", fields: [] }] },
-    { path: "yamlite.yaml", status: "added", table: null, records: null },
+    { path: "yamlite.yaml", status: "modified", table: null, records: null },
+    { path: ".pages/new.html", status: "added", table: null, records: null },
   ],
 };
 
@@ -61,19 +62,21 @@ function renderDialog(state: GitState = git, onOpenChange = () => {}) {
   );
 }
 
-test("lists records under their files, with other files last and no actions on them", () => {
+test("lists records under their files, with other files last", () => {
   renderDialog();
   expect(screen.getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"))).toEqual([
     "Include people.yaml",
     "Include tasks/a.yaml",
     "Include tasks/b.yaml",
     "Include yamlite.yaml",
+    "Include .pages/new.html",
   ]);
   expect(screen.getByRole("button", { name: "Put 1 back as committed" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Delete 2; it was never committed" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Put a back as committed" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Put b back as committed" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /yamlite\.yaml/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Delete .pages/new.html; it was never committed" })).toBeTruthy();
   expect(screen.getByText("Other files")).toBeTruthy();
 });
 
@@ -94,13 +97,14 @@ test("expanding a file shows its fields as committed and now", async () => {
 test("a record goes back as committed, and the toast's undo writes the previous values back", async () => {
   vi.mocked(gitApi.revert).mockResolvedValue({
     reverted: [{ table: "tasks", key: "a", before: { title: "A2", note: "x" }, after: { title: "A", note: null } }],
+    files: [],
   });
   renderDialog();
   fireEvent.click(screen.getByRole("button", { name: "Put a back as committed" }));
   await waitFor(() => expect(toast.success).toHaveBeenCalled());
-  expect(gitApi.revert).toHaveBeenCalledWith([{ table: "tasks", key: "a" }]);
+  expect(gitApi.revert).toHaveBeenCalledWith({ records: [{ table: "tasks", key: "a" }], files: [] });
   const [message, opts] = vi.mocked(toast.success).mock.calls[0]!;
-  expect(message).toBe("Put 1 record back as committed");
+  expect(message).toBe("Put 1 change back as committed");
   (opts as unknown as { action: { onClick: () => void } }).action.onClick();
   await waitFor(() =>
     expect(api.update).toHaveBeenCalledWith("tasks", "a", { title: "A2", note: "x" }, { title: "A", note: null }),
@@ -110,25 +114,97 @@ test("a record goes back as committed, and the toast's undo writes the previous 
 test("an added record is deleted only after a second click", async () => {
   vi.mocked(gitApi.revert).mockResolvedValue({
     reverted: [{ table: "people", key: "2", before: { name: "Bob" }, after: null }],
+    files: [],
   });
   renderDialog();
   fireEvent.click(screen.getByRole("button", { name: "Delete 2; it was never committed" }));
   expect(gitApi.revert).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-  await waitFor(() => expect(gitApi.revert).toHaveBeenCalledWith([{ table: "people", key: "2", delete: true }]));
+  await waitFor(() =>
+    expect(gitApi.revert).toHaveBeenCalledWith({ records: [{ table: "people", key: "2", delete: true }], files: [] }),
+  );
+});
+
+test("a file that holds no records goes back only after a second click, with no undo", async () => {
+  vi.mocked(gitApi.revert).mockResolvedValue({ reverted: [], files: ["yamlite.yaml"] });
+  renderDialog();
+  fireEvent.click(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" }));
+  expect(gitApi.revert).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Put back" }));
+  await waitFor(() => expect(toast.success).toHaveBeenCalled());
+  expect(gitApi.revert).toHaveBeenCalledWith({ records: [], files: ["yamlite.yaml"] });
+  expect(vi.mocked(toast.success).mock.calls[0]).toEqual(["Put 1 change back as committed", {}]);
+});
+
+test("a file's second click is asked for again once the focus moves away", () => {
+  renderDialog();
+  fireEvent.click(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" }));
+  fireEvent.blur(screen.getByRole("button", { name: "Put back" }));
+  expect(screen.queryByRole("button", { name: "Put back" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" })).toBeTruthy();
+});
+
+test("an added file that holds no records is deleted only after a second click", async () => {
+  vi.mocked(gitApi.revert).mockResolvedValue({ reverted: [], files: [".pages/new.html"] });
+  renderDialog();
+  fireEvent.click(screen.getByRole("button", { name: "Delete .pages/new.html; it was never committed" }));
+  expect(gitApi.revert).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+  await waitFor(() => expect(gitApi.revert).toHaveBeenCalledWith({ records: [], files: [".pages/new.html"] }));
 });
 
 test("the bulk button puts back changed and deleted records of the checked files, never added ones", async () => {
-  vi.mocked(gitApi.revert).mockResolvedValue({ reverted: [] });
+  vi.mocked(gitApi.revert).mockResolvedValue({ reverted: [], files: [] });
   renderDialog();
   fireEvent.click(screen.getByRole("checkbox", { name: "Include tasks/a.yaml" }));
-  fireEvent.click(screen.getByRole("button", { name: "Put back 2 records" }));
+  fireEvent.click(screen.getByRole("checkbox", { name: "Include yamlite.yaml" }));
+  fireEvent.click(screen.getByRole("button", { name: "Put back 2 changes" }));
   await waitFor(() =>
-    expect(gitApi.revert).toHaveBeenCalledWith([
-      { table: "people", key: "1" },
-      { table: "tasks", key: "b" },
-    ]),
+    expect(gitApi.revert).toHaveBeenCalledWith({
+      records: [
+        { table: "people", key: "1" },
+        { table: "tasks", key: "b" },
+      ],
+      files: [],
+    }),
   );
+});
+
+test("the bulk button counts changed files too, and asks once more before putting them back", async () => {
+  vi.mocked(gitApi.revert).mockResolvedValue({ reverted: [], files: ["yamlite.yaml"] });
+  renderDialog();
+  fireEvent.click(screen.getByRole("checkbox", { name: "Include tasks/a.yaml" }));
+  fireEvent.click(screen.getByRole("button", { name: "Put back 3 changes" }));
+  expect(gitApi.revert).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Put back 3 changes (no undo)" }));
+  await waitFor(() =>
+    expect(gitApi.revert).toHaveBeenCalledWith({
+      records: [
+        { table: "people", key: "1" },
+        { table: "tasks", key: "b" },
+      ],
+      files: ["yamlite.yaml"],
+    }),
+  );
+});
+
+test("the bulk button asks again when the changes it would put back change", () => {
+  const client = new QueryClient();
+  const dialog = (state: GitState) => (
+    <QueryClientProvider client={client}>
+      <ReviewDialog git={state} open onOpenChange={() => {}} />
+    </QueryClientProvider>
+  );
+  const view = render(dialog(git));
+  fireEvent.click(screen.getByRole("button", { name: "Put back 4 changes" }));
+  expect(screen.getByRole("button", { name: "Put back 4 changes (no undo)" })).toBeTruthy();
+  const more: GitState = {
+    ...git,
+    changes: [...git.changes, { path: "notes.txt", status: "modified", table: null, records: null }],
+  };
+  view.rerender(dialog(more));
+  fireEvent.click(screen.getByRole("button", { name: "Put back 5 changes" }));
+  expect(gitApi.revert).not.toHaveBeenCalled();
 });
 
 test("sends the title, the description and only the checked files, then links the PR", async () => {
@@ -150,7 +226,7 @@ test("sends the title, the description and only the checked files, then links th
   expect(gitApi.review).toHaveBeenCalledWith({
     title: "Update tasks",
     body: "why",
-    paths: ["people.yaml", "tasks/a.yaml", "tasks/b.yaml"],
+    paths: ["people.yaml", "tasks/a.yaml", "tasks/b.yaml", ".pages/new.html"],
   });
   expect(screen.getByText("Sent for review.")).toBeTruthy();
 });

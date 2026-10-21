@@ -1,6 +1,6 @@
 import { NoRepository, ReviewRefused } from "../../git/driver.ts";
 import type { ReviewRequest } from "../../git/review.ts";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { writeAtomic } from "../../fsutil.ts";
 import { canonical } from "../../hash.ts";
@@ -108,14 +108,38 @@ export const gitRoutes: Routes = (router, ctx) => {
     });
   });
 
-  // puts records back to their committed values through the same writes as the forms, so the sync writes the files
+  // puts records back to their committed values through the same writes as the forms, so the sync writes the files;
+  // other changed files are written back as committed, or removed when git has never seen them
   router.add("POST", "/api/git/revert", async ({ body }) => {
     const git = ctx.git;
     if (!git) throw new HttpError(404, "the data folder is not in a git repository");
     ctx.proposals.assertIdle();
-    const items = objectBody(body, "body").records;
-    if (!Array.isArray(items) || items.length === 0)
-      throw new HttpError(400, "choose at least one record", { field: "records" });
+    const b = objectBody(body, "body");
+    const items = b.records ?? [];
+    const paths = b.files ?? [];
+    if (!Array.isArray(items)) throw new HttpError(400, "records must be a list", { field: "records" });
+    if (!Array.isArray(paths) || paths.some((p) => typeof p !== "string"))
+      throw new HttpError(400, "files must be a list of paths", { field: "files" });
+    if (items.length === 0 && paths.length === 0)
+      throw new HttpError(400, "choose at least one record or file", { field: "records" });
+    const changed = new Map(paths.length > 0 ? (await git.status()).changes.map((c) => [c.path, c.status]) : []);
+    const files = await Promise.all(
+      (paths as string[]).map(async (path) => {
+        const file = resolve(ctx.root, path);
+        const rel = relative(ctx.root, file);
+        if (rel === "" || rel.startsWith("..") || isAbsolute(rel))
+          throw new HttpError(400, `${path} is outside the data folder`);
+        const status = changed.get(path);
+        if (status === undefined) throw new HttpError(400, `${path} has no changes`);
+        const content = await git.baseFile(path).catch(notFound);
+        // a changed file the commit has no file for was renamed or copied; removing it would lose it
+        if (content === null && status !== "added")
+          throw new HttpError(409, `${path} is not in the last commit under this name; put it back with git`);
+        if (content === null && existsSync(file) && lstatSync(file).isDirectory())
+          throw new HttpError(409, `${path} is a folder; remove it with git`);
+        return { path, file, content };
+      }),
+    );
     const plan = await Promise.all(
       items.map(async (raw) => {
         const item = objectBody(raw, "record");
@@ -141,6 +165,15 @@ export const gitRoutes: Routes = (router, ctx) => {
       }),
     );
     ctx.proposals.assertIdle();
+    // files first: a write that fails leaves the records as they were
+    for (const f of files) {
+      if (f.content === null) rmSync(f.file, { force: true });
+      else {
+        mkdirSync(dirname(f.file), { recursive: true });
+        writeAtomic(f.file, f.content);
+      }
+    }
+    if (files.some((f) => f.file === resolve(ctx.configFile))) ctx.reloadConfig();
     writeTx(ctx.store, () => {
       for (const p of plan) {
         if (p.after === null) deleteRecord(ctx.store, p.spec, p.key);
@@ -153,7 +186,10 @@ export const gitRoutes: Routes = (router, ctx) => {
       mkdirSync(dirname(p.restore.file), { recursive: true });
       writeAtomic(p.restore.file, p.restore.content);
     }
-    return { reverted: plan.map((p) => ({ table: p.spec.name, key: p.key, before: p.before, after: p.after })) };
+    return {
+      reverted: plan.map((p) => ({ table: p.spec.name, key: p.key, before: p.before, after: p.after })),
+      files: files.map((f) => f.path),
+    };
   });
 };
 

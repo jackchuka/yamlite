@@ -15,11 +15,13 @@ export interface Repo {
   prefix: string;
 }
 
-export function runGit(
-  cwd: string,
-  args: string[],
-  opts: { input?: string; timeoutMs?: number; cmd?: string } = {},
-): Promise<string> {
+type GitOptions = { input?: string; timeoutMs?: number; cmd?: string };
+
+export const runGit = async (cwd: string, args: string[], opts: GitOptions = {}): Promise<string> =>
+  (await runGitBytes(cwd, args, opts)).toString();
+
+// the output as git wrote it, for content that may not be text
+export function runGitBytes(cwd: string, args: string[], opts: GitOptions = {}): Promise<Buffer> {
   const cmd = opts.cmd ?? "git";
   return new Promise((done, fail) => {
     // a missing credential must fail the step, not wait on a prompt nobody sees
@@ -43,7 +45,7 @@ export function runGit(
     });
     child.on("close", (code) => {
       clearTimeout(timer);
-      if (code === 0) return done(Buffer.concat(out).toString());
+      if (code === 0) return done(Buffer.concat(out));
       if (timedOut) return fail(new GitError(`${cmd} ${args[0]} timed out`));
       const first = Buffer.concat(err).toString().trim().split("\n")[0];
       fail(new GitError(first || `${cmd} ${args[0]} exited with ${code}`));

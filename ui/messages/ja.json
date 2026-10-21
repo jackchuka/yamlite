@@ -590,6 +590,7 @@
   "review_committed": "コミット時点",
   "review_now": "現在",
   "review_delete_confirm": "削除",
+  "review_revert_confirm": "戻す",
   "review_delete_record": "{record} を削除（一度も commit されていません）",
   "review_revert_record": "{record} をコミット時点に戻す",
   "review_include": "{file} を含める",
@@ -599,7 +600,7 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=other": "{count} 件のレコードをコミット時点に戻しました"
+        "n=other": "{count} 件の変更をコミット時点に戻しました"
       }
     }
   ],
@@ -610,6 +611,15 @@
       "selectors": ["n"],
       "match": {
         "n=other": "{count} 件をコミット時点に戻す"
+      }
+    }
+  ],
+  "review_revert_selected_confirm": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件を戻す（取り消せません）"
       }
     }
   ]

@@ -42,14 +42,22 @@ const KIND_CLASS: Record<ChangeKind, string> = {
 };
 
 type Target = { table: string; key: string; delete?: boolean };
+type Targets = { records: Target[]; files: string[] };
 
-// what the bulk button puts back: an added record has no committed version, so it is only ever removed one by one
-const revertable = (c: GitChange): Target[] =>
-  c.table === null
-    ? []
-    : (c.records ?? [])
-        .filter((r) => r.kind === "deleted" || r.fields.length > 0)
-        .map((r) => ({ table: c.table as string, key: r.key }));
+// what the bulk button puts back: an added record or file has no committed version, so it is only ever removed one
+// by one; a file that is not read as records goes back whole
+const revertable = (c: GitChange): Targets =>
+  c.records === null
+    ? { records: [], files: c.status === "added" ? [] : [c.path] }
+    : {
+        records:
+          c.table === null
+            ? []
+            : c.records
+                .filter((r) => r.kind === "deleted" || r.fields.length > 0)
+                .map((r) => ({ table: c.table as string, key: r.key })),
+        files: [],
+      };
 
 const show = (v: unknown) => (v === null || v === undefined ? "—" : typeof v === "string" ? v : JSON.stringify(v));
 
@@ -86,32 +94,18 @@ function RecordActions({
   table: string;
   record: RecordChange;
   busy: boolean;
-  onRevert: (t: Target[]) => void;
+  onRevert: (t: Targets) => void;
 }) {
-  const [confirm, setConfirm] = useState(false);
-  if (record.kind === "added") {
-    return confirm ? (
-      <Button
-        size="sm"
-        variant="destructive"
-        disabled={busy}
-        onClick={() => onRevert([{ table, key: record.key, delete: true }])}
-      >
-        {m.review_delete_confirm()}
-      </Button>
-    ) : (
-      <button
-        type="button"
-        aria-label={m.review_delete_record({ record: record.key })}
-        title={m.review_delete_record({ record: record.key })}
-        disabled={busy}
-        className="rounded p-1 text-muted-foreground hover:bg-panel-2 hover:text-err disabled:opacity-50"
-        onClick={() => setConfirm(true)}
-      >
-        <Trash2 className="size-4" />
-      </button>
+  if (record.kind === "added")
+    return (
+      <ConfirmAction
+        label={m.review_delete_record({ record: record.key })}
+        confirm={m.review_delete_confirm()}
+        remove
+        busy={busy}
+        onConfirm={() => onRevert({ records: [{ table, key: record.key, delete: true }], files: [] })}
+      />
     );
-  }
   return (
     <button
       type="button"
@@ -120,9 +114,72 @@ function RecordActions({
       // a change to formatting or comments only has no values to put back
       disabled={busy || (record.kind === "modified" && record.fields.length === 0)}
       className="rounded p-1 text-muted-foreground hover:bg-panel-2 hover:text-foreground disabled:opacity-30"
-      onClick={() => onRevert([{ table, key: record.key }])}
+      onClick={() => onRevert({ records: [{ table, key: record.key }], files: [] })}
     >
       <Undo2 className="size-4" />
+    </button>
+  );
+}
+
+// a file goes back whole, which cannot be undone, so it is asked for twice
+function FileActions({ change, busy, onRevert }: { change: GitChange; busy: boolean; onRevert: (t: Targets) => void }) {
+  const added = change.status === "added";
+  return (
+    <ConfirmAction
+      label={added ? m.review_delete_record({ record: change.path }) : m.review_revert_record({ record: change.path })}
+      confirm={added ? m.review_delete_confirm() : m.review_revert_confirm()}
+      remove={added}
+      busy={busy}
+      onConfirm={() => onRevert({ records: [], files: [change.path] })}
+    />
+  );
+}
+
+// asks a second time for what cannot be undone; looking away, or an attempt that ends, asks again from the start
+function ConfirmAction({
+  label,
+  confirm,
+  remove = false,
+  busy,
+  onConfirm,
+}: {
+  label: string;
+  confirm: string;
+  remove?: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!busy) setArmed(false);
+  }, [busy]);
+  if (armed)
+    return (
+      <Button
+        size="sm"
+        variant="destructive"
+        className="h-6 px-2 text-[12.5px]"
+        autoFocus
+        disabled={busy}
+        onBlur={() => setArmed(false)}
+        onClick={onConfirm}
+      >
+        {confirm}
+      </Button>
+    );
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={busy}
+      className={cn(
+        "rounded p-1 text-muted-foreground hover:bg-panel-2 disabled:opacity-50",
+        remove ? "hover:text-err" : "hover:text-foreground",
+      )}
+      onClick={() => setArmed(true)}
+    >
+      {remove ? <Trash2 className="size-4" /> : <Undo2 className="size-4" />}
     </button>
   );
 }
@@ -145,7 +202,7 @@ function Line({
         <span className="min-w-0 truncate text-[12.5px] text-muted-foreground">{fields.join(", ")}</span>
       )}
       <span className={cn("ml-auto shrink-0 text-[12.5px]", KIND_CLASS[kind])}>{KIND[kind]()}</span>
-      <span className="flex w-7 shrink-0 justify-end">{action}</span>
+      <span className="flex min-w-7 shrink-0 justify-end">{action}</span>
     </div>
   );
 }
@@ -164,7 +221,7 @@ function FileRow({
   checked: boolean;
   busy: boolean;
   onToggle: () => void;
-  onRevert: (t: Target[]) => void;
+  onRevert: (t: Targets) => void;
 }) {
   const [open, setOpen] = useState(false);
   const { table, records } = change;
@@ -199,7 +256,11 @@ function FileRow({
             action={<RecordActions table={table} record={one} busy={busy} onRevert={onRevert} />}
           />
         ) : (
-          <Line label={change.path} kind={change.status} />
+          <Line
+            label={change.path}
+            kind={change.status}
+            action={records === null && <FileActions change={change} busy={busy} onRevert={onRevert} />}
+          />
         )}
       </div>
       {!one && table && records && records.length > 0 && (
@@ -239,6 +300,8 @@ export function ReviewDialog({
   const [body, setBody] = useState("");
   const [branch, setBranch] = useState("");
   const [unchecked, setUnchecked] = useState<Set<string>>(new Set());
+  // the set the bulk button was armed for; a different set, as after a refetch, asks again
+  const [armedFor, setArmedFor] = useState<string | null>(null);
   const paths = git.changes.map((c) => c.path).filter((p) => !unchecked.has(p));
   const onDefault = git.branch === git.defaultBranch;
   const refresh = () => void client.invalidateQueries({ queryKey: GIT_KEY });
@@ -257,21 +320,31 @@ export function ReviewDialog({
       .then(refresh)
       .catch((e: unknown) => toast.error(e instanceof Error ? e.message : String(e)));
   const revert = useMutation({
-    mutationFn: (targets: Target[]) => gitApi.revert(targets),
-    onSuccess: ({ reverted }) =>
-      toast.success(m.review_reverted({ count: reverted.length }), {
-        action: { label: m.review_undo(), onClick: () => undo(reverted) },
-      }),
-    onSettled: refresh,
+    mutationFn: (targets: Targets) => gitApi.revert(targets),
+    // a file written back has nothing to undo it with, so undo is offered only when records alone went back
+    onSuccess: ({ reverted, files }) =>
+      toast.success(
+        m.review_reverted({ count: reverted.length + files.length }),
+        files.length > 0 ? {} : { action: { label: m.review_undo(), onClick: () => undo(reverted) } },
+      ),
+    onSettled: () => {
+      setArmedFor(null);
+      refresh();
+    },
   });
   const busy = send.isPending || revert.isPending;
-  const bulk = git.changes.filter((c) => !unchecked.has(c.path)).flatMap(revertable);
-  const toggle = (path: string) =>
+  const chosen = git.changes.filter((c) => !unchecked.has(c.path)).map(revertable);
+  const bulk = { records: chosen.flatMap((t) => t.records), files: chosen.flatMap((t) => t.files) };
+  const bulkCount = bulk.records.length + bulk.files.length;
+  const bulkKey = JSON.stringify(bulk);
+  const confirmBulk = armedFor === bulkKey;
+  const toggle = (path: string) => {
     setUnchecked((s) => {
       const next = new Set(s);
       if (!next.delete(path)) next.add(path);
       return next;
     });
+  };
   const close = (o: boolean) => {
     onOpenChange(o);
     if (!o) {
@@ -281,6 +354,7 @@ export function ReviewDialog({
       setBody("");
       setBranch("");
       setUnchecked(new Set());
+      setArmedFor(null);
     }
   };
   const empty = git.changes.length === 0;
@@ -380,13 +454,15 @@ export function ReviewDialog({
           ) : (
             <>
               <Button
-                variant="outline"
+                variant={confirmBulk ? "destructive" : "outline"}
                 className="sm:mr-auto"
-                disabled={bulk.length === 0 || busy}
-                onClick={() => revert.mutate(bulk)}
+                disabled={bulkCount === 0 || busy}
+                onClick={() => (bulk.files.length > 0 && !confirmBulk ? setArmedFor(bulkKey) : revert.mutate(bulk))}
               >
                 <Undo2 className="size-4" />
-                {m.review_revert_selected({ count: bulk.length })}
+                {confirmBulk
+                  ? m.review_revert_selected_confirm({ count: bulkCount })
+                  : m.review_revert_selected({ count: bulkCount })}
               </Button>
               <Button variant="outline" onClick={() => close(false)}>
                 {m.common_cancel()}

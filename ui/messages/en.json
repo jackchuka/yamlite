@@ -630,6 +630,7 @@
   "review_committed": "Committed",
   "review_now": "Now",
   "review_delete_confirm": "Delete",
+  "review_revert_confirm": "Put back",
   "review_delete_record": "Delete {record}; it was never committed",
   "review_revert_record": "Put {record} back as committed",
   "review_include": "Include {file}",
@@ -639,8 +640,8 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=one": "Put {count} record back as committed",
-        "n=other": "Put {count} records back as committed"
+        "n=one": "Put {count} change back as committed",
+        "n=other": "Put {count} changes back as committed"
       }
     }
   ],
@@ -650,8 +651,18 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=one": "Put back {count} record",
-        "n=other": "Put back {count} records"
+        "n=one": "Put back {count} change",
+        "n=other": "Put back {count} changes"
+      }
+    }
+  ],
+  "review_revert_selected_confirm": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "Put back {count} change (no undo)",
+        "n=other": "Put back {count} changes (no undo)"
       }
     }
   ]
