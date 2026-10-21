@@ -93,7 +93,12 @@ export interface Meta {
   views: ViewMeta[];
   pages: PageMeta[];
   // absent in a static export
-  ai?: { providers: import("./ai").AiProvider[]; viewerKeys: boolean; settingsUrl: string | null } | null;
+  ai?: {
+    providers: import("./ai").AiProvider[];
+    viewerKeys: boolean;
+    settingsUrl: string | null;
+    unavailable: boolean;
+  } | null;
 }
 
 export interface TableSchema {

@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 test("the panel docks beside the screen when open and an agent exists", () => {
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.getByText("outlet")).toBeTruthy();
@@ -64,7 +64,7 @@ test("dragging the sidebar's right edge widens it and the width is remembered", 
 
 test("an app shows only its page: no sidebar, status bar or Ask AI", () => {
   appRoute = true;
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   act(() => agentPanel.open());
   render(<Shell />);
   expect(screen.getByText("outlet")).toBeTruthy();

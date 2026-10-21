@@ -1,3 +1,4 @@
+import { generateText } from "ai";
 import { expect, test } from "vitest";
 import { createModel, envKeys, PROVIDERS, providerOf } from "../../src/agent/providers.ts";
 
@@ -28,11 +29,11 @@ test("createModel with baseURL leaves out the browser header", async () => {
   }) as typeof fetch;
   const call = async (baseURL?: string) => {
     const model = createModel({ provider: "anthropic", model: "claude-sonnet-5-5", apiKey: "k", baseURL, fetch: spy });
-    const prompt = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
-    await (model as any).doGenerate({ prompt }).catch(() => {});
+    await generateText({ model, prompt: "hi", maxRetries: 0 }).catch(() => {});
   };
   await call("https://h/anthropic/v1");
   await call();
+  expect(calls).toHaveLength(2);
   expect(calls[0]?.url).toMatch(/^https:\/\/h\/anthropic\/v1\/messages/);
   expect(calls[0]?.headers.has("anthropic-dangerous-direct-browser-access")).toBe(false);
   expect(calls[1]?.headers.get("anthropic-dangerous-direct-browser-access")).toBe("true");

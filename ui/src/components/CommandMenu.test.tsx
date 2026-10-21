@@ -49,7 +49,7 @@ test("on a phone the search text keeps clear of the close button and the list fi
 });
 
 test("the AI item shows only when an agent exists and opens the panel", () => {
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   renderMenu();
   const { result } = renderHook(() => useAgentPanelOpen());
   act(() => openCommandMenu());

@@ -96,6 +96,7 @@ test("meta lists the providers and which keys serve holds", async () => {
     { id: "anthropic", hasKey: true },
     { id: "openai", hasKey: false },
   ]);
+  expect(ai.unavailable).toBe(false);
 });
 
 test("meta lists the host's default provider first", async () => {
@@ -104,6 +105,13 @@ test("meta lists the host's default provider first", async () => {
   });
   const ai = (await t.api("/api/meta")).body.ai;
   expect(ai.providers.map((p: any) => p.id)).toEqual(["openai", "anthropic"]);
+});
+
+test("meta says whether the host could not load its AI settings", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, {
+    ai: { viewerKeys: false, unavailable: true },
+  });
+  expect((await t.api("/api/meta")).body.ai.unavailable).toBe(true);
 });
 
 test("agent: false hides the feature", async () => {

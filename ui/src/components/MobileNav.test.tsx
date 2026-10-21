@@ -62,7 +62,7 @@ test("search from the sidebar sheet closes the sheet", () => {
 });
 
 test("the AI button shows only when an agent exists and opens the panel", () => {
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   render(<MobileNav onNewTable={() => {}} />);
   const { result } = renderHook(() => useAgentPanelOpen());
   fireEvent.click(screen.getByRole("button", { name: "Ask AI" }));

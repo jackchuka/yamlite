@@ -271,7 +271,7 @@ export function AgentPanel() {
       </header>
       {noHostKey && (
         <div className="flex flex-col items-start gap-2 border-b p-3.5 text-[15px]">
-          <p>{m.agent_no_host_key()}</p>
+          <p>{host?.unavailable ? m.agent_ai_unavailable() : m.agent_no_host_key()}</p>
           <SettingsLink url={host?.settingsUrl} />
         </div>
       )}

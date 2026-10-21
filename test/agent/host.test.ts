@@ -266,6 +266,11 @@ test("viewerKeys: false lists only providers the host has a key for", () => {
   expect(host.providers().map((p) => p.id)).toEqual(["openai"]);
 });
 
+test("unavailable is false unless the host says its settings could not be loaded", () => {
+  expect(makeHost([]).host.unavailable).toBe(false);
+  expect(makeHost([], { viewerKeys: false, unavailable: true }).host.unavailable).toBe(true);
+});
+
 test("models replaces the suggestions and, without viewer keys, limits the choice", () => {
   const { host, made } = makeHost([scripted([])], { models: { anthropic: ["claude-haiku-5-5"] }, viewerKeys: false });
   expect(host.providers()[0]?.models).toEqual(["claude-haiku-5-5"]);
@@ -274,6 +279,38 @@ test("models replaces the suggestions and, without viewer keys, limits the choic
   );
   host.start({ provider: "anthropic" });
   expect(made[0]?.model).toBe("claude-haiku-5-5");
+});
+
+test("a provider's models are fixed only without viewer keys and with a listed entry", () => {
+  const fixed = (o: Partial<HostOptions>) =>
+    Object.fromEntries(
+      makeHost([], o)
+        .host.providers()
+        .map((p) => [p.id, p.fixedModels]),
+    );
+  const keys = { anthropic: "k", openai: "k" };
+  expect(fixed({ keys, viewerKeys: false, models: { anthropic: ["claude-haiku-5-5"] } })).toEqual({
+    anthropic: true,
+    openai: false,
+  });
+  expect(fixed({ keys, models: { anthropic: ["claude-haiku-5-5"] } })).toEqual({ anthropic: false, openai: false });
+});
+
+test("without a listed entry and without viewer keys, any model id goes through", () => {
+  const { host, made } = makeHost([scripted([])], { keys: { openai: "k" }, viewerKeys: false });
+  host.start({ provider: "openai", model: "gpt-next" });
+  expect(made[0]?.model).toBe("gpt-next");
+});
+
+test("an empty models list counts as no entry", () => {
+  const { host, made } = makeHost([scripted([]), scripted([])], { models: { anthropic: [] }, viewerKeys: false });
+  const p = host.providers().find((x) => x.id === "anthropic");
+  expect(p?.models.length).toBeGreaterThan(0);
+  expect(p?.fixedModels).toBe(false);
+  host.start({ provider: "anthropic" });
+  expect(made[0]?.model).toBe(p?.models[0]);
+  host.start({ provider: "anthropic", model: "claude-next" });
+  expect(made[1]?.model).toBe("claude-next");
 });
 
 test("baseURL reaches createModel", () => {

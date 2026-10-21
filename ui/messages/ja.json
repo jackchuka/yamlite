@@ -398,6 +398,7 @@
   "agent_remember_key": "この端末にキーを保存する",
   "agent_save": "保存",
   "agent_no_host_key": "このリポジトリには AI のキーが設定されていません。リポジトリの管理者に設定を依頼してください。",
+  "agent_ai_unavailable": "AI の設定を読み込めませんでした。ページを再読み込みしてから、もう一度お試しください。",
   "agent_open_settings": "AI の設定",
   "agent_host_key_refused": "このリポジトリの AI のキーが拒否されました。リポジトリの管理者に確認を依頼してください。",
   "agent_key_required": "始めるには API キーを入力してください。",
