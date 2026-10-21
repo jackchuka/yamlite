@@ -13,9 +13,11 @@ const providers = vi.hoisted(() => ({
     { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true },
   ] as import("@/lib/ai").AiProvider[],
 }));
+const host = vi.hoisted(() => ({ value: { viewerKeys: true, settingsUrl: null as string | null } }));
 vi.mock("@/lib/ai", async (orig) => ({
   ...(await orig<typeof import("@/lib/ai")>()),
   useAiProviders: () => providers.list,
+  useAiHost: () => host.value,
 }));
 vi.mock("@/lib/agent", async (orig) => {
   const real = await orig<typeof import("@/lib/agent")>();
@@ -29,6 +31,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   providers.list = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  host.value = { viewerKeys: true, settingsUrl: null };
 });
 
 const renderPanel = () =>
@@ -258,4 +261,46 @@ test("Escape keeps the panel open with an unsent draft, and in another text fiel
   fireEvent.keyDown(box, { key: "Escape" });
   expect(close).toHaveBeenCalledTimes(1);
   close.mockRestore();
+});
+
+test("with no host key and no viewer keys it says so and links to the settings", () => {
+  providers.list = [];
+  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai" };
+  renderPanel();
+  expect(screen.getByText(/No AI key is set up for this repository/)).toBeTruthy();
+  const link = screen.getByRole("link", { name: "AI settings" });
+  expect(link.getAttribute("href")).toBe("https://example.com/settings/ai");
+  expect(link.getAttribute("target")).toBeNull();
+  expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
+  expect((screen.getByRole("textbox", { name: "Request to the AI" }) as HTMLTextAreaElement).disabled).toBe(true);
+});
+
+test("with no host key and no settings URL there is no link", () => {
+  providers.list = [];
+  host.value = { viewerKeys: false, settingsUrl: null };
+  renderPanel();
+  expect(screen.getByText(/No AI key is set up for this repository/)).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "AI settings" })).toBeNull();
+});
+
+test("without viewer keys an auth error says so and links to the settings instead of opening the form", async () => {
+  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai" };
+  renderPanel();
+  await setChat({ items: [{ kind: "error", code: "auth", message: "rejected" }] });
+  expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
+  expect(screen.getByRole("alert").textContent).toContain(
+    "The AI key for this repository was refused. Ask a repository admin to check it.",
+  );
+  const link = screen.getByRole("link", { name: "AI settings" });
+  expect(link.getAttribute("href")).toBe("https://example.com/settings/ai");
+  expect(link.getAttribute("target")).toBeNull();
+});
+
+test("without viewer keys or a settings URL an auth error has no link", async () => {
+  host.value = { viewerKeys: false, settingsUrl: null };
+  renderPanel();
+  await setChat({ items: [{ kind: "error", code: "auth", message: "rejected" }] });
+  expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
+  expect(screen.getByText(/The AI key for this repository was refused/)).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "AI settings" })).toBeNull();
 });

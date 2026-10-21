@@ -44,6 +44,12 @@ export function useAiProviders(): AiProvider[] | null {
   return isReadOnly() ? null : (meta.data?.ai?.providers ?? null);
 }
 
+export function useAiHost(): { viewerKeys: boolean; settingsUrl: string | null } | null {
+  const meta = useMeta();
+  const ai = isReadOnly() ? null : meta.data?.ai;
+  return ai ? { viewerKeys: ai.viewerKeys, settingsUrl: ai.settingsUrl } : null;
+}
+
 export function savedKey(providerId: string): string {
   return unsaved[providerId] ?? load().keys?.[providerId] ?? "";
 }
@@ -52,12 +58,16 @@ export function isRemembered(providerId: string): boolean {
   return !!load().keys?.[providerId];
 }
 
-export function currentChoice(providers: AiProvider[]): AiChoice | null {
+export function currentChoice(
+  providers: AiProvider[],
+  { viewerKeys }: { viewerKeys: boolean } = { viewerKeys: true },
+): AiChoice | null {
   const s = load();
   const p = providers.find((x) => x.id === s.provider) ?? providers.find((x) => x.hasKey) ?? providers[0];
   if (!p) return null;
-  const model = p.id === s.provider && s.model ? s.model : (p.models[0] as string);
-  const apiKey = savedKey(p.id);
+  const saved = p.id === s.provider && s.model ? s.model : undefined;
+  const model = saved && (viewerKeys || p.models.includes(saved)) ? saved : (p.models[0] as string);
+  const apiKey = viewerKeys ? savedKey(p.id) : "";
   return apiKey || p.hasKey ? { provider: p.id, model, apiKey } : null;
 }
 

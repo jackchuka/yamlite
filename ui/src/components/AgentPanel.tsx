@@ -18,7 +18,7 @@ import {
   useConversations,
   usePendingProposals,
 } from "@/lib/agent";
-import { type AiChoice, currentChoice, saveChoice, useAiProviders } from "@/lib/ai";
+import { type AiChoice, currentChoice, saveChoice, useAiHost, useAiProviders } from "@/lib/ai";
 import { ApiError } from "@/lib/api";
 import { usePanelWidth } from "@/lib/panelWidth";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -122,6 +122,15 @@ function ConversationMenu({ current, onPick }: { current: string | null; onPick:
   );
 }
 
+// the host's own app, so it opens in this tab
+function SettingsLink({ url }: { url: string | null | undefined }) {
+  return url ? (
+    <a href={url} className="underline">
+      {m.agent_open_settings()}
+    </a>
+  ) : null;
+}
+
 function startErrorText(e: unknown): string {
   if (e instanceof ApiError && e.body.code === "no_key") return m.agent_key_required();
   return e instanceof Error ? e.message : String(e);
@@ -129,10 +138,14 @@ function startErrorText(e: unknown): string {
 
 export function AgentPanel() {
   const providers = useAiProviders();
+  const host = useAiHost();
+  const viewerKeys = host?.viewerKeys ?? true;
   const state = useChat();
   const mobile = useIsMobile();
   const [width, setWidth] = usePanelWidth("yamlite-agent-width", 420);
-  const [choice, setChoice] = useState<AiChoice | null>(() => (providers ? currentChoice(providers) : null));
+  const [choice, setChoice] = useState<AiChoice | null>(() =>
+    providers ? currentChoice(providers, { viewerKeys }) : null,
+  );
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
   const [startError, setStartError] = useState<string | null>(null);
@@ -167,8 +180,10 @@ export function AgentPanel() {
 
   if (!providers) return null;
   const last = state.items.at(-1);
-  const keyRejected = last?.kind === "error" && last.code === "auth";
-  const showSettings = editing || choice === null || keyRejected;
+  // without viewer keys the form has no key to fix, so the refusal is reported in the chat instead
+  const keyRejected = viewerKeys && last?.kind === "error" && last.code === "auth";
+  const noHostKey = !viewerKeys && providers.length === 0;
+  const showSettings = !noHostKey && (editing || choice === null || keyRejected);
 
   const submit = async () => {
     const message = text.trim();
@@ -214,20 +229,22 @@ export function AgentPanel() {
       {!mobile && <PanelResizeHandle width={width} label="Resize AI panel" onResize={setWidth} />}
       <header className="flex items-center justify-between gap-2 border-b px-3.5 py-2.5">
         <div className="flex min-w-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            className="min-w-0 shrink text-[14px]"
-            aria-label={m.agent_settings()}
-            aria-expanded={showSettings}
-            onClick={() => setEditing((v) => !v)}
-          >
-            <Settings className="size-4" />
-            <span className="truncate">
-              {choice
-                ? `${providers.find((p) => p.id === choice.provider)?.name ?? choice.provider} · ${choice.model}`
-                : m.agent_settings()}
-            </span>
-          </Button>
+          {!noHostKey && (
+            <Button
+              variant="ghost"
+              className="min-w-0 shrink text-[14px]"
+              aria-label={m.agent_settings()}
+              aria-expanded={showSettings}
+              onClick={() => setEditing((v) => !v)}
+            >
+              <Settings className="size-4" />
+              <span className="truncate">
+                {choice
+                  ? `${providers.find((p) => p.id === choice.provider)?.name ?? choice.provider} · ${choice.model}`
+                  : m.agent_settings()}
+              </span>
+            </Button>
+          )}
           <ConversationMenu
             current={chat.id}
             onPick={(c) => {
@@ -252,8 +269,15 @@ export function AgentPanel() {
           </Button>
         </div>
       </header>
+      {noHostKey && (
+        <div className="flex flex-col items-start gap-2 border-b p-3.5 text-[15px]">
+          <p>{m.agent_no_host_key()}</p>
+          <SettingsLink url={host?.settingsUrl} />
+        </div>
+      )}
       {showSettings && (
         <AiSettings
+          viewerKeys={viewerKeys}
           providers={providers}
           initial={choice}
           onSave={(c, remember) => {
@@ -302,6 +326,15 @@ export function AgentPanel() {
             <ToolLine key={item.id} item={item} />
           ) : item.kind === "proposal" ? (
             <ProposalCard key={item.proposal.id} proposal={item.proposal} />
+          ) : !viewerKeys && item.code === "auth" ? (
+            <div
+              key={i}
+              role="alert"
+              className="flex flex-col items-start gap-2 rounded-md border border-err px-3 py-2"
+            >
+              <p className="text-err">{m.agent_host_key_refused()}</p>
+              <SettingsLink url={host?.settingsUrl} />
+            </div>
           ) : (
             <p key={i} role="alert" className="rounded-md border border-err px-3 py-2 text-err">
               {item.message}
@@ -326,6 +359,7 @@ export function AgentPanel() {
         <textarea
           ref={input}
           aria-label={m.agent_input()}
+          disabled={noHostKey}
           rows={3}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -340,7 +374,7 @@ export function AgentPanel() {
               <Square className="size-4" /> {m.agent_stop()}
             </Button>
           ) : (
-            <Button type="submit" disabled={sending || text.trim() === ""}>
+            <Button type="submit" disabled={noHostKey || sending || text.trim() === ""}>
               {m.agent_send()}
             </Button>
           )}
