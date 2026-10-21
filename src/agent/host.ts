@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { APICallError, jsonSchema, type LanguageModel, type ModelMessage, stepCountIs, streamText, tool } from "ai";
 import { HttpError } from "../serve/http.ts";
-import { type Credentials, createModel, PROVIDERS, providerOf } from "./providers.ts";
+import { type Credentials, createModel, PROVIDERS, type Provider, providerOf } from "./providers.ts";
 import type { AgentEvent, ConversationSummary } from "./types.ts";
 import { type AgentTool, toolText } from "./tools.ts";
 
@@ -88,6 +88,15 @@ export interface HostOptions {
   notes?: string[];
   // keys the host holds itself, by provider id; yamlite serve reads them from the environment
   keys?: Record<string, string>;
+  // false: only the host's keys are used; a key sent by the client is refused
+  viewerKeys?: boolean;
+  // replaces the suggested models per provider; without viewerKeys the choice is limited to them
+  models?: Record<string, string[]>;
+  baseURL?: (provider: string) => string;
+  // listed first, so a viewer with no saved choice gets it
+  defaultProvider?: string;
+  // where the host's AI settings live
+  settingsUrl?: string;
   createModel?: (c: Credentials) => LanguageModel;
   maxConversations?: number;
   maxSteps?: number;
@@ -99,13 +108,25 @@ export class AgentHost {
 
   constructor(private readonly opts: HostOptions) {}
 
+  get viewerKeys(): boolean {
+    return this.opts.viewerKeys ?? true;
+  }
+
+  get settingsUrl(): string | null {
+    return this.opts.settingsUrl ?? null;
+  }
+
   providers(): { id: string; name: string; models: string[]; hasKey: boolean }[] {
-    return PROVIDERS.map((p) => ({
-      id: p.id,
-      name: p.name,
-      models: [...p.models],
-      hasKey: Boolean(this.opts.keys?.[p.id]),
-    }));
+    const first = this.opts.defaultProvider;
+    const ordered = [...PROVIDERS].sort((a, b) => Number(b.id === first) - Number(a.id === first));
+    return ordered
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        models: this.modelsOf(p),
+        hasKey: Boolean(this.opts.keys?.[p.id]),
+      }))
+      .filter((p) => this.viewerKeys || p.hasKey);
   }
 
   start(input: StartInput): Conversation {
@@ -113,16 +134,30 @@ export class AgentHost {
     const p = providerOf(input.provider);
     if (input.model !== undefined && typeof input.model !== "string")
       throw new HttpError(400, "model must be a string");
+    const models = this.modelsOf(p);
     // any model id goes through: the provider rejects one it does not have
-    const model = input.model?.trim() || (p.models[0] as string);
+    const model = input.model?.trim() || (models[0] as string);
+    if (!this.viewerKeys && this.opts.models?.[p.id] && !models.includes(model))
+      throw new HttpError(400, `model ${model} is not allowed here`);
     const given = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
+    if (given && !this.viewerKeys) throw new HttpError(400, "this host does not take API keys");
     const apiKey = given || this.opts.keys?.[p.id];
     if (!apiKey) throw new HttpError(400, `an API key for ${p.name} is required`, { code: "no_key" });
     const make = this.opts.createModel ?? createModel;
-    const c = new Conversation(randomBytes(8).toString("hex"), p.id, model, make({ provider: p.id, model, apiKey }));
+    const baseURL = this.opts.baseURL?.(p.id);
+    const c = new Conversation(
+      randomBytes(8).toString("hex"),
+      p.id,
+      model,
+      make({ provider: p.id, model, apiKey, ...(baseURL ? { baseURL } : {}) }),
+    );
     this.evict();
     this.conversations.set(c.id, c);
     return c;
+  }
+
+  private modelsOf(p: Provider): string[] {
+    return [...(this.opts.models?.[p.id] ?? p.models)];
   }
 
   get(id: string): Conversation | undefined {

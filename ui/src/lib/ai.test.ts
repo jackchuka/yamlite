@@ -34,3 +34,8 @@ test("a model saved for another provider is not carried over", () => {
   saveChoice({ provider: "removed-provider", model: "x-1", apiKey: "k" }, true);
   expect(currentChoice(PROVIDERS.map((p) => ({ ...p, hasKey: true })))?.model).toBe("claude-sonnet-5-5");
 });
+
+test("with nothing saved, the first provider with a key is chosen, so the host's default leads", () => {
+  const listed = [PROVIDERS[1], PROVIDERS[0]].map((p) => ({ ...p, hasKey: true }) as AiProvider);
+  expect(currentChoice(listed, { viewerKeys: false })).toEqual({ provider: "openai", model: "gpt-5", apiKey: "" });
+});

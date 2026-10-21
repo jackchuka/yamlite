@@ -23,6 +23,15 @@ import { assertSynced } from "./write.ts";
 export interface AiOptions {
   // keys the server holds, by provider id
   keys?: Record<string, string>;
+  // false: only the server's keys are used; a key sent by the client is refused
+  viewerKeys?: boolean;
+  // replaces the suggested models per provider; without viewerKeys the choice is limited to them
+  models?: Record<string, string[]>;
+  baseURL?: (provider: string) => string;
+  // listed first, so a viewer with no saved choice gets it
+  defaultProvider?: string;
+  // where the host's AI settings live
+  settingsUrl?: string;
   createModel?: (c: Credentials) => LanguageModel;
 }
 
@@ -125,6 +134,11 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     if (o.ai) {
       ctx.agent = new AgentHost({
         keys: o.ai.keys,
+        viewerKeys: o.ai.viewerKeys,
+        models: o.ai.models,
+        baseURL: o.ai.baseURL,
+        defaultProvider: o.ai.defaultProvider,
+        settingsUrl: o.ai.settingsUrl,
         createModel: o.ai.createModel,
         tools: (id) => agentTools(ctx, id),
         notes: git?.steps ? [GIT_NOTE] : [],

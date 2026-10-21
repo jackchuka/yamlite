@@ -174,6 +174,21 @@ test("providers says which keys the host holds", () => {
   ]);
 });
 
+test("defaultProvider is listed first, the others keep their order", () => {
+  const { host } = makeHost([], { keys: { anthropic: "a", openai: "o" }, defaultProvider: "openai" });
+  expect(host.providers().map((p) => p.id)).toEqual(["openai", "anthropic"]);
+});
+
+test("defaultProvider without viewer keys still lists only providers with a key", () => {
+  const { host } = makeHost([], { keys: { anthropic: "a" }, viewerKeys: false, defaultProvider: "openai" });
+  expect(host.providers().map((p) => p.id)).toEqual(["anthropic"]);
+});
+
+test("defaultProvider does not make the provider optional in start", () => {
+  const { host } = makeHost([], { keys: { anthropic: "a", openai: "o" }, defaultProvider: "openai" });
+  expect(() => host.start({ provider: undefined })).toThrow(expect.objectContaining({ status: 400 }));
+});
+
 test("the list is newest first and end closes a conversation", async () => {
   const { host } = makeHost([scripted([{ say: "a" }]), scripted([{ say: "b" }])]);
   const first = host.start({ provider: "anthropic" });
@@ -237,4 +252,37 @@ test("an error while setting up a turn is reported and the next turn works", asy
   host.prompt(c.id, "two");
   await idle(c);
   expect(c.events.at(-2)).toEqual({ type: "text", text: "fine" });
+});
+
+test("viewerKeys: false refuses a key sent by the client", () => {
+  const { host } = makeHost([], { keys: { anthropic: "k" }, viewerKeys: false });
+  expect(() => host.start({ provider: "anthropic", apiKey: "x" })).toThrow(
+    expect.objectContaining({ status: 400, message: "this host does not take API keys" }),
+  );
+});
+
+test("viewerKeys: false lists only providers the host has a key for", () => {
+  const { host } = makeHost([], { keys: { openai: "k" }, viewerKeys: false });
+  expect(host.providers().map((p) => p.id)).toEqual(["openai"]);
+});
+
+test("models replaces the suggestions and, without viewer keys, limits the choice", () => {
+  const { host, made } = makeHost([scripted([])], { models: { anthropic: ["claude-haiku-5-5"] }, viewerKeys: false });
+  expect(host.providers()[0]?.models).toEqual(["claude-haiku-5-5"]);
+  expect(() => host.start({ provider: "anthropic", model: "claude-opus-5-5" })).toThrow(
+    expect.objectContaining({ status: 400, message: "model claude-opus-5-5 is not allowed here" }),
+  );
+  host.start({ provider: "anthropic" });
+  expect(made[0]?.model).toBe("claude-haiku-5-5");
+});
+
+test("baseURL reaches createModel", () => {
+  const { host, made } = makeHost([scripted([])], { baseURL: (p) => `https://h/-/ai/o/r/${p}/v1` });
+  host.start({ provider: "anthropic" });
+  expect(made[0]).toEqual({
+    provider: "anthropic",
+    model: "claude-sonnet-5-5",
+    apiKey: "env-key",
+    baseURL: "https://h/-/ai/o/r/anthropic/v1",
+  });
 });
