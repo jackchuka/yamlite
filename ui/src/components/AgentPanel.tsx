@@ -13,6 +13,7 @@ import {
   agentPanel,
   type ChatItem,
   type ConversationSummary,
+  type Source,
   chat,
   useChat,
   useConversations,
@@ -39,6 +40,9 @@ const TOOL_LABEL: Record<string, () => string> = {
   propose_sql: m.agent_tool_propose_changes,
   propose_table: m.agent_tool_propose_table,
   check: m.agent_tool_check,
+  web_search: m.agent_tool_web_search,
+  // Anthropic narrows search results by running code before they reach the model
+  code_execution: m.agent_tool_filter_results,
 };
 
 const toolLabel = (title: string) => TOOL_LABEL[title]?.() ?? title;
@@ -67,7 +71,8 @@ function WorkingStatus({ busy, last }: { busy: boolean; last: ChatItem | undefin
 
 function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
   const label = toolLabel(item.title);
-  const sql = (item.input as { sql?: string } | undefined)?.sql;
+  const input = item.input as { sql?: string; query?: string } | undefined;
+  const plain = input?.sql ?? (item.title === "web_search" ? input?.query : undefined);
   return (
     <details className="min-w-0 rounded-md border bg-panel px-2.5 py-1.5 text-[14px] text-muted-foreground">
       <summary className="cursor-pointer">
@@ -76,9 +81,36 @@ function ToolLine({ item }: { item: Extract<ChatItem, { kind: "tool" }> }) {
       </summary>
       {item.input !== undefined && (
         <pre className="mt-1.5 font-mono text-[14px] whitespace-pre-wrap text-foreground [overflow-wrap:anywhere]">
-          {sql ?? JSON.stringify(item.input, null, 2)}
+          {plain ?? JSON.stringify(item.input, null, 2)}
         </pre>
       )}
+      {item.sources && <SourceList sources={item.sources} />}
+    </details>
+  );
+}
+
+const hostOf = (url: string) => URL.parse(url)?.hostname || url;
+
+function SourceList({ sources }: { sources: Source[] }) {
+  return (
+    <ul className="mt-1.5 flex flex-col gap-1">
+      {sources.map((s) => (
+        <li key={s.url} className="min-w-0 truncate">
+          <a href={s.url} target="_blank" rel="noreferrer noopener" title={s.url}>
+            {s.title || hostOf(s.url)}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Sources({ sources }: { sources: Source[] }) {
+  return (
+    // an answer can cite dozens of pages, so the list stays folded under it
+    <details className="mt-2 text-[14px] text-muted-foreground">
+      <summary className="cursor-pointer">{m.agent_sources({ count: sources.length })}</summary>
+      <SourceList sources={sources} />
     </details>
   );
 }
@@ -321,6 +353,7 @@ export function AgentPanel() {
               >
                 {item.text}
               </Markdown>
+              {item.sources && <Sources sources={item.sources} />}
             </div>
           ) : item.kind === "tool" ? (
             <ToolLine key={item.id} item={item} />

@@ -18,6 +18,8 @@ export interface ServeOptions {
   uiDir?: string;
   watch?: WatchOptions;
   agent?: boolean;
+  // Ask AI may search the web; each search is billed to the key
+  webSearch?: boolean;
   // tests: in place of the keys from the environment
   ai?: AiOptions;
   // skips gh detection; null means no gh
@@ -56,7 +58,7 @@ export async function serve(opts: ServeOptions): Promise<Server> {
     root: opts.root,
     db: opts.db,
     watch: opts.watch,
-    ai: opts.agent === false ? null : (opts.ai ?? { keys: envKeys(process.env) }),
+    ai: opts.agent === false ? null : (opts.ai ?? { keys: envKeys(process.env), webSearch: opts.webSearch }),
     gh: opts.gh,
     git: opts.git,
   });

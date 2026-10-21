@@ -15,6 +15,8 @@ You cannot write files or run commands. To change data, call propose_changes, pr
 For questions about the schema, yamlite.yaml or how to structure data, read the guide tool first. Its workflow is for explaining: you cannot run YAMLite commands or edit yamlite.yaml; propose_table is the only schema change you can propose.
 Reply in the language the user writes in, briefly and without SQL unless they ask for it.`;
 
+const WEB_SEARCH_NOTE = `You can search the web with web_search for what the data does not hold, such as current facts to check or fill in records with. Say which pages an answer comes from, as Markdown links such as [nodejs.org](https://nodejs.org/en/blog/release), never as bare URLs: text right after a bare URL would become part of the link.`;
+
 export const GIT_NOTE = `The data folder is in a git repository. Read it with git_status, git_diff, git_log and git_branches. To branch, commit, push, open a pull request or switch branches, call propose_git with the steps in order; like other proposals it runs only when the user presses the card's button ("Run N steps" / "N 件の手順を実行"). Read git_status first and choose the files to commit yourself: only files related to what the user asked. Pull requests are created as drafts. In the proposal title or your reply, say what the user will see afterwards, e.g. that switching back to the default branch hides the committed changes until the PR is merged and pulled, and that uncommitted changes stay as they are.`;
 
 export const GIT_DONE = `The git steps you proposed have finished; their result is above. Tell the user briefly what happened, with the pull request link if there is one. If a step failed, say what to do next.`;
@@ -99,6 +101,8 @@ export interface HostOptions {
   settingsUrl?: string;
   // the host could not tell which keys it holds, so an empty list is not a missing key
   unavailable?: boolean;
+  // lets the model search the web through its provider; each search is billed to the key
+  webSearch?: boolean;
   createModel?: (c: Credentials) => LanguageModel;
   maxConversations?: number;
   maxSteps?: number;
@@ -259,8 +263,10 @@ export class AgentHost {
 
   private async run(c: Conversation, signal: AbortSignal): Promise<boolean> {
     try {
-      const tools = Object.fromEntries(
-        this.opts.tools(c.id).map((t) => [
+      const search = this.opts.webSearch ? providerOf(c.provider).webSearch() : undefined;
+      const tools = Object.fromEntries([
+        ...(search ? [["web_search", search] as const] : []),
+        ...this.opts.tools(c.id).map((t) => [
           t.name,
           tool({
             description: t.description,
@@ -268,10 +274,10 @@ export class AgentHost {
             execute: async (args: unknown) => toolText(await t.call((args ?? {}) as Record<string, unknown>)),
           }),
         ]),
-      );
+      ]);
       const r = streamText({
         model: c.model,
-        system: [PREAMBLE, ...(this.opts.notes ?? [])].join("\n"),
+        system: [PREAMBLE, ...(search ? [WEB_SEARCH_NOTE] : []), ...(this.opts.notes ?? [])].join("\n"),
         messages: [...c.messages],
         tools,
         stopWhen: stepCountIs(this.opts.maxSteps ?? MAX_STEPS),
@@ -289,6 +295,9 @@ export class AgentHost {
             break;
           case "tool-result":
             c.emit({ type: "tool", id: p.toolCallId, status: "completed" });
+            break;
+          case "source":
+            if (p.sourceType === "url") c.emit({ type: "source", url: p.url, ...(p.title ? { title: p.title } : {}) });
             break;
           case "tool-error":
             c.emit({ type: "tool", id: p.toolCallId, status: "failed" });

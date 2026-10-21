@@ -323,3 +323,39 @@ test("baseURL reaches createModel", () => {
     baseURL: "https://h/-/ai/o/r/anthropic/v1",
   });
 });
+
+const toolIds = (model: ReturnType<typeof scripted>) =>
+  (model.doStreamCalls[0]?.tools ?? []).map((t) => (t.type === "provider" ? t.id : t.name));
+
+test("web search is offered only when the host turns it on, with a note in the system prompt", async () => {
+  const off = scripted([{ say: "ok" }]);
+  const on = scripted([{ say: "ok" }]);
+  const { host } = makeHost([off]);
+  const a = host.start({ provider: "anthropic" });
+  host.prompt(a.id, "hi");
+  await idle(a);
+  expect(toolIds(off)).not.toContain("anthropic.web_search_20260318");
+  expect(JSON.stringify(off.doStreamCalls[0]?.prompt[0])).not.toContain("web_search");
+  await host.close();
+
+  const { host: searching } = makeHost([on], { webSearch: true });
+  const b = searching.start({ provider: "anthropic" });
+  searching.prompt(b.id, "hi");
+  await idle(b);
+  expect(toolIds(on)).toEqual(expect.arrayContaining(["anthropic.web_search_20260318", "schema"]));
+  expect(JSON.stringify(on.doStreamCalls[0]?.prompt[0])).toContain("web_search");
+});
+
+test("the pages an answer draws on are passed on as sources", async () => {
+  const model = scripted([
+    { sources: [{ url: "https://a.example/", title: "A" }, { url: "https://b.example/" }], say: "Sunny." },
+  ]);
+  const { host } = makeHost([model], { webSearch: true });
+  const c = host.start({ provider: "anthropic" });
+  host.prompt(c.id, "weather?");
+  await idle(c);
+  expect(c.events.filter((e) => e.type === "source")).toEqual([
+    { type: "source", url: "https://a.example/", title: "A" },
+    { type: "source", url: "https://b.example/" },
+  ]);
+});

@@ -43,6 +43,7 @@ export type AgentEvent =
   | { type: "user"; text: string }
   | { type: "text"; text: string }
   | { type: "tool"; id: string; title?: string; status?: "in_progress" | "completed" | "failed"; input?: unknown }
+  | { type: "source"; url: string; title?: string }
   | { type: "proposal"; proposal: Proposal }
   | { type: "busy"; busy: boolean }
   | { type: "error"; message: string; code?: "auth" }
