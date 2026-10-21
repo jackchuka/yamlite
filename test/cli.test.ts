@@ -15,13 +15,15 @@ const exec = (file: string, args: string[]) =>
   );
 // each CLI test spawns its own processes in its own folder, so they run concurrently
 const run = (...args: string[]) => exec(process.execPath, [bin, ...args]);
+// a run takes up to about 1s while the full suite keeps every core busy, so the default 5s fits only a few in a row
+const runs = { timeout: 20_000 };
 
 beforeAll(() => {
   execFileSync("pnpm", ["build"], { cwd: repo, stdio: "ignore" });
 }, 120_000);
 
 // the built cli writes a WAL database, which the node VFS under sqlite-wasm cannot open
-test.skipIf(process.env.YAMLITE_SQLITE === "wasm").concurrent("status then sync", async () => {
+test.skipIf(process.env.YAMLITE_SQLITE === "wasm").concurrent("status then sync", runs, async () => {
   const root = dataRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   const status = await run("status", root);
@@ -49,7 +51,7 @@ test.concurrent("prints the version", async () => {
   expect((await run("--version")).stdout.trim()).toBe(version);
 });
 
-test.concurrent("init creates yamlite.yaml and refuses to overwrite it", async () => {
+test.concurrent("init creates yamlite.yaml and refuses to overwrite it", runs, async () => {
   const root = tmpRoot();
   write(join(root, "tasks/a.yaml"), "title: A\n");
   expect((await run("sync", root)).status).toBe(1);
@@ -109,7 +111,7 @@ test.concurrent("export writes a static site and lists what it wrote", async () 
   });
 });
 
-test.concurrent("check exits 0 without problems and 1 with them, and writes nothing", async () => {
+test.concurrent("check exits 0 without problems and 1 with them, and writes nothing", runs, async () => {
   const root = tmpRoot();
   write(
     join(root, "yamlite.yaml"),
@@ -135,7 +137,7 @@ test.concurrent("check does not take --db", async () => {
   expect(r.stderr).toContain("unknown option '--db'");
 });
 
-test.concurrent("query prints a table, JSON or CSV, and reports rows and truncation on stderr", async () => {
+test.concurrent("query prints a table, JSON or CSV, and reports rows and truncation on stderr", runs, async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
@@ -152,7 +154,7 @@ test.concurrent("query prints a table, JSON or CSV, and reports rows and truncat
   expect(existsSync(join(root, ".yamlite"))).toBe(false);
 });
 
-test.concurrent("query exits 1 with a specific message on a write, an SQL error or a bad option", async () => {
+test.concurrent("query exits 1 with a specific message on a write, an SQL error or a bad option", runs, async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables: {}\n");
   const cases: [string[], string][] = [
@@ -162,15 +164,15 @@ test.concurrent("query exits 1 with a specific message on a write, an SQL error 
     [["select 1", root, "--format", "constructor"], "unknown format constructor"],
     [["select 1", root, "--limit", "abc"], "--limit must be a whole number"],
   ];
-  for (const [args, message] of cases) {
-    const r = await run("query", ...args);
+  const ran = await Promise.all(cases.map(([args]) => run("query", ...args)));
+  ran.forEach((r, i) => {
     expect(r.status).toBe(1);
     expect(r.stdout).toBe("");
-    expect(r.stderr).toContain(message);
-  }
+    expect(r.stderr).toContain(cases[i]![1]);
+  });
 });
 
-test.concurrent("query --limit 0 does not truncate, and one row is singular", async () => {
+test.concurrent("query --limit 0 does not truncate, and one row is singular", runs, async () => {
   const root = tmpRoot();
   write(join(root, "yamlite.yaml"), "tables:\n  tasks:\n    columns: { title: TEXT }\n");
   write(join(root, "tasks/a.yaml"), "title: A\n");
@@ -196,7 +198,7 @@ test.concurrent("guide piped into a reader that stops early prints no error", as
   expect(r.stderr).toBe("");
 });
 
-test.concurrent("every command the guide names exists", async () => {
+test.concurrent("every command the guide names exists", runs, async () => {
   const help = (await run("--help")).stdout;
   const named = new Set([...(await run("guide")).stdout.matchAll(/`yamlite (\w+)/g)].map((m) => m[1]!));
   expect(named.size).toBeGreaterThan(0);
