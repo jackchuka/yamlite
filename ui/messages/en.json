@@ -430,6 +430,7 @@
   "agent_remember_key": "Remember the key on this device",
   "agent_save": "Save",
   "agent_no_host_key": "No AI key is set up for this repository. Ask a repository admin to add one.",
+  "agent_ai_unavailable": "AI settings could not be loaded. Reload the page to try again.",
   "agent_open_settings": "AI settings",
   "agent_host_key_refused": "The AI key for this repository was refused. Ask a repository admin to check it.",
   "agent_key_required": "Enter an API key to start.",
@@ -629,6 +630,7 @@
   "review_committed": "Committed",
   "review_now": "Now",
   "review_delete_confirm": "Delete",
+  "review_revert_confirm": "Put back",
   "review_delete_record": "Delete {record}; it was never committed",
   "review_revert_record": "Put {record} back as committed",
   "review_include": "Include {file}",
@@ -638,8 +640,8 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=one": "Put {count} record back as committed",
-        "n=other": "Put {count} records back as committed"
+        "n=one": "Put {count} change back as committed",
+        "n=other": "Put {count} changes back as committed"
       }
     }
   ],
@@ -649,8 +651,18 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=one": "Put back {count} record",
-        "n=other": "Put back {count} records"
+        "n=one": "Put back {count} change",
+        "n=other": "Put back {count} changes"
+      }
+    }
+  ],
+  "review_revert_selected_confirm": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=one": "Put back {count} change (no undo)",
+        "n=other": "Put back {count} changes (no undo)"
       }
     }
   ]

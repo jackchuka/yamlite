@@ -12,7 +12,12 @@ export const metaRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/meta", () => ({
     root: ctx.root,
     ai: ctx.agent
-      ? { providers: ctx.agent.providers(), viewerKeys: ctx.agent.viewerKeys, settingsUrl: ctx.agent.settingsUrl }
+      ? {
+          providers: ctx.agent.providers(),
+          viewerKeys: ctx.agent.viewerKeys,
+          settingsUrl: ctx.agent.settingsUrl,
+          unavailable: ctx.agent.unavailable,
+        }
       : null,
     db: display(ctx.dbPath),
     configFile: display(ctx.configFile),

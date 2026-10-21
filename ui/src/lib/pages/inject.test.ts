@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { pageCsp } from "../../../../src/pages/access.ts";
 import { injectPage } from "./inject";
+import { pagePath } from "./location";
 
 const parse = (html: string) => new DOMParser().parseFromString(html, "text/html");
 
@@ -54,4 +55,17 @@ test("the theme style follows the policy and the sdk is told the initial theme",
 test("the sdk is told where the page stands, escaped like the theme", () => {
   const script = parse(injectPage("<p>x</p>", [], "light", "/a?q=</script>")).head.children[2];
   expect(script?.textContent).toContain('"/a?q=\\u003c/script>"');
+});
+
+test("the sdk is handed the host's path rules", () => {
+  const script = parse(injectPage("<p>x</p>", [])).head.children[2];
+  expect(script?.textContent).toContain(String(pagePath));
+});
+
+test("the sdk is told the state its place was left with, as JSON, and none for what JSON cannot hold", () => {
+  const script = (state: unknown) =>
+    parse(injectPage("<p>x</p>", [], "light", "/", state)).head.children[2]?.textContent;
+  expect(script({ q: "</script>" })).toContain('{"q":"\\u003c/script>"});');
+  expect(script(undefined)).toMatch(/, null\);$/);
+  expect(script({ n: 1n })).toMatch(/, null\);$/);
 });

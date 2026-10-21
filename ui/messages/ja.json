@@ -398,6 +398,7 @@
   "agent_remember_key": "この端末にキーを保存する",
   "agent_save": "保存",
   "agent_no_host_key": "このリポジトリには AI のキーが設定されていません。リポジトリの管理者に設定を依頼してください。",
+  "agent_ai_unavailable": "AI の設定を読み込めませんでした。ページを再読み込みしてから、もう一度お試しください。",
   "agent_open_settings": "AI の設定",
   "agent_host_key_refused": "このリポジトリの AI のキーが拒否されました。リポジトリの管理者に確認を依頼してください。",
   "agent_key_required": "始めるには API キーを入力してください。",
@@ -589,6 +590,7 @@
   "review_committed": "コミット時点",
   "review_now": "現在",
   "review_delete_confirm": "削除",
+  "review_revert_confirm": "戻す",
   "review_delete_record": "{record} を削除（一度も commit されていません）",
   "review_revert_record": "{record} をコミット時点に戻す",
   "review_include": "{file} を含める",
@@ -598,7 +600,7 @@
       "declarations": ["input count", "local n = count: plural"],
       "selectors": ["n"],
       "match": {
-        "n=other": "{count} 件のレコードをコミット時点に戻しました"
+        "n=other": "{count} 件の変更をコミット時点に戻しました"
       }
     }
   ],
@@ -609,6 +611,15 @@
       "selectors": ["n"],
       "match": {
         "n=other": "{count} 件をコミット時点に戻す"
+      }
+    }
+  ],
+  "review_revert_selected_confirm": [
+    {
+      "declarations": ["input count", "local n = count: plural"],
+      "selectors": ["n"],
+      "match": {
+        "n=other": "{count} 件を戻す（取り消せません）"
       }
     }
   ]

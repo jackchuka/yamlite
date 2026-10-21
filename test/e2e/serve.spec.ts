@@ -343,7 +343,7 @@ test("an edit from the form shows up in History as an uncommitted change", async
   await expect(drawer.getByText("add fix-ci")).toBeVisible();
 });
 
-test("a record is put back as committed from the review dialog, and the toast's undo brings the edit back", async ({
+test("a record is put back as committed from the review dialog, the toast's undo brings the edit back, and yamlite.yaml goes back after a confirm", async ({
   page,
 }) => {
   const env = {
@@ -375,9 +375,11 @@ test("a record is put back as committed from the review dialog, and the toast's 
   const running = app;
   // edited before the page opens: an edit made while it connects could land before its event stream does
   put(join(running.root, "tasks/fix-ci.yaml"), "title: Fix flaky CI\n");
+  const config = file(running, "yamlite.yaml");
+  put(join(running.root, "yamlite.yaml"), `# mine\n${config}`);
   await expect.poll(() => titleOf(running, "fix-ci")).toBe("Fix flaky CI");
   await page.goto(running.url);
-  await expect(page.getByText("1 change")).toBeVisible();
+  await expect(page.getByText("2 changes")).toBeVisible();
   await page.getByRole("button", { name: "Send for review" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Show the changes in tasks/fix-ci.yaml" }).click();
@@ -387,6 +389,10 @@ test("a record is put back as committed from the review dialog, and the toast's 
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix CI\n");
   await page.getByRole("button", { name: "Undo" }).click();
   await expect.poll(() => file(running, "tasks/fix-ci.yaml")).toBe("title: Fix flaky CI\n");
+  await dialog.getByRole("button", { name: "Put yamlite.yaml back as committed" }).click();
+  await dialog.getByRole("button", { name: "Put back", exact: true }).click();
+  await expect.poll(() => file(running, "yamlite.yaml")).toBe(config);
+  await expect(dialog.getByRole("checkbox", { name: "Include yamlite.yaml" })).toHaveCount(0);
 });
 
 // what the database holds now; null until the first sync has created the row

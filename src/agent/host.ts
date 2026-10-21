@@ -90,13 +90,15 @@ export interface HostOptions {
   keys?: Record<string, string>;
   // false: only the host's keys are used; a key sent by the client is refused
   viewerKeys?: boolean;
-  // replaces the suggested models per provider; without viewerKeys the choice is limited to them
+  // replaces the suggested models per provider; without viewerKeys the choice is limited to them; an empty list counts as none
   models?: Record<string, string[]>;
   baseURL?: (provider: string) => string;
   // listed first, so a viewer with no saved choice gets it
   defaultProvider?: string;
   // where the host's AI settings live
   settingsUrl?: string;
+  // the host could not tell which keys it holds, so an empty list is not a missing key
+  unavailable?: boolean;
   createModel?: (c: Credentials) => LanguageModel;
   maxConversations?: number;
   maxSteps?: number;
@@ -116,7 +118,11 @@ export class AgentHost {
     return this.opts.settingsUrl ?? null;
   }
 
-  providers(): { id: string; name: string; models: string[]; hasKey: boolean }[] {
+  get unavailable(): boolean {
+    return this.opts.unavailable ?? false;
+  }
+
+  providers(): { id: string; name: string; models: string[]; fixedModels: boolean; hasKey: boolean }[] {
     const first = this.opts.defaultProvider;
     const ordered = [...PROVIDERS].sort((a, b) => Number(b.id === first) - Number(a.id === first));
     return ordered
@@ -124,6 +130,7 @@ export class AgentHost {
         id: p.id,
         name: p.name,
         models: this.modelsOf(p),
+        fixedModels: this.fixedModels(p),
         hasKey: Boolean(this.opts.keys?.[p.id]),
       }))
       .filter((p) => this.viewerKeys || p.hasKey);
@@ -137,8 +144,7 @@ export class AgentHost {
     const models = this.modelsOf(p);
     // any model id goes through: the provider rejects one it does not have
     const model = input.model?.trim() || (models[0] as string);
-    if (!this.viewerKeys && this.opts.models?.[p.id] && !models.includes(model))
-      throw new HttpError(400, `model ${model} is not allowed here`);
+    if (this.fixedModels(p) && !models.includes(model)) throw new HttpError(400, `model ${model} is not allowed here`);
     const given = typeof input.apiKey === "string" ? input.apiKey.trim() : "";
     if (given && !this.viewerKeys) throw new HttpError(400, "this host does not take API keys");
     const apiKey = given || this.opts.keys?.[p.id];
@@ -156,8 +162,18 @@ export class AgentHost {
     return c;
   }
 
+  private listed(p: Provider): string[] | undefined {
+    const models = this.opts.models?.[p.id];
+    return models?.length ? models : undefined;
+  }
+
   private modelsOf(p: Provider): string[] {
-    return [...(this.opts.models?.[p.id] ?? p.models)];
+    return [...(this.listed(p) ?? p.models)];
+  }
+
+  // only these models are accepted
+  private fixedModels(p: Provider): boolean {
+    return !this.viewerKeys && this.listed(p) !== undefined;
   }
 
   get(id: string): Conversation | undefined {

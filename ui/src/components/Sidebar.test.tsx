@@ -147,7 +147,7 @@ test("without groups there are no group headings", async () => {
 });
 
 test("the AI button shows only when an agent exists and toggles the panel", async () => {
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   await renderSidebar();
   const { result } = renderHook(() => useAgentPanelOpen());
   fireEvent.click(await screen.findByRole("button", { name: "Ask AI" }));
@@ -163,7 +163,7 @@ test("no AI button when Ask AI is off", async () => {
 });
 
 test("in the phone menu the AI button closes the menu and keeps the panel open", async () => {
-  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
+  ai = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true }];
   const onSearch = vi.fn();
   await renderSidebar({ onSearch });
   const { result } = renderHook(() => useAgentPanelOpen());

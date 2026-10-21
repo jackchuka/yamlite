@@ -2,8 +2,14 @@ import { afterEach, expect, test } from "vitest";
 import { type AiProvider, currentChoice, saveChoice } from "./ai";
 
 const PROVIDERS: AiProvider[] = [
-  { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5", "claude-haiku-5-5"], hasKey: false },
-  { id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], hasKey: false },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    models: ["claude-sonnet-5-5", "claude-haiku-5-5"],
+    fixedModels: false,
+    hasKey: false,
+  },
+  { id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], fixedModels: false, hasKey: false },
 ];
 afterEach(() => localStorage.clear());
 
@@ -38,4 +44,16 @@ test("a model saved for another provider is not carried over", () => {
 test("with nothing saved, the first provider with a key is chosen, so the host's default leads", () => {
   const listed = [PROVIDERS[1], PROVIDERS[0]].map((p) => ({ ...p, hasKey: true }) as AiProvider);
   expect(currentChoice(listed, { viewerKeys: false })).toEqual({ provider: "openai", model: "gpt-5", apiKey: "" });
+});
+
+test("without viewer keys, a saved model is kept unless the list is fixed", () => {
+  saveChoice({ provider: "openai", model: "gpt-next", apiKey: "" }, false);
+  const keyed = PROVIDERS.map((p) => ({ ...p, hasKey: true }));
+  expect(currentChoice(keyed, { viewerKeys: false })?.model).toBe("gpt-next");
+});
+
+test("a stored model outside a fixed list falls back to the list's first model", () => {
+  saveChoice({ provider: "openai", model: "gpt-next", apiKey: "" }, false);
+  const fixed = PROVIDERS.map((p) => ({ ...p, hasKey: true, fixedModels: true }));
+  expect(currentChoice(fixed, { viewerKeys: false })).toEqual({ provider: "openai", model: "gpt-5", apiKey: "" });
 });

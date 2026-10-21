@@ -63,8 +63,9 @@ export const gitApi = {
       "GET",
       `/api/git/diff?path=${encodeURIComponent(path)}`,
     ),
-  revert: (records: Array<{ table: string; key: string; delete?: boolean }>) =>
-    request<{ reverted: Reverted[] }>("POST", "/api/git/revert", { records }),
+  // files: paths of changed files that are not records, written back as committed or removed when never committed
+  revert: (body: { records: Array<{ table: string; key: string; delete?: boolean }>; files: string[] }) =>
+    request<{ reverted: Reverted[]; files: string[] }>("POST", "/api/git/revert", body),
 };
 
 // puts reverted records back the way they were before the revert, through the same writes as the forms

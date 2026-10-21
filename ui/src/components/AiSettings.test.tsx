@@ -4,8 +4,14 @@ import { type AiProvider, currentChoice, saveChoice } from "@/lib/ai";
 import { AiSettings } from "./AiSettings";
 
 const PROVIDERS: AiProvider[] = [
-  { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5", "claude-haiku-5-5"], hasKey: false },
-  { id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], hasKey: true },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    models: ["claude-sonnet-5-5", "claude-haiku-5-5"],
+    fixedModels: false,
+    hasKey: false,
+  },
+  { id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], fixedModels: false, hasKey: true },
 ];
 afterEach(() => {
   cleanup();
@@ -67,13 +73,12 @@ test("an empty model cannot be saved", () => {
   expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-test("without viewer keys there is no key field and the model is picked from the list", () => {
+test("without viewer keys there is no key field and a fixed list is picked from", () => {
   saveChoice({ provider: "openai", model: "gpt-5", apiKey: "sk-o" }, true);
   const opts = { viewerKeys: false };
+  const fixed = PROVIDERS.map((p) => ({ ...p, fixedModels: true }));
   const onSave = vi.fn();
-  render(
-    <AiSettings viewerKeys={false} providers={PROVIDERS} initial={currentChoice(PROVIDERS, opts)} onSave={onSave} />,
-  );
+  render(<AiSettings viewerKeys={false} providers={fixed} initial={currentChoice(fixed, opts)} onSave={onSave} />);
   expect(screen.queryByLabelText("API key")).toBeNull();
   expect(screen.queryByLabelText("Remember the key on this device")).toBeNull();
   const model = screen.getByLabelText("Model") as HTMLSelectElement;
@@ -82,6 +87,28 @@ test("without viewer keys there is no key field and the model is picked from the
   fireEvent.change(model, { target: { value: "gpt-5-mini" } });
   fireEvent.submit(screen.getByRole("form", { name: "AI settings" }));
   expect(onSave).toHaveBeenCalledWith({ provider: "openai", model: "gpt-5-mini", apiKey: "" }, false);
+});
+
+test("without viewer keys a list that is not fixed still takes any model", () => {
+  const onSave = vi.fn();
+  render(<AiSettings viewerKeys={false} providers={PROVIDERS} initial={null} onSave={onSave} />);
+  const model = screen.getByLabelText("Model") as HTMLInputElement;
+  expect(model.tagName).toBe("INPUT");
+  fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openai" } });
+  fireEvent.change(model, { target: { value: "gpt-next" } });
+  fireEvent.submit(screen.getByRole("form", { name: "AI settings" }));
+  expect(onSave).toHaveBeenCalledWith({ provider: "openai", model: "gpt-next", apiKey: "" }, false);
+});
+
+test("without viewer keys the browser's stored keys are not read", () => {
+  const getItem = vi.spyOn(Storage.prototype, "getItem");
+  try {
+    render(<AiSettings viewerKeys={false} providers={PROVIDERS} initial={null} onSave={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Provider"), { target: { value: "openai" } });
+    expect(getItem).not.toHaveBeenCalledWith("yamlite-ai");
+  } finally {
+    getItem.mockRestore();
+  }
 });
 
 test("currentChoice ignores a stored viewer key when viewer keys are off", () => {

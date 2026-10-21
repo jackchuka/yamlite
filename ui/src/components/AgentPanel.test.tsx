@@ -10,10 +10,12 @@ const reset = vi.hoisted(() => vi.fn(async () => {}));
 const pending = vi.hoisted(() => ({ list: [] as import("@/lib/agent").Proposal[] }));
 const providers = vi.hoisted(() => ({
   list: [
-    { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true },
+    { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true },
   ] as import("@/lib/ai").AiProvider[],
 }));
-const host = vi.hoisted(() => ({ value: { viewerKeys: true, settingsUrl: null as string | null } }));
+const host = vi.hoisted(() => ({
+  value: { viewerKeys: true, settingsUrl: null as string | null, unavailable: false },
+}));
 vi.mock("@/lib/ai", async (orig) => ({
   ...(await orig<typeof import("@/lib/ai")>()),
   useAiProviders: () => providers.list,
@@ -30,8 +32,10 @@ vi.mock("@/lib/agent", async (orig) => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
-  providers.list = [{ id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], hasKey: true }];
-  host.value = { viewerKeys: true, settingsUrl: null };
+  providers.list = [
+    { id: "anthropic", name: "Anthropic", models: ["claude-sonnet-5-5"], fixedModels: false, hasKey: true },
+  ];
+  host.value = { viewerKeys: true, settingsUrl: null, unavailable: false };
 });
 
 const renderPanel = () =>
@@ -89,7 +93,9 @@ test("tool lines are labelled by tool name", async () => {
 });
 
 test("without a key the settings form comes first, and saving starts with the chosen model", async () => {
-  providers.list = [{ id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], hasKey: false }];
+  providers.list = [
+    { id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], fixedModels: false, hasKey: false },
+  ];
   start.mockResolvedValue(undefined);
   send.mockResolvedValue(undefined);
   renderPanel();
@@ -265,7 +271,7 @@ test("Escape keeps the panel open with an unsent draft, and in another text fiel
 
 test("with no host key and no viewer keys it says so and links to the settings", () => {
   providers.list = [];
-  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai" };
+  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai", unavailable: false };
   renderPanel();
   expect(screen.getByText(/No AI key is set up for this repository/)).toBeTruthy();
   const link = screen.getByRole("link", { name: "AI settings" });
@@ -277,14 +283,39 @@ test("with no host key and no viewer keys it says so and links to the settings",
 
 test("with no host key and no settings URL there is no link", () => {
   providers.list = [];
-  host.value = { viewerKeys: false, settingsUrl: null };
+  host.value = { viewerKeys: false, settingsUrl: null, unavailable: false };
   renderPanel();
   expect(screen.getByText(/No AI key is set up for this repository/)).toBeTruthy();
   expect(screen.queryByRole("link", { name: "AI settings" })).toBeNull();
 });
 
+test("when the host could not load its AI settings it says so instead of the no-key message", () => {
+  providers.list = [];
+  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai", unavailable: true };
+  renderPanel();
+  expect(screen.getByText("AI settings could not be loaded. Reload the page to try again.")).toBeTruthy();
+  expect(screen.queryByText(/No AI key is set up/)).toBeNull();
+  expect(screen.getByRole("link", { name: "AI settings" }).getAttribute("href")).toBe(
+    "https://example.com/settings/ai",
+  );
+});
+
+test("unavailable settings without a settings URL show no link", () => {
+  providers.list = [];
+  host.value = { viewerKeys: false, settingsUrl: null, unavailable: true };
+  renderPanel();
+  expect(screen.getByText(/could not be loaded/)).toBeTruthy();
+  expect(screen.queryByRole("link", { name: "AI settings" })).toBeNull();
+});
+
+test("a host that does have a provider ignores unavailable", () => {
+  host.value = { viewerKeys: false, settingsUrl: null, unavailable: true };
+  renderPanel();
+  expect(screen.queryByText(/could not be loaded/)).toBeNull();
+});
+
 test("without viewer keys an auth error says so and links to the settings instead of opening the form", async () => {
-  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai" };
+  host.value = { viewerKeys: false, settingsUrl: "https://example.com/settings/ai", unavailable: false };
   renderPanel();
   await setChat({ items: [{ kind: "error", code: "auth", message: "rejected" }] });
   expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
@@ -297,10 +328,22 @@ test("without viewer keys an auth error says so and links to the settings instea
 });
 
 test("without viewer keys or a settings URL an auth error has no link", async () => {
-  host.value = { viewerKeys: false, settingsUrl: null };
+  host.value = { viewerKeys: false, settingsUrl: null, unavailable: false };
   renderPanel();
   await setChat({ items: [{ kind: "error", code: "auth", message: "rejected" }] });
   expect(screen.queryByRole("form", { name: "AI settings" })).toBeNull();
   expect(screen.getByText(/The AI key for this repository was refused/)).toBeTruthy();
   expect(screen.queryByRole("link", { name: "AI settings" })).toBeNull();
+});
+
+test("without viewer keys a host's providers give a model select and no no-key message", () => {
+  providers.list = [{ id: "openai", name: "OpenAI", models: ["gpt-5", "gpt-5-mini"], fixedModels: true, hasKey: true }];
+  host.value = { viewerKeys: false, settingsUrl: null, unavailable: false };
+  renderPanel();
+  expect(screen.queryByText(/No AI key is set up/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "AI settings" }));
+  const model = screen.getByLabelText("Model") as HTMLSelectElement;
+  expect(model.tagName).toBe("SELECT");
+  expect([...model.options].map((o) => o.value)).toEqual(["gpt-5", "gpt-5-mini"]);
+  expect(screen.queryByLabelText("API key")).toBeNull();
 });

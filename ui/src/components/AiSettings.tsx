@@ -19,8 +19,10 @@ export function AiSettings({
   const [providerId, setProviderId] = useState(initial?.provider ?? providers[0]?.id ?? "");
   const p = providers.find((x) => x.id === providerId) ?? (providers[0] as AiProvider);
   const [model, setModel] = useState(initial?.provider === p.id ? initial.model : (p.models[0] as string));
-  const [apiKey, setApiKey] = useState(initial?.provider === p.id ? initial.apiKey : savedKey(p.id));
-  const [remember, setRemember] = useState(isRemembered(p.id));
+  const keyOf = (id: string) => (viewerKeys ? savedKey(id) : "");
+  const rememberedOf = (id: string) => viewerKeys && isRemembered(id);
+  const [apiKey, setApiKey] = useState(() => (initial?.provider === p.id ? initial.apiKey : keyOf(p.id)));
+  const [remember, setRemember] = useState(() => rememberedOf(p.id));
   const modelId = model.trim();
   const canSave = modelId !== "" && (!viewerKeys || apiKey.trim() !== "" || p.hasKey);
   return (
@@ -42,8 +44,8 @@ export function AiSettings({
             const next = providers.find((x) => x.id === e.target.value) as AiProvider;
             setProviderId(next.id);
             setModel(next.models[0] as string);
-            setApiKey(savedKey(next.id));
-            setRemember(isRemembered(next.id));
+            setApiKey(keyOf(next.id));
+            setRemember(rememberedOf(next.id));
           }}
         >
           {providers.map((x) => (
@@ -53,7 +55,7 @@ export function AiSettings({
           ))}
         </select>
       </label>
-      {viewerKeys ? (
+      {!p.fixedModels ? (
         <label className="flex flex-col gap-1">
           {m.agent_model()}
           <input

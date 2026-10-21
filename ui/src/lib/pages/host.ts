@@ -62,7 +62,9 @@ export class PageHost {
     private readonly meta: () => Meta,
     private readonly deps: HostDeps,
   ) {
-    this.unlisten = deps.location.listen((path) => this.post({ yamlite: 1, event: "location", data: { path } }));
+    this.unlisten = deps.location.listen((path, state) =>
+      this.post({ yamlite: 1, event: "location", data: { path, state } }),
+    );
   }
 
   readonly handle = (e: MessageEvent): void => {
@@ -80,7 +82,7 @@ export class PageHost {
     // the page has already moved; these only keep the address with it
     if (method === "navigate") {
       const path = pagePath(args[0]);
-      if (path !== null) this.deps.location.navigate(path, args[1] === true);
+      if (path !== null) this.deps.location.navigate(path, args[1] === true, args[2] ?? null);
       return;
     }
     if (method === "go") {

@@ -13,6 +13,7 @@ function fakeDriver(files: Record<string, string>, changes: GitStatus): GitDrive
     status: async () => changes,
     defaultBranch: async () => "main",
     baseContent: async (p) => files[p] ?? null,
+    baseFile: async (p) => (files[p] === undefined ? null : Buffer.from(files[p])),
     history: async () => ({ state: "ok", entries: [], next: null }),
     fileDiff: async () => ({ state: "missing" }),
     review: async () => ({ branch: "b", steps: [], results: [], url: null, created: false }),

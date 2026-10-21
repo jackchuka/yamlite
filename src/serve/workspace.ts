@@ -25,13 +25,15 @@ export interface AiOptions {
   keys?: Record<string, string>;
   // false: only the server's keys are used; a key sent by the client is refused
   viewerKeys?: boolean;
-  // replaces the suggested models per provider; without viewerKeys the choice is limited to them
+  // replaces the suggested models per provider; without viewerKeys the choice is limited to them; an empty list counts as none
   models?: Record<string, string[]>;
   baseURL?: (provider: string) => string;
   // listed first, so a viewer with no saved choice gets it
   defaultProvider?: string;
   // where the host's AI settings live
   settingsUrl?: string;
+  // the host could not tell which keys it holds, so an empty list is not a missing key
+  unavailable?: boolean;
   createModel?: (c: Credentials) => LanguageModel;
 }
 
@@ -139,6 +141,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
         baseURL: o.ai.baseURL,
         defaultProvider: o.ai.defaultProvider,
         settingsUrl: o.ai.settingsUrl,
+        unavailable: o.ai.unavailable,
         createModel: o.ai.createModel,
         tools: (id) => agentTools(ctx, id),
         notes: git?.steps ? [GIT_NOTE] : [],

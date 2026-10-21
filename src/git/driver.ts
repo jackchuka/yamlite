@@ -1,6 +1,16 @@
 import { type DiffResult, type Extract, fileDiff, type HistoryTarget, recordHistory } from "../githistory.ts";
 import { findOpenPr } from "./pr.ts";
-import { defaultBranch, findRepo, gitStatus, insideRoot, type Repo, runGit } from "./repo.ts";
+import {
+  defaultBranch,
+  findRepo,
+  GitError,
+  gitStatus,
+  insideRoot,
+  type Repo,
+  runGit,
+  runGitBytes,
+  SLOW_MS,
+} from "./repo.ts";
 import { localReview, type ReviewRequest } from "./review.ts";
 import { type RunOptions, runSteps, validateSteps } from "./steps.ts";
 import type { GitStep, StepResult } from "./types.ts";
@@ -20,6 +30,9 @@ export interface GitDriver {
   defaultBranch(): Promise<string | null>;
   // the file at the base commit (HEAD locally); null when it has none
   baseContent(rootPath: string): Promise<string | null>;
+  // the file's bytes at the base commit, as a checkout writes them; null only when the commit has no file there,
+  // and a throw when that cannot be told, since a caller may remove a file it gets null for
+  baseFile(rootPath: string): Promise<Uint8Array | null>;
   history(t: HistoryTarget, extract: Extract, o: { cursor?: string }): Promise<HistoryPage>;
   fileDiff(t: HistoryTarget, rev: string): Promise<DiffResult>;
   // runs inside the workspace's proposals.exclusive, after a sync; target null: a new PR
@@ -137,6 +150,27 @@ export async function localDriver(root: string, gh: () => Promise<string | null>
       } catch {
         return null;
       }
+    },
+    async baseFile(rootPath) {
+      const { repo } = await need();
+      const top = insideRoot(repo, rootPath);
+      if (top === null) throw new GitError(`${rootPath} is outside the repository`);
+      let entry: string;
+      try {
+        entry = await runGit(repo.top, ["ls-tree", "-z", "HEAD", "--", top]);
+      } catch (e) {
+        const born = await runGit(repo.top, ["rev-parse", "-q", "--verify", "HEAD"]).then(
+          () => true,
+          () => false,
+        );
+        if (!born) return null;
+        throw e;
+      }
+      if (entry === "") return null;
+      const type = entry.split(" ")[1];
+      if (type !== "blob") throw new GitError(`${rootPath} is a ${type === "commit" ? "submodule" : "folder"}`);
+      // through the repository's filters, so a Git LFS file comes back as its content, not its pointer
+      return runGitBytes(repo.top, ["cat-file", "--filters", `HEAD:${top}`], { timeoutMs: SLOW_MS });
     },
     history: (t, extract, o) => recordHistory(t, extract, o),
     fileDiff: (t, rev) => fileDiff(t, rev),

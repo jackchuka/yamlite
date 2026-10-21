@@ -5,6 +5,8 @@ export interface AiProvider {
   id: string;
   name: string;
   models: string[];
+  // only these models are accepted
+  fixedModels: boolean;
   hasKey: boolean;
 }
 
@@ -44,10 +46,10 @@ export function useAiProviders(): AiProvider[] | null {
   return isReadOnly() ? null : (meta.data?.ai?.providers ?? null);
 }
 
-export function useAiHost(): { viewerKeys: boolean; settingsUrl: string | null } | null {
+export function useAiHost(): { viewerKeys: boolean; settingsUrl: string | null; unavailable: boolean } | null {
   const meta = useMeta();
   const ai = isReadOnly() ? null : meta.data?.ai;
-  return ai ? { viewerKeys: ai.viewerKeys, settingsUrl: ai.settingsUrl } : null;
+  return ai ? { viewerKeys: ai.viewerKeys, settingsUrl: ai.settingsUrl, unavailable: ai.unavailable ?? false } : null;
 }
 
 export function savedKey(providerId: string): string {
@@ -66,7 +68,7 @@ export function currentChoice(
   const p = providers.find((x) => x.id === s.provider) ?? providers.find((x) => x.hasKey) ?? providers[0];
   if (!p) return null;
   const saved = p.id === s.provider && s.model ? s.model : undefined;
-  const model = saved && (viewerKeys || p.models.includes(saved)) ? saved : (p.models[0] as string);
+  const model = saved && (!p.fixedModels || p.models.includes(saved)) ? saved : (p.models[0] as string);
   const apiKey = viewerKeys ? savedKey(p.id) : "";
   return apiKey || p.hasKey ? { provider: p.id, model, apiKey } : null;
 }

@@ -16,7 +16,7 @@ export interface FileStamp {
   contentHash: string;
 }
 
-export function writeAtomic(path: string, content: string): void {
+export function writeAtomic(path: string, content: string | Uint8Array): void {
   const exists = existsSync(path);
   // write through symlinks so the link itself is preserved
   const target = exists ? realpathSync(path) : path;

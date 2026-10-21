@@ -1,9 +1,9 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { commit, useGitEnv, withRemote } from "../gitrepo.ts";
+import { commit, git, useGitEnv, withRemote } from "../gitrepo.ts";
 import { dataRoot, read, sql, waitFor, write } from "../helpers.ts";
-import { type Served, startServe } from "./helpers.ts";
+import { type Served, startServe, waitForAsync } from "./helpers.ts";
 import { CONFIG, gitOf, repoServe } from "./repo.ts";
 
 let t: Served | undefined;
@@ -139,6 +139,82 @@ test("revert is refused with 409 while git steps run", async () => {
   expect((await revert(t, [{ table: "tasks", key: "a" }])).status).toBe(409);
   release();
   await held;
+});
+
+const revertFiles = (t: Served, files: string[]) => t.api("/api/git/revert", { method: "POST", body: { files } });
+
+test("revert puts a changed file that holds no records back as committed, and reloads yamlite.yaml", async () => {
+  ({ t } = await repoServe());
+  const committed = read(join(t.root, "yamlite.yaml"));
+  write(join(t.root, "yamlite.yaml"), `${committed}  notes:\n    columns:\n      body: TEXT\n`);
+  write(join(t.root, ".pages/home.html"), "<p>mine</p>\n");
+  await waitFor(() => t!.s.context.y.tables.some((s) => s.name === "notes"));
+  const r = await revertFiles(t, ["yamlite.yaml", ".pages/home.html"]);
+  expect(r.status).toBe(200);
+  expect(r.body).toEqual({ reverted: [], files: ["yamlite.yaml", ".pages/home.html"] });
+  expect(read(join(t.root, "yamlite.yaml"))).toBe(committed);
+  expect(existsSync(join(t.root, ".pages/home.html"))).toBe(false);
+  expect(t.s.context.y.tables.map((s) => s.name)).not.toContain("notes");
+  expect((await gitOf(t)).changes).toEqual([]);
+});
+
+test("revert brings a deleted file back, and puts records and files back together", async () => {
+  ({ t } = await repoServe());
+  write(join(t.root, "tasks/a.yaml"), "title: A2\n");
+  write(join(t.root, "notes.txt"), "x\n");
+  await waitFor(() => sql(t!.db, "SELECT title FROM tasks WHERE id = 'a'")[0]!.title === "A2");
+  const committed = read(join(t.root, "yamlite.yaml"));
+  rmSync(join(t.root, "yamlite.yaml"));
+  await waitForAsync(async () => (await gitOf(t!)).changes.length === 3);
+  const r = await t.api("/api/git/revert", {
+    method: "POST",
+    body: { records: [{ table: "tasks", key: "a" }], files: ["yamlite.yaml", "notes.txt"] },
+  });
+  expect(r.status).toBe(200);
+  expect(r.body.reverted).toEqual([{ table: "tasks", key: "a", before: { title: "A2" }, after: { title: "A" } }]);
+  expect(r.body.files).toEqual(["yamlite.yaml", "notes.txt"]);
+  expect(read(join(t.root, "yamlite.yaml"))).toBe(committed);
+  await waitFor(() => read(join(t!.root, "tasks/a.yaml")) === "title: A\n");
+  expect((await gitOf(t)).changes).toEqual([]);
+});
+
+test("revert refuses files outside the data folder or without changes, and writes nothing then", async () => {
+  ({ t } = await repoServe());
+  write(join(t.root, "notes.txt"), "x\n");
+  await waitForAsync(async () => (await gitOf(t!)).changes.length === 1);
+  for (const files of [["../x.txt"], ["tasks/b.yaml"], ["notes.txt", "missing.txt"], [3]]) {
+    const r = await t.api("/api/git/revert", { method: "POST", body: { files } });
+    expect(r.status).toBe(400);
+  }
+  expect((await t.api("/api/git/revert", { method: "POST", body: { files: [] } })).status).toBe(400);
+  expect(read(join(t.root, "notes.txt"))).toBe("x\n");
+});
+
+test("revert puts a binary file back byte for byte", async () => {
+  ({ t } = await repoServe());
+  const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80]);
+  writeFileSync(join(t.root, "logo.png"), bytes);
+  commit(t.root, "logo");
+  writeFileSync(join(t.root, "logo.png"), Buffer.from([1, 2, 3]));
+  await waitForAsync(async () => (await gitOf(t!)).changes.length === 1);
+  expect((await revertFiles(t, ["logo.png"])).status).toBe(200);
+  expect(readFileSync(join(t.root, "logo.png"))).toEqual(bytes);
+});
+
+test("revert refuses a renamed file instead of removing it, and writes nothing then", async () => {
+  ({ t } = await repoServe());
+  write(join(t.root, "notes.txt"), "x\n");
+  commit(t.root, "notes");
+  write(join(t.root, "tasks/a.yaml"), "title: A2\n");
+  git(t.root, "mv", "notes.txt", "moved.txt");
+  await waitForAsync(async () => (await gitOf(t!)).changes.some((c: { path: string }) => c.path === "moved.txt"));
+  const r = await t.api("/api/git/revert", {
+    method: "POST",
+    body: { records: [{ table: "tasks", key: "a" }], files: ["moved.txt"] },
+  });
+  expect(r.status).toBe(409);
+  expect(read(join(t.root, "moved.txt"))).toBe("x\n");
+  expect(read(join(t.root, "tasks/a.yaml"))).toBe("title: A2\n");
 });
 
 test("GET /api/git/diff gives each changed record's fields before and after", async () => {
