@@ -13,10 +13,15 @@ export type { GitStep } from "../../../src/git/types.ts";
 
 export type ChatItem =
   | { kind: "user"; text: string }
-  | { kind: "agent"; text: string }
-  | { kind: "tool"; id: string; title: string; status: string | null; input?: unknown }
+  | { kind: "agent"; text: string; sources?: Source[] }
+  | { kind: "tool"; id: string; title: string; status: string | null; input?: unknown; sources?: Source[] }
   | { kind: "proposal"; proposal: Proposal }
   | { kind: "error"; message: string; code?: "auth" };
+
+export interface Source {
+  url: string;
+  title?: string;
+}
 
 export interface ChatState {
   items: ChatItem[];
@@ -34,8 +39,17 @@ export function reduceChat(s: ChatState, e: AgentEvent): ChatState {
     case "text": {
       const last = items.at(-1);
       if (last?.kind === "agent")
-        return { ...s, items: [...items.slice(0, -1), { kind: "agent", text: last.text + e.text }] };
+        return { ...s, items: [...items.slice(0, -1), { ...last, text: last.text + e.text }] };
       return { ...s, items: [...items, { kind: "agent", text: e.text }] };
+    }
+    // pages a search found go under that search, pages an answer cites under the answer
+    case "source": {
+      const last = items.at(-1);
+      const source: Source = { url: e.url, ...(e.title ? { title: e.title } : {}) };
+      if (last?.kind !== "agent" && last?.kind !== "tool")
+        return { ...s, items: [...items, { kind: "agent", text: "", sources: [source] }] };
+      if (last.sources?.some((x) => x.url === e.url)) return s;
+      return { ...s, items: [...items.slice(0, -1), { ...last, sources: [...(last.sources ?? []), source] }] };
     }
     case "tool": {
       const i = items.findIndex((x) => x.kind === "tool" && x.id === e.id);

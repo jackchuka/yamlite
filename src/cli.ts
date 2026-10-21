@@ -178,38 +178,44 @@ withRoot(program.command("serve").description("open the web UI and sync continuo
   .option("--host <address>", "address to listen on", "127.0.0.1")
   .option("--open", "open the UI in the browser")
   .option("--no-agent", "do not offer Ask AI in the web UI")
-  .action(async (root: string, o: { db?: string; port: string; host: string; open?: boolean; agent: boolean }) => {
-    const port = Number(o.port);
-    if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`invalid port: ${o.port}`);
-    const s = await serve({ root, db: o.db, port, host: o.host, agent: o.agent });
-    if (!isLoopback(o.host)) {
-      const askAi = o.agent && Object.keys(envKeys(process.env)).length > 0;
-      console.error(
-        painter(process.stderr)(
-          "yellow",
-          `warning: listening on ${o.host}; anyone who can reach it and has the token can read and change the data${askAi ? " and use Ask AI with the API keys from the environment" : ""}`,
-        ),
-      );
-    }
-    console.log(`${out("green", "✓")} YAMLite UI · ${out("bold", s.url)}`);
-    console.log(out("dim", `  watching ${displayPath(resolve(root))} · Ctrl+C to stop`));
-    if (o.open) openBrowser(s.url);
-    let stopping = false;
-    const stop = () => {
-      // a second signal gives up on a close that hangs
-      if (stopping) process.exit(130);
-      stopping = true;
-      s.close().then(
-        () => process.exit(0),
-        (e: unknown) => {
-          console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
-          process.exit(1);
-        },
-      );
-    };
-    process.on("SIGINT", stop);
-    process.on("SIGTERM", stop);
-  });
+  .option("--web-search", "let Ask AI search the web; each search is billed to the API key")
+  .action(
+    async (
+      root: string,
+      o: { db?: string; port: string; host: string; open?: boolean; agent: boolean; webSearch?: boolean },
+    ) => {
+      const port = Number(o.port);
+      if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error(`invalid port: ${o.port}`);
+      const s = await serve({ root, db: o.db, port, host: o.host, agent: o.agent, webSearch: o.webSearch });
+      if (!isLoopback(o.host)) {
+        const askAi = o.agent && Object.keys(envKeys(process.env)).length > 0;
+        console.error(
+          painter(process.stderr)(
+            "yellow",
+            `warning: listening on ${o.host}; anyone who can reach it and has the token can read and change the data${askAi ? " and use Ask AI with the API keys from the environment" : ""}`,
+          ),
+        );
+      }
+      console.log(`${out("green", "✓")} YAMLite UI · ${out("bold", s.url)}`);
+      console.log(out("dim", `  watching ${displayPath(resolve(root))} · Ctrl+C to stop`));
+      if (o.open) openBrowser(s.url);
+      let stopping = false;
+      const stop = () => {
+        // a second signal gives up on a close that hangs
+        if (stopping) process.exit(130);
+        stopping = true;
+        s.close().then(
+          () => process.exit(0),
+          (e: unknown) => {
+            console.error(`error: ${e instanceof Error ? e.message : String(e)}`);
+            process.exit(1);
+          },
+        );
+      };
+      process.on("SIGINT", stop);
+      process.on("SIGTERM", stop);
+    },
+  );
 
 program
   .command("export")

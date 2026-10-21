@@ -186,3 +186,39 @@ test("start, open and reset refresh the conversation list", async () => {
   await c.reset();
   expect(invalidate).toHaveBeenCalledWith({ queryKey: ["agent-conversations"] });
 });
+
+test("sources join the answer they come with, once per URL", () => {
+  const s = run([
+    { type: "user", text: "weather?" },
+    { type: "source", url: "https://a.example/1", title: "A" },
+    { type: "text", text: "Sunny." },
+    { type: "source", url: "https://a.example/1", title: "A" },
+    { type: "source", url: "https://b.example/2" },
+  ]);
+  expect(s.items).toEqual([
+    { kind: "user", text: "weather?" },
+    {
+      kind: "agent",
+      text: "Sunny.",
+      sources: [{ url: "https://a.example/1", title: "A" }, { url: "https://b.example/2" }],
+    },
+  ]);
+});
+
+test("pages a search found go under that search", () => {
+  const s = run([
+    { type: "tool", id: "s1", title: "web_search", status: "completed" },
+    { type: "source", url: "https://a.example/1", title: "A" },
+    { type: "text", text: "Found it." },
+  ]);
+  expect(s.items).toEqual([
+    {
+      kind: "tool",
+      id: "s1",
+      title: "web_search",
+      status: "completed",
+      sources: [{ url: "https://a.example/1", title: "A" }],
+    },
+    { kind: "agent", text: "Found it." },
+  ]);
+});

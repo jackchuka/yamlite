@@ -1,7 +1,13 @@
 import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test";
 
 // one model answer: text, tool calls, or an error the provider call throws
-export type Reply = { say?: string; tools?: { name: string; args?: Record<string, unknown> }[] } | Error;
+export type Reply =
+  | {
+      say?: string;
+      tools?: { name: string; args?: Record<string, unknown> }[];
+      sources?: { url: string; title?: string }[];
+    }
+  | Error;
 
 const usage = {
   inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
@@ -15,6 +21,7 @@ export function scripted(replies: Reply[]): MockLanguageModelV4 {
       const r = replies[n++] ?? { say: "" };
       if (r instanceof Error) throw r;
       const parts: unknown[] = [{ type: "stream-start", warnings: [] }];
+      (r.sources ?? []).forEach((s, i) => parts.push({ type: "source", sourceType: "url", id: `src_${n}_${i}`, ...s }));
       if (r.say)
         parts.push(
           { type: "text-start", id: "t" },

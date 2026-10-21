@@ -1,7 +1,5 @@
 import { resolve } from "node:path";
-import type { LanguageModel } from "ai";
-import { AgentHost, GIT_DONE, GIT_NOTE } from "../agent/host.ts";
-import type { Credentials } from "../agent/providers.ts";
+import { AgentHost, GIT_DONE, GIT_NOTE, type HostOptions } from "../agent/host.ts";
 import { ProposalStore } from "../agent/proposals.ts";
 import { agentTools } from "../agent/tools.ts";
 import { configPath, resolveConfig } from "../config.ts";
@@ -20,22 +18,8 @@ import { ROUTES } from "./routes/index.ts";
 import { createTable } from "./routes/tables.ts";
 import { assertSynced } from "./write.ts";
 
-export interface AiOptions {
-  // keys the server holds, by provider id
-  keys?: Record<string, string>;
-  // false: only the server's keys are used; a key sent by the client is refused
-  viewerKeys?: boolean;
-  // replaces the suggested models per provider; without viewerKeys the choice is limited to them; an empty list counts as none
-  models?: Record<string, string[]>;
-  baseURL?: (provider: string) => string;
-  // listed first, so a viewer with no saved choice gets it
-  defaultProvider?: string;
-  // where the host's AI settings live
-  settingsUrl?: string;
-  // the host could not tell which keys it holds, so an empty list is not a missing key
-  unavailable?: boolean;
-  createModel?: (c: Credentials) => LanguageModel;
-}
+// Ask AI as a host configures it; the workspace supplies the tools and what they report
+export type AiOptions = Omit<HostOptions, "tools" | "feedback" | "notes">;
 
 export interface WorkspaceOptions {
   root: string;
@@ -135,14 +119,7 @@ export async function createWorkspace(o: WorkspaceOptions): Promise<Workspace> {
     for (const routes of ROUTES) routes(router, ctx);
     if (o.ai) {
       ctx.agent = new AgentHost({
-        keys: o.ai.keys,
-        viewerKeys: o.ai.viewerKeys,
-        models: o.ai.models,
-        baseURL: o.ai.baseURL,
-        defaultProvider: o.ai.defaultProvider,
-        settingsUrl: o.ai.settingsUrl,
-        unavailable: o.ai.unavailable,
-        createModel: o.ai.createModel,
+        ...o.ai,
         tools: (id) => agentTools(ctx, id),
         notes: git?.steps ? [GIT_NOTE] : [],
         feedback: (id) => ctx.proposals.takeFeedback(id),
