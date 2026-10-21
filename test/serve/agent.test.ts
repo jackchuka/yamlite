@@ -98,6 +98,14 @@ test("meta lists the providers and which keys serve holds", async () => {
   ]);
 });
 
+test("meta lists the host's default provider first", async () => {
+  t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, {
+    ai: { keys: { anthropic: "a", openai: "o" }, defaultProvider: "openai" },
+  });
+  const ai = (await t.api("/api/meta")).body.ai;
+  expect(ai.providers.map((p: any) => p.id)).toEqual(["openai", "anthropic"]);
+});
+
 test("agent: false hides the feature", async () => {
   t = await startServe({ "tasks/a.yaml": "title: A\n" }, undefined, { agent: false });
   expect((await t.api("/api/meta")).body.ai).toBeNull();

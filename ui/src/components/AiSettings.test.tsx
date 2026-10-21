@@ -16,7 +16,7 @@ const keys = () => JSON.parse(localStorage.getItem("yamlite-ai") ?? "{}").keys;
 
 function renderSettings() {
   const onSave = vi.fn((c, remember) => saveChoice(c, remember));
-  render(<AiSettings providers={PROVIDERS} initial={currentChoice(PROVIDERS)} onSave={onSave} />);
+  render(<AiSettings viewerKeys providers={PROVIDERS} initial={currentChoice(PROVIDERS)} onSave={onSave} />);
   return onSave;
 }
 
@@ -65,4 +65,27 @@ test("an empty model cannot be saved", () => {
   renderSettings();
   fireEvent.change(screen.getByLabelText("Model"), { target: { value: "  " } });
   expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+test("without viewer keys there is no key field and the model is picked from the list", () => {
+  saveChoice({ provider: "openai", model: "gpt-5", apiKey: "sk-o" }, true);
+  const opts = { viewerKeys: false };
+  const onSave = vi.fn();
+  render(
+    <AiSettings viewerKeys={false} providers={PROVIDERS} initial={currentChoice(PROVIDERS, opts)} onSave={onSave} />,
+  );
+  expect(screen.queryByLabelText("API key")).toBeNull();
+  expect(screen.queryByLabelText("Remember the key on this device")).toBeNull();
+  const model = screen.getByLabelText("Model") as HTMLSelectElement;
+  expect(model.tagName).toBe("SELECT");
+  expect([...model.options].map((o) => o.value)).toEqual(["gpt-5", "gpt-5-mini"]);
+  fireEvent.change(model, { target: { value: "gpt-5-mini" } });
+  fireEvent.submit(screen.getByRole("form", { name: "AI settings" }));
+  expect(onSave).toHaveBeenCalledWith({ provider: "openai", model: "gpt-5-mini", apiKey: "" }, false);
+});
+
+test("currentChoice ignores a stored viewer key when viewer keys are off", () => {
+  saveChoice({ provider: "openai", model: "gpt-5", apiKey: "sk-o" }, true);
+  expect(currentChoice(PROVIDERS, { viewerKeys: false })).toEqual({ provider: "openai", model: "gpt-5", apiKey: "" });
+  expect(currentChoice([PROVIDERS[0] as AiProvider], { viewerKeys: false })).toBeNull();
 });

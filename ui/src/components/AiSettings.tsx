@@ -6,10 +6,12 @@ import { m } from "@/paraglide/messages.js";
 const field = "w-full rounded-md border bg-panel px-2.5 py-1.5 text-[15px]";
 
 export function AiSettings({
+  viewerKeys,
   providers,
   initial,
   onSave,
 }: {
+  viewerKeys: boolean;
   providers: AiProvider[];
   initial: AiChoice | null;
   onSave: (c: AiChoice, remember: boolean) => void;
@@ -20,14 +22,15 @@ export function AiSettings({
   const [apiKey, setApiKey] = useState(initial?.provider === p.id ? initial.apiKey : savedKey(p.id));
   const [remember, setRemember] = useState(isRemembered(p.id));
   const modelId = model.trim();
-  const canSave = modelId !== "" && (apiKey.trim() !== "" || p.hasKey);
+  const canSave = modelId !== "" && (!viewerKeys || apiKey.trim() !== "" || p.hasKey);
   return (
     <form
       aria-label={m.agent_settings()}
       className="flex flex-col gap-3 border-b p-3.5 text-[15px]"
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSave) onSave({ provider: p.id, model: modelId, apiKey: apiKey.trim() }, remember);
+        if (canSave)
+          onSave({ provider: p.id, model: modelId, apiKey: viewerKeys ? apiKey.trim() : "" }, viewerKeys && remember);
       }}
     >
       <label className="flex flex-col gap-1">
@@ -50,42 +53,59 @@ export function AiSettings({
           ))}
         </select>
       </label>
-      <label className="flex flex-col gap-1">
-        {m.agent_model()}
-        <input
-          className={field}
-          list={`ai-models-${p.id}`}
-          autoComplete="off"
-          spellCheck={false}
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-        />
-        <datalist id={`ai-models-${p.id}`}>
-          {p.models.map((x) => (
-            <option key={x} value={x} />
-          ))}
-        </datalist>
-        {modelId !== "" && !p.models.includes(modelId) && (
-          <span className="text-[14px] text-muted-foreground">{m.agent_model_unverified()}</span>
-        )}
-      </label>
-      <label className="flex flex-col gap-1">
-        {m.agent_api_key()}
-        <input
-          className={field}
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          value={apiKey}
-          placeholder={p.hasKey ? m.agent_api_key_server() : ""}
-          onChange={(e) => setApiKey(e.target.value)}
-        />
-      </label>
-      <p className="text-[14px] text-muted-foreground">{m.agent_api_key_note()}</p>
-      <label className="flex items-center gap-2">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        {m.agent_remember_key()}
-      </label>
+      {viewerKeys ? (
+        <label className="flex flex-col gap-1">
+          {m.agent_model()}
+          <input
+            className={field}
+            list={`ai-models-${p.id}`}
+            autoComplete="off"
+            spellCheck={false}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+          />
+          <datalist id={`ai-models-${p.id}`}>
+            {p.models.map((x) => (
+              <option key={x} value={x} />
+            ))}
+          </datalist>
+          {modelId !== "" && !p.models.includes(modelId) && (
+            <span className="text-[14px] text-muted-foreground">{m.agent_model_unverified()}</span>
+          )}
+        </label>
+      ) : (
+        <label className="flex flex-col gap-1">
+          {m.agent_model()}
+          <select className={field} value={model} onChange={(e) => setModel(e.target.value)}>
+            {p.models.map((x) => (
+              <option key={x} value={x}>
+                {x}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {viewerKeys && (
+        <>
+          <label className="flex flex-col gap-1">
+            {m.agent_api_key()}
+            <input
+              className={field}
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              value={apiKey}
+              placeholder={p.hasKey ? m.agent_api_key_server() : ""}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </label>
+          <p className="text-[14px] text-muted-foreground">{m.agent_api_key_note()}</p>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            {m.agent_remember_key()}
+          </label>
+        </>
+      )}
       <Button type="submit" disabled={!canSave} className="self-end">
         {m.agent_save()}
       </Button>

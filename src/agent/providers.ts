@@ -26,6 +26,9 @@ export interface Credentials {
   provider: string;
   model: string;
   apiKey: string;
+  // routes the SDK through another URL, e.g. the host's own proxy
+  baseURL?: string;
+  fetch?: typeof fetch;
 }
 
 export function providerOf(id: unknown): Provider {
@@ -37,13 +40,16 @@ export function providerOf(id: unknown): Provider {
 export function createModel(c: Credentials): LanguageModel {
   switch (c.provider) {
     case "anthropic":
-      // Anthropic refuses requests from a browser origin without this header; the Cloud build calls it from a Worker
+      // Anthropic refuses requests from a browser origin without this header; the Cloud build calls it from a Worker.
+      // A host's proxy takes the request itself, so it does not need it.
       return createAnthropic({
         apiKey: c.apiKey,
-        headers: { "anthropic-dangerous-direct-browser-access": "true" },
+        baseURL: c.baseURL,
+        fetch: c.fetch,
+        ...(c.baseURL ? {} : { headers: { "anthropic-dangerous-direct-browser-access": "true" } }),
       })(c.model);
     case "openai":
-      return createOpenAI({ apiKey: c.apiKey })(c.model);
+      return createOpenAI({ apiKey: c.apiKey, baseURL: c.baseURL, fetch: c.fetch })(c.model);
     default:
       throw new HttpError(400, `unknown provider: ${c.provider}`);
   }
