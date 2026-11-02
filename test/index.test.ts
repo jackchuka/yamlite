@@ -228,3 +228,17 @@ test("Markdown files are never added to yamlite.yaml on their own", async () => 
   await y.close();
   expect(read(join(root, "yamlite.yaml"))).not.toMatch(/blog|_md|notes/);
 });
+
+test("ignored files are neither read nor deleted", async () => {
+  const root = tmpRoot();
+  write(join(root, "yamlite.yaml"), 'ignore: ["**/*.draft.yaml", scripts]\n');
+  write(join(root, "tasks/a.yaml"), "title: A\n");
+  write(join(root, "tasks/b.draft.yaml"), "title: B\n");
+  write(join(root, "scripts/c.yaml"), "x: 1\n");
+  const y = await open({ root });
+  expect(y.tables.map((t) => t.name)).toEqual(["tasks"]);
+  await y.sync();
+  expect(sql(dbOf(root), "SELECT id FROM tasks")).toEqual([{ id: "a" }]);
+  await y.close();
+  expect(read(join(root, "tasks/b.draft.yaml"))).toBe("title: B\n");
+});

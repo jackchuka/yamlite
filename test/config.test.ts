@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { expect, test } from "vitest";
 import { expandPath, filesOf, parseConfig, readsFile, resolveConfig, type TableLocation } from "../src/config.ts";
+import { claims } from "../src/source/files.ts";
 import type { TableSpec } from "../src/types.ts";
 import { browserFs, dataRoot, read, tmpRoot, write } from "./helpers.ts";
 
@@ -815,7 +816,12 @@ test("parseConfig reads where each table's files are from the config text alone"
     ["plain", { kind: "default" }],
   ]);
   expect(parseConfig(text).tables.find((t) => t.name === "teams")?.columns).toEqual({ org: "TEXT" });
-  expect(parseConfig("")).toEqual({ tables: [], pages: [], ai: { instructions: null, pullRequests: null } });
+  expect(parseConfig("")).toEqual({
+    tables: [],
+    pages: [],
+    ai: { instructions: null, pullRequests: null },
+    ignore: [],
+  });
 });
 
 test("parseConfig keeps page paths as written", () => {
@@ -878,5 +884,48 @@ test.each([
   ["ai:\n  instructions: 1\n", "ai.instructions must be text"],
   [`ai:\n  pullRequests: ${"x".repeat(4_001)}\n`, "ai.pullRequests is longer than 4000 characters"],
 ])("ai %#: %s", (text, error) => {
+  expect(() => parseConfig(text)).toThrow(error);
+});
+
+test("ignore keeps matching folders and root files from becoming tables", () => {
+  const root = tmpRoot();
+  mkdirSync(join(root, "tasks"));
+  mkdirSync(join(root, "scripts"));
+  mkdirSync(join(root, "fixtures"));
+  write(join(root, "people.yaml"), "[]\n");
+  write(join(root, "old.yaml"), "[]\n");
+  write(join(root, "yamlite.yaml"), "ignore:\n  - scripts\n  - fixtures/**\n  - old.yaml\n");
+  expect(resolveConfig({ root }).tables.map((t) => t.name)).toEqual(["people", "tasks"]);
+});
+
+test("ignore excludes matching files from every files table under the root", () => {
+  const root = tmpRoot();
+  const outside = tmpRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    `ignore: ["**/*.draft.yaml", tasks/archive/]\ntables:\n  inbox:\n    files: ${outside}/*.yaml\n`,
+  );
+  mkdirSync(join(root, "tasks"));
+  const t = Object.fromEntries(resolveConfig({ root }).tables.map((x) => [x.name, x]));
+  const owns = (spec: TableSpec | undefined, file: string) => !(spec?.exclude ?? []).some((c) => claims(c, file));
+  expect(owns(t.tasks, join(root, "tasks/a.yaml"))).toBe(true);
+  expect(owns(t.tasks, join(root, "tasks/a.draft.yaml"))).toBe(false);
+  expect(owns(t.tasks, join(root, "tasks/archive/old.yaml"))).toBe(false);
+  expect(owns(t.inbox, join(outside, "b.draft.yaml"))).toBe(true);
+});
+
+test("parseConfig reads ignore", () => {
+  expect(parseConfig("ignore: [./scripts/, '**/*.draft.yaml']\n").ignore).toEqual(["scripts", "**/*.draft.yaml"]);
+  expect(parseConfig("tables: {}\n").ignore).toEqual([]);
+});
+
+test.each([
+  ["ignore: scripts\n", "ignore must be a list of globs"],
+  ["ignore: [1]\n", "ignore must be a list of globs"],
+  ["ignore: ['']\n", "ignore must be a list of globs"],
+  ["ignore: [/abs]\n", 'ignore entry "/abs" must be relative to the root'],
+  ["ignore: [../x]\n", 'ignore entry "../x" must be relative to the root'],
+  ["ignore: ['!keep.yaml']\n", 'ignore entry "!keep.yaml" cannot start with !'],
+])("ignore %#: %s", (text, error) => {
   expect(() => parseConfig(text)).toThrow(error);
 });

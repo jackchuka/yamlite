@@ -1,6 +1,6 @@
 import { type Dirent, existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, matchesGlob, normalize, relative, resolve, sep } from "node:path";
 import { isSeq, parse, parseDocument } from "yaml";
 import { instant, isDate, isDatetime } from "./datetime.ts";
 import { claims } from "./source/files.ts";
@@ -132,6 +132,8 @@ export interface Config {
   tables: DeclaredTable[];
   pages: PageSpec[];
   ai: AiInstructions;
+  // globs relative to the root, as normalized
+  ignore: string[];
 }
 
 class FolderPathError extends Error {}
@@ -237,11 +239,16 @@ function notAList(path: string): boolean {
   return doc.errors.length === 0 && doc.contents !== null && !isSeq(doc.contents);
 }
 
-function scanRoot(root: string): Located[] {
+// a pattern that matches a folder ignores everything in it, as in .gitignore
+const ignoredEntry = (name: string, ignore: readonly string[]) =>
+  ignore.some((p) => matchesGlob(name, p) || matchesGlob(`${name}/`, p));
+
+function scanRoot(root: string, ignore: readonly string[]): Located[] {
   const out: Located[] = [];
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     const name = entry.name;
     if (name.startsWith(".") || name === "node_modules" || CONFIG_NAMES.includes(name)) continue;
+    if (ignoredEntry(name, ignore)) continue;
     const path = join(root, name);
     let kind: { isDirectory(): boolean; isFile(): boolean } = entry;
     if (entry.isSymbolicLink()) {
@@ -331,7 +338,7 @@ const TABLE_KEYS = [
 
 function readRootConfig(root: string, text?: string): Config {
   const path = configPath(root) ?? (text === undefined ? null : "yamlite.yaml");
-  if (path === null) return { tables: [], pages: [], ai: NO_AI };
+  if (path === null) return { tables: [], pages: [], ai: NO_AI, ignore: [] };
   return parseConfig(text ?? readFileSync(path, "utf8"), basename(path));
 }
 
@@ -339,7 +346,7 @@ function readRootConfig(root: string, text?: string): Config {
 // errors, as opening the folder; what only the folder can tell (a default place, a path that is a folder, page
 // access to a table found by convention) is checked when it is opened
 export function parseConfig(text: string, name = "yamlite.yaml"): Config {
-  let raw: { tables?: Record<string, RawTable | null>; pages?: unknown; ai?: unknown } | null;
+  let raw: { tables?: Record<string, RawTable | null>; pages?: unknown; ai?: unknown; ignore?: unknown } | null;
   try {
     raw = parse(text);
   } catch (e) {
@@ -376,7 +383,25 @@ export function parseConfig(text: string, name = "yamlite.yaml"): Config {
     return { ...declared, location };
   });
   checkViewNames(tables.map((t) => ({ ...t, ...placeholder(t) })));
-  return { tables, pages: toPages(raw?.pages, (p) => p), ai: toAi(raw?.ai) };
+  return { tables, pages: toPages(raw?.pages, (p) => p), ai: toAi(raw?.ai), ignore: toIgnore(raw?.ignore) };
+}
+
+function toIgnore(raw: unknown): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!isStringList(raw)) throw new Error("ignore must be a list of globs");
+  return raw.map((entry) => {
+    if (entry.startsWith("!")) throw new Error(`ignore entry "${entry}" cannot start with !`);
+    const glob = entry.replace(/^(\.\/)+/, "").replace(/\/+$/, "");
+    if (
+      isAbsolute(glob) ||
+      glob.startsWith("~") ||
+      glob.split("/").some((s) => s === ".." || s === ".") ||
+      glob === ""
+    ) {
+      throw new Error(`ignore entry "${entry}" must be relative to the root`);
+    }
+    return glob;
+  });
 }
 
 export const AI_INSTRUCTIONS_MAX = 4_000;
@@ -483,7 +508,7 @@ function toSpec(t: Located, persisted: boolean): TableSpec {
 
 // the most specific table owns a file: a table excludes the files of every table inside its folder,
 // and a table with the same folder that matches the same file is an error for both
-function withClaims(tables: TableSpec[], configFiles: string[]): TableSpec[] {
+function withClaims(tables: TableSpec[], configFiles: string[], ignored: Claim[] = []): TableSpec[] {
   return tables.map((t) => {
     if (t.mode !== "files") return t;
     const inside = (o: TableSpec) =>
@@ -497,7 +522,7 @@ function withClaims(tables: TableSpec[], configFiles: string[]): TableSpec[] {
     for (const path of configFiles) {
       if (path.startsWith(t.path + sep)) exclude.push({ owner: basename(path), path, glob: null, tie: false });
     }
-    return { ...t, exclude };
+    return { ...t, exclude: [...exclude, ...ignored] };
   });
 }
 
@@ -835,8 +860,8 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     if (requireConfig && configPath(root) === null) {
       throw new Error(`no yamlite.yaml in ${root}; run "yamlite init" to create it`);
     }
-    const scanned = scanRoot(root);
     const config = readRootConfig(root, opts.configText);
+    const scanned = scanRoot(root, config.ignore);
     const declared = new Map<string, Located | TableSpec>();
     const pathErrors: string[] = [];
     for (const t of config.tables) {
@@ -881,10 +906,14 @@ export function resolveConfig(opts: OpenOptions, { requireConfig = true } = {}):
     }
     for (const [name, d] of declared) if (!merged.has(name)) merged.set(name, d);
     const configFiles = CONFIG_NAMES.map((name) => join(root, name));
+    const ignored = config.ignore.flatMap((glob) =>
+      [glob, `${glob}/**`].map((g): Claim => ({ owner: `ignore entry "${glob}"`, path: root, glob: g, tie: false })),
+    );
     const tables = checkViewNames(
       withClaims(
         [...merged.values()].map((t) => ("mode" in t ? t : toSpec(t, true))),
         configFiles,
+        ignored,
       ),
     );
     return {
