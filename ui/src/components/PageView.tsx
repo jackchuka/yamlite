@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { type SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type SyntheticEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { appLink } from "@/lib/appMode";
+import { appLink, useBranchAppLink } from "@/lib/appMode";
 import { api } from "@/lib/api";
 import { isReadOnly } from "@/lib/mode";
 import { PageHost } from "@/lib/pages/host";
@@ -31,6 +31,7 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
   const store = useEventStore();
   const page = meta?.pages.find((p) => p.name === name);
   const link = appLink(name);
+  const branchLink = useBranchAppLink(name);
   const html = useQuery({ queryKey: ["page", name], queryFn: () => api.pageHtml(name), enabled: page !== undefined });
   const frame = useRef<HTMLIFrameElement>(null);
   const counted = useRef<{ el: EventTarget | null; n: number }>({ el: null, n: 0 });
@@ -134,18 +135,16 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
             {accessBrief(page)}
           </HintPopover>
           {link !== null && (
-            <button
-              type="button"
-              className="ml-auto shrink-0 text-[12px] text-muted-foreground hover:text-foreground max-md:text-[13px]"
-              onClick={() => {
-                // plain http on a LAN address has no clipboard; the link stays up long enough to be copied by hand
-                const failed = () => toast.error(m.page_app_link_copy_failed({ link }), { duration: 30_000 });
-                if (!navigator.clipboard) return failed();
-                void navigator.clipboard.writeText(link).then(() => toast.success(m.page_app_link_copied()), failed);
-              }}
-            >
-              {m.page_copy_app_link()}
-            </button>
+            <span className="ml-auto flex shrink-0 items-center gap-3">
+              {branchLink !== null && (
+                <CopyLink link={branchLink} copied={m.page_branch_link_copied}>
+                  {m.page_copy_branch_link()}
+                </CopyLink>
+              )}
+              <CopyLink link={link} copied={m.page_app_link_copied}>
+                {m.page_copy_app_link()}
+              </CopyLink>
+            </span>
           )}
         </header>
       )}
@@ -188,5 +187,22 @@ export function PageView({ name, app = false }: { name: string; app?: boolean })
         />
       )}
     </div>
+  );
+}
+
+function CopyLink({ link, copied, children }: { link: string; copied: () => string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="text-[12px] text-muted-foreground hover:text-foreground max-md:text-[13px]"
+      onClick={() => {
+        // plain http on a LAN address has no clipboard; the link stays up long enough to be copied by hand
+        const failed = () => toast.error(m.page_app_link_copy_failed({ link }), { duration: 30_000 });
+        if (!navigator.clipboard) return failed();
+        void navigator.clipboard.writeText(link).then(() => toast.success(copied()), failed);
+      }}
+    >
+      {children}
+    </button>
   );
 }

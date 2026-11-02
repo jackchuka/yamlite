@@ -365,6 +365,8 @@
   "page_copy_app_link": "アプリのリンクをコピー",
   "page_app_link_copied": "このページだけを開くリンクをコピーしました",
   "page_app_link_copy_failed": "コピーできませんでした。次のリンクを手動でコピーしてください: {link}",
+  "page_copy_branch_link": "ブランチのリンクをコピー",
+  "page_branch_link_copied": "このページだけを、このブランチの編集を含めて開くリンクをコピーしました",
   "page_reload": "再読み込み",
   "agent_tool_schema": "テーブル構成を確認",
   "agent_tool_query": "検索",
