@@ -28,6 +28,17 @@ tables:
 
 `files:` takes a glob from the root: everything before the first wildcard is the table's folder (it may be outside the root), and the key is the path below it without the extension. `files: "**/*.{yaml,yml}"` makes the whole root one table; the conventions then add no folder tables under it, and `yamlite.yaml` itself is never a record. A file two tables match belongs to the one whose folder is deeper; two tables with the same folder matching the same file is an error. `path:` is for a single YAML file holding a list of records — a folder there is an error that names the `files:` line to use instead.
 
+### Ignoring files
+
+`ignore:` lists globs, relative to the root, for files and folders YAMLite leaves alone: an ignored folder or root file never becomes a table, and an ignored file is neither read into nor written from any table. A pattern that matches a folder ignores everything inside it, as in `.gitignore`. Patterns cannot start with `!`, and tables outside the root are not affected.
+
+```yaml
+ignore:
+  - scripts # the folder and everything in it
+  - "**/*.draft.yaml" # drafts in every table
+tables: {}
+```
+
 ### Markdown files
 
 A `files:` glob ending in `*.md` or `*.mdx` makes a Markdown table: the YAML front matter between the `---` lines at the top of each file becomes columns, and the text below it goes into a `body` column, which the web UI edits as Markdown.
