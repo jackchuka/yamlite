@@ -1,4 +1,4 @@
-import { setAppFooter, setAppLinkBuilder } from "./appMode";
+import { type BranchAppLink, setAppFooter, setAppLinkBuilder, setBranchAppLink } from "./appMode";
 import { setEmbedded } from "./embedded";
 import { setReadOnly } from "./mode";
 import { setPageFrame } from "./pageFrame";
@@ -14,6 +14,8 @@ export interface MountOptions {
   pageFrame?: string;
   // shapes the link Copy app link produces, e.g. to point at the default branch; without it there is no Copy app link
   appLink?: (page: string) => string;
+  // adds Copy branch link: the page on the branch being viewed, while appLink opens another
+  branchAppLink?: BranchAppLink;
   // opens this page as an app: the editor stays out of reach, whatever the address says
   app?: string;
   // the host's own part of an app's bar, placed at its left; the edits and Send for review are on its right
@@ -25,6 +27,7 @@ export function applyMountOptions(el: HTMLElement, o: MountOptions): void {
   setEmbedded(o.embedded ?? false);
   setPageFrame(o.pageFrame);
   setAppLinkBuilder(o.appLink ?? null);
+  setBranchAppLink(o.branchAppLink);
   setAppFooter(o.appFooter);
   if (o.fit === "container") el.style.setProperty("--y-shell-h", "100%");
   else el.style.removeProperty("--y-shell-h");

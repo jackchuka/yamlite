@@ -1,8 +1,8 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { api } from "@/lib/api";
-import { setAppLinkBuilder } from "@/lib/appMode";
+import { setAppLinkBuilder, setBranchAppLink } from "@/lib/appMode";
 import { enterStatic } from "@/lib/mode";
 import { setPageFrame } from "@/lib/pageFrame";
 import type { Snapshot } from "@/lib/types";
@@ -94,6 +94,33 @@ test("a host that gave no app link has no Copy app link", async () => {
     expect(screen.queryByRole("button", { name: "Copy app link" })).toBeNull();
   } finally {
     setAppLinkBuilder(undefined);
+  }
+});
+
+test("a host's branch link is offered next to the app link, and follows the branch", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+  let branch: string | null = null;
+  const listeners = new Set<() => void>();
+  setBranchAppLink({
+    get: (page) => (branch === null ? null : `https://host/-/apps/${page}?branch=${branch}`),
+    subscribe: (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+  });
+  try {
+    await show("board");
+    expect(await screen.findByRole("button", { name: "Copy app link" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Copy branch link" })).toBeNull();
+    act(() => {
+      branch = "review";
+      listeners.forEach((fn) => fn());
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Copy branch link" }));
+    expect(writeText).toHaveBeenCalledWith("https://host/-/apps/board?branch=review");
+  } finally {
+    setBranchAppLink(undefined);
   }
 });
 

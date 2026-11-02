@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useSyncExternalStore } from "react";
 import { useRouteContext } from "@tanstack/react-router";
 
 // an entry at -/apps/<name>/ opens that page as an app: it fills the screen, and the people it is shared with see none of the editor around it
@@ -15,6 +15,23 @@ let appLinkBuilder: ((page: string) => string) | null | undefined;
 export const setAppLinkBuilder = (fn: ((page: string) => string) | null | undefined): void => {
   appLinkBuilder = fn;
 };
+
+// a host whose app link opens another branch than the one being viewed (Cloud: a review) also links to the page on
+// this branch, so someone can see its edits before they are applied. get gives null where the app link already opens
+// this branch; subscribe tells when the branch changes under a mounted UI
+export interface BranchAppLink {
+  get: (page: string) => string | null;
+  subscribe: (onChange: () => void) => () => void;
+}
+let branchAppLinkSource: BranchAppLink | undefined;
+export const setBranchAppLink = (s: BranchAppLink | undefined): void => {
+  branchAppLinkSource = s;
+};
+const noSubscribe = () => () => {};
+export function useBranchAppLink(page: string): string | null {
+  const s = branchAppLinkSource;
+  return useSyncExternalStore(s?.subscribe ?? noSubscribe, () => s?.get(page) ?? null);
+}
 
 // an element of the host's, shown at the left of the app's bar; the host renders into it whatever it adds there
 let appFooterHost: HTMLElement | undefined;
