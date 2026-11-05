@@ -139,4 +139,6 @@ test("a driver without history answers nogit", async () => {
   const { w } = await tasksWorkspace({ git });
   const h = await (await w.router.dispatch(new Request("http://x/api/tables/tasks/rows/a/history"))).json();
   expect(h.state).toBe("nogit");
+  const diff = await w.router.dispatch(new Request(`http://x/api/tables/tasks/rows/a/history/${"a".repeat(40)}/diff`));
+  expect(diff.status).toBe(404);
 });
