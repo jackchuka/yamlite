@@ -24,19 +24,30 @@ export interface GitStatus {
   changes: { path: string; status: "added" | "modified" | "deleted" }[]; // paths relative to the data root
 }
 
-// the git work the server needs: local serve uses the user's own git and gh, another host can supply its own
-export interface GitDriver {
-  // false: the UI shows no git footer
-  hasRemote(): Promise<boolean>;
+// what the server needs from where the data folder comes from: local serve uses the user's own git and gh, another
+// host supplies its own. Each optional part is a capability the UI shows only when it is there
+export interface WorkspaceDriver {
   status(): Promise<GitStatus>;
-  defaultBranch(): Promise<string | null>;
   // the file at the base commit (HEAD locally); null when it has none
   baseContent(rootPath: string): Promise<string | null>;
   // the file's bytes at the base commit, as a checkout writes them; null only when the commit has no file there,
   // and a throw when that cannot be told, since a caller may remove a file it gets null for
   baseFile(rootPath: string): Promise<Uint8Array | null>;
-  history(t: HistoryTarget, extract: Extract, o: { cursor?: string }): Promise<HistoryPage>;
-  fileDiff(t: HistoryTarget, rev: string): Promise<DiffResult>;
+  // absent: the history panel answers nogit
+  history?(t: HistoryTarget, extract: Extract, o: { cursor?: string }): Promise<HistoryPage>;
+  fileDiff?(t: HistoryTarget, rev: string): Promise<DiffResult>;
+  // absent: no git footer
+  review?: ReviewCapability;
+  // present only where arbitrary git steps can run (a local checkout);
+  // absent: no git tools for the agent, and applying a git proposal answers 404
+  readonly steps?: StepRunner;
+}
+
+// sending edits for review on a branch, as a pull request
+export interface ReviewCapability {
+  // false: the UI shows no git footer. Asked each time, as a local repository can get its origin after start
+  available(): Promise<boolean>;
+  defaultBranch(): Promise<string | null>;
   // runs inside the workspace's proposals.exclusive, after a sync; target null: a new PR
   review(
     req: ReviewRequest & { target: string | null },
@@ -50,9 +61,6 @@ export interface GitDriver {
   readonly namesBranch?: boolean;
   // present where the host can read the default branch; absent: the UI offers no way to put files back as it has them
   readonly defaultBranchFiles?: DefaultBranchFiles;
-  // present only where arbitrary git steps can run (a local checkout);
-  // absent: no git tools for the agent, and applying a git proposal answers 404
-  readonly steps?: StepRunner;
 }
 
 // the default branch, for putting part of a review back the way the default branch has it
@@ -105,7 +113,7 @@ export class NoRepository extends Error {
 }
 
 // the user's own git and gh; the repository is looked up on each use until one exists, so `git init` after start works
-export async function localDriver(root: string, gh: () => Promise<string | null>): Promise<GitDriver> {
+export async function localDriver(root: string, gh: () => Promise<string | null>): Promise<WorkspaceDriver> {
   let found: { repo: Repo; steps: StepRunner } | null = null;
   let base: string | null = null;
   const lookup = async () => {
@@ -135,19 +143,8 @@ export async function localDriver(root: string, gh: () => Promise<string | null>
   };
   await lookup();
   return {
-    namesBranch: true,
     get steps() {
       return found?.steps;
-    },
-    async hasRemote() {
-      const f = await lookup();
-      if (!f) return false;
-      try {
-        await runGit(f.repo.top, ["remote", "get-url", "origin"]);
-        return true;
-      } catch {
-        return false;
-      }
     },
     async status() {
       const f = await lookup();
@@ -158,7 +155,6 @@ export async function localDriver(root: string, gh: () => Promise<string | null>
         .map((c) => ({ path: c.path, status: changeStatus(c.status) }));
       return { branch: s.branch, upstream: s.upstream, changes };
     },
-    defaultBranch: defaultName,
     async baseContent(rootPath) {
       const { repo } = await need();
       const top = insideRoot(repo, rootPath);
@@ -172,61 +168,81 @@ export async function localDriver(root: string, gh: () => Promise<string | null>
     async baseFile(rootPath) {
       return blobAt((await need()).repo, "HEAD", rootPath);
     },
-    defaultBranchFiles: {
-      async changes() {
-        const f = await lookup();
-        if (!f) return [];
-        const [branch, name] = [await currentBranch(f.repo), await defaultName()];
-        if (branch === null || name === null || branch === name) return [];
-        // three dots: what the branch changes since it left the default branch, as the pull request shows it
-        const out = await runGit(f.repo.top, [
-          "diff",
-          "--name-status",
-          "--no-renames",
-          "-z",
-          `${await defaultRef(f.repo, name)}...HEAD`,
-          "--",
-          f.repo.prefix || ".",
-        ]);
-        const parts = out.split("\0");
-        const changes: GitStatus["changes"] = [];
-        for (let i = 0; i + 1 < parts.length; i += 2) {
-          const path = toRoot(f.repo, parts[i + 1] as string);
-          if (path === null) continue;
-          const code = parts[i] as string;
-          changes.push({ path, status: code === "A" ? "added" : code === "D" ? "deleted" : "modified" });
-        }
-        return changes;
-      },
-      async file(rootPath) {
-        const { repo } = await need();
-        const name = await defaultName();
-        if (name === null) throw new GitError("the default branch is not known");
-        return blobAt(repo, await defaultRef(repo, name), rootPath);
-      },
-    },
     history: (t, extract, o) => recordHistory(t, extract, o),
     fileDiff: (t, rev) => fileDiff(t, rev),
-    async openPr() {
-      const f = await lookup();
-      if (!f) return null;
-      const branch = await currentBranch(f.repo);
-      if (branch === null || branch === (await defaultName())) return null;
-      return findOpenPr(f.repo, branch, await gh());
-    },
-    async pullRequestTemplate() {
-      const f = await lookup();
-      if (!f) return null;
-      const listed = await runGit(f.repo.top, ["ls-tree", "--name-only", "HEAD", "--", ".", ".github/", "docs/"]).catch(
-        () => "",
-      );
-      const path = templatePath(listed.split("\n"));
-      return path === null ? null : runGit(f.repo.top, ["show", `HEAD:${path}`]).catch(() => null);
-    },
-    async review(req, o) {
-      if (req.target !== null) throw new ReviewRefused(400, "this server cannot add to an existing pull request");
-      const { repo, steps } = await need();
-      return localReview(steps, req, { ...o, findOpenPr: async (branch) => findOpenPr(repo, branch, await gh()) });
+    review: {
+      namesBranch: true,
+      async available() {
+        const f = await lookup();
+        if (!f) return false;
+        try {
+          await runGit(f.repo.top, ["remote", "get-url", "origin"]);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      defaultBranch: defaultName,
+      defaultBranchFiles: {
+        async changes() {
+          const f = await lookup();
+          if (!f) return [];
+          const [branch, name] = [await currentBranch(f.repo), await defaultName()];
+          if (branch === null || name === null || branch === name) return [];
+          // three dots: what the branch changes since it left the default branch, as the pull request shows it
+          const out = await runGit(f.repo.top, [
+            "diff",
+            "--name-status",
+            "--no-renames",
+            "-z",
+            `${await defaultRef(f.repo, name)}...HEAD`,
+            "--",
+            f.repo.prefix || ".",
+          ]);
+          const parts = out.split("\0");
+          const changes: GitStatus["changes"] = [];
+          for (let i = 0; i + 1 < parts.length; i += 2) {
+            const path = toRoot(f.repo, parts[i + 1] as string);
+            if (path === null) continue;
+            const code = parts[i] as string;
+            changes.push({ path, status: code === "A" ? "added" : code === "D" ? "deleted" : "modified" });
+          }
+          return changes;
+        },
+        async file(rootPath) {
+          const { repo } = await need();
+          const name = await defaultName();
+          if (name === null) throw new GitError("the default branch is not known");
+          return blobAt(repo, await defaultRef(repo, name), rootPath);
+        },
+      },
+      async openPr() {
+        const f = await lookup();
+        if (!f) return null;
+        const branch = await currentBranch(f.repo);
+        if (branch === null || branch === (await defaultName())) return null;
+        return findOpenPr(f.repo, branch, await gh());
+      },
+      async pullRequestTemplate() {
+        const f = await lookup();
+        if (!f) return null;
+        const listed = await runGit(f.repo.top, [
+          "ls-tree",
+          "--name-only",
+          "HEAD",
+          "--",
+          ".",
+          ".github/",
+          "docs/",
+        ]).catch(() => "");
+        const path = templatePath(listed.split("\n"));
+        return path === null ? null : runGit(f.repo.top, ["show", `HEAD:${path}`]).catch(() => null);
+      },
+      async review(req, o) {
+        if (req.target !== null) throw new ReviewRefused(400, "this server cannot add to an existing pull request");
+        const { repo, steps } = await need();
+        return localReview(steps, req, { ...o, findOpenPr: async (branch) => findOpenPr(repo, branch, await gh()) });
+      },
     },
   };
 }

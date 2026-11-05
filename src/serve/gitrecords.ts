@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { isMap, isSeq, parseDocument } from "yaml";
 import { fieldChanges } from "../githistory.ts";
-import type { GitDriver } from "../git/driver.ts";
+import type { WorkspaceDriver } from "../git/driver.ts";
 import { claims } from "../source/files.ts";
 import { PARSE_OPTIONS } from "../source/yamldoc.ts";
 import { own, type Rec, type TableSpec } from "../types.ts";
@@ -74,7 +74,7 @@ function compare(key: string, before: Rec | null, after: Rec | null): RecordChan
 
 // the records a changed file adds, changes or removes; null for files that are not records or cannot be read
 export async function recordChanges(
-  git: GitDriver,
+  git: WorkspaceDriver,
   root: string,
   tables: readonly TableSpec[],
   rootPath: string,
@@ -102,7 +102,7 @@ export async function recordChanges(
 
 // the record as HEAD has it, without its key, and the file it was read from; null when HEAD does not have it
 export async function headRecord(
-  git: GitDriver,
+  git: WorkspaceDriver,
   root: string,
   spec: TableSpec,
   key: string,
@@ -119,7 +119,7 @@ export async function headRecord(
 
 // the record's file now, or when it is gone the one HEAD has: a deleted "a.yml" is not where a new record would go
 async function headFile(
-  git: GitDriver,
+  git: WorkspaceDriver,
   root: string,
   spec: TableSpec,
   key: string,

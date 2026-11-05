@@ -32,7 +32,8 @@ function reviewBody(body: unknown): ReviewRequest {
 export const gitRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/git", async () => {
     const git = ctx.git;
-    if (!git || !(await git.hasRemote())) return { git: null };
+    const review = git?.review;
+    if (!git || !review || !(await review.available())) return { git: null };
     const status = await git.status();
     const changes = await Promise.all(
       status.changes.map(async (c) => ({
@@ -42,16 +43,16 @@ export const gitRoutes: Routes = (router, ctx) => {
       })),
     );
     changes.sort((a, b) => a.path.localeCompare(b.path));
-    const defaultBranch = await git.defaultBranch();
+    const defaultBranch = await review.defaultBranch();
     return {
       git: {
         branch: status.branch,
         defaultBranch,
         upstream: status.upstream,
-        namesBranch: git.namesBranch === true,
+        namesBranch: review.namesBranch === true,
         // the files can be put back as the default branch has them; the list comes from /api/git/default
         restoresDefault:
-          git.defaultBranchFiles !== undefined &&
+          review.defaultBranchFiles !== undefined &&
           status.branch !== null &&
           defaultBranch !== null &&
           status.branch !== defaultBranch,
@@ -62,7 +63,7 @@ export const gitRoutes: Routes = (router, ctx) => {
 
   // the files the review changes from the default branch; unsent: the file also has edits not sent yet
   router.add("GET", "/api/git/default", async () => {
-    const from = ctx.git?.defaultBranchFiles;
+    const from = ctx.git?.review?.defaultBranchFiles;
     if (!from) throw new HttpError(404, "this host cannot read the default branch");
     const [changes, status] = await Promise.all([from.changes().catch(notFound), ctx.git!.status()]);
     const unsent = new Set(status.changes.map((c) => c.path));
@@ -80,7 +81,7 @@ export const gitRoutes: Routes = (router, ctx) => {
 
   // writes the chosen files as the default branch has them, or removes those it has not; they become unsent edits
   router.add("POST", "/api/git/restore-default", async ({ body }) => {
-    const from = ctx.git?.defaultBranchFiles;
+    const from = ctx.git?.review?.defaultBranchFiles;
     if (!from) throw new HttpError(404, "this host cannot read the default branch");
     const paths = objectBody(body, "body").files;
     if (!Array.isArray(paths) || paths.length === 0 || paths.some((p) => typeof p !== "string"))
@@ -144,11 +145,11 @@ export const gitRoutes: Routes = (router, ctx) => {
   });
 
   router.add("POST", "/api/git/review", async ({ body }) => {
-    const git = ctx.git;
-    if (!git || !(await git.hasRemote()))
+    const review = ctx.git?.review;
+    if (!review || !(await review.available()))
       throw new HttpError(404, "the data folder is not in a git repository with an origin");
     const req = reviewBody(body);
-    if (req.branch !== undefined && !git.namesBranch)
+    if (req.branch !== undefined && !review.namesBranch)
       throw new HttpError(400, "this host names the branch for a review itself", { field: "branch" });
     const target = objectBody(body, "body").target;
     if (target !== undefined && target !== null && typeof target !== "string")
@@ -157,7 +158,7 @@ export const gitRoutes: Routes = (router, ctx) => {
       // UI edits reach the files before git reads them
       assertSynced(await ctx.y.sync(), "could not write the latest edits to files for", "; nothing was sent");
       try {
-        return await git.review(
+        return await review.review(
           { ...req, target: target ?? null },
           {
             afterTreeChange: async () =>
@@ -177,7 +178,7 @@ export const gitRoutes: Routes = (router, ctx) => {
   router.add("GET", "/api/git/pr", async () => {
     const git = ctx.git;
     if (!git) throw new HttpError(404, "the data folder is not in a git repository");
-    return { url: (await git.openPr?.().catch(notFound)) ?? null };
+    return { url: (await git.review?.openPr?.().catch(notFound)) ?? null };
   });
 
   router.add("POST", "/api/git/review/draft", async ({ body, signal }) => {
@@ -211,7 +212,7 @@ export const gitRoutes: Routes = (router, ctx) => {
         };
       }),
     );
-    const template = b.mode === "pr" ? ((await git.pullRequestTemplate?.()) ?? null) : null;
+    const template = b.mode === "pr" ? ((await git.review?.pullRequestTemplate?.()) ?? null) : null;
     const release = ctx.agent.pageSlot();
     try {
       return await draftReview(languageModel, { files, mode: b.mode, locale, template, ai: ctx.y.ai }, signal);

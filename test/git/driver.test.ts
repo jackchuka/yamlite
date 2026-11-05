@@ -21,15 +21,15 @@ test("a null default branch is asked for again, a found one is kept", async () =
   initRepo(root);
   commit(root, "init");
   const d = await localDriver(root, async () => null);
-  expect(await d.defaultBranch()).toBeNull();
+  expect(await d.review!.defaultBranch()).toBeNull();
   const bare = tmpRoot();
   git(bare, "init", "-q", "--bare", "-b", "main");
   git(root, "remote", "add", "origin", bare);
   git(root, "push", "-q", "-u", "origin", "main");
   git(root, "remote", "set-head", "origin", "main");
-  expect(await d.defaultBranch()).toBe("main");
+  expect(await d.review!.defaultBranch()).toBe("main");
   git(root, "remote", "remove", "origin");
-  expect(await d.defaultBranch()).toBe("main");
+  expect(await d.review!.defaultBranch()).toBe("main");
 });
 
 test("without gh, findOpenPr is null", async () => {
@@ -55,7 +55,10 @@ test("the local driver offers git steps and refuses a review target", async () =
   const d = await localDriver(root, async () => null);
   expect(d.steps?.repo).toEqual(repo);
   await expect(
-    d.review({ title: "T", body: "", paths: ["tasks/a.yaml"], target: "work" }, { afterTreeChange: async () => {} }),
+    d.review!.review(
+      { title: "T", body: "", paths: ["tasks/a.yaml"], target: "work" },
+      { afterTreeChange: async () => {} },
+    ),
   ).rejects.toEqual(new ReviewRefused(400, "this server cannot add to an existing pull request"));
 });
 
@@ -65,7 +68,7 @@ test("the local driver refuses a detached HEAD with 409", async () => {
   git(root, "switch", "-q", "--detach");
   const d = await localDriver(root, async () => null);
   await expect(
-    d.review({ title: "T", body: "", paths: ["x.yaml"], target: null }, { afterTreeChange: async () => {} }),
+    d.review!.review({ title: "T", body: "", paths: ["x.yaml"], target: null }, { afterTreeChange: async () => {} }),
   ).rejects.toMatchObject({ status: 409 });
 });
 
@@ -73,15 +76,18 @@ test("without a repository the local driver answers no git, and finds one create
   const root = dataRoot();
   const d = await localDriver(root, async () => null);
   expect(d.steps).toBeUndefined();
-  expect(await d.hasRemote()).toBe(false);
+  expect(await d.review!.available()).toBe(false);
   expect(await d.status()).toEqual({ branch: null, upstream: null, changes: [] });
-  expect(await d.defaultBranch()).toBeNull();
+  expect(await d.review!.defaultBranch()).toBeNull();
   await expect(d.baseContent("tasks/a.yaml")).rejects.toBeInstanceOf(NoRepository);
   await expect(
-    d.review({ title: "T", body: "", paths: ["tasks/a.yaml"], target: null }, { afterTreeChange: async () => {} }),
+    d.review!.review(
+      { title: "T", body: "", paths: ["tasks/a.yaml"], target: null },
+      { afterTreeChange: async () => {} },
+    ),
   ).rejects.toBeInstanceOf(NoRepository);
   withRemote(root);
-  expect(await d.hasRemote()).toBe(true);
+  expect(await d.review!.available()).toBe(true);
   expect(d.steps?.repo).toEqual(await findRepo(root));
 });
 
@@ -93,19 +99,19 @@ test("the local driver lists a review's changes under the data folder and reads 
   writeFileSync(join(root, "a.yaml"), "title: A\n");
   withRemote(top);
   const d = await localDriver(root, async () => null);
-  expect(await d.defaultBranchFiles!.changes()).toEqual([]);
+  expect(await d.review!.defaultBranchFiles!.changes()).toEqual([]);
   git(top, "switch", "-q", "-c", "work");
   writeFileSync(join(top, "README.md"), "changed\n");
   writeFileSync(join(root, "a.yaml"), "title: A2\n");
   writeFileSync(join(root, "b.yaml"), "title: B\n");
   commit(top, "review");
-  expect(await d.defaultBranchFiles!.changes()).toEqual([
+  expect(await d.review!.defaultBranchFiles!.changes()).toEqual([
     { path: "a.yaml", status: "modified" },
     { path: "b.yaml", status: "added" },
   ]);
-  expect(Buffer.from((await d.defaultBranchFiles!.file("a.yaml"))!).toString()).toBe("title: A\n");
-  expect(await d.defaultBranchFiles!.file("b.yaml")).toBeNull();
-  await expect(d.defaultBranchFiles!.file("../README.md")).rejects.toThrow(/outside the repository/);
+  expect(Buffer.from((await d.review!.defaultBranchFiles!.file("a.yaml"))!).toString()).toBe("title: A\n");
+  expect(await d.review!.defaultBranchFiles!.file("b.yaml")).toBeNull();
+  await expect(d.review!.defaultBranchFiles!.file("../README.md")).rejects.toThrow(/outside the repository/);
 });
 
 test("without a fetched default branch the local driver reads the local one", async () => {
@@ -116,19 +122,19 @@ test("without a fetched default branch the local driver reads the local one", as
   commit(root, "review");
   git(root, "update-ref", "-d", "refs/remotes/origin/main");
   const d = await localDriver(root, async () => null);
-  expect(await d.defaultBranchFiles!.changes()).toEqual([{ path: "a.yaml", status: "added" }]);
+  expect(await d.review!.defaultBranchFiles!.changes()).toEqual([{ path: "a.yaml", status: "added" }]);
   git(root, "branch", "-q", "-D", "main");
-  await expect(d.defaultBranchFiles!.changes()).rejects.toThrow(/default branch main is not in this clone/);
+  await expect(d.review!.defaultBranchFiles!.changes()).rejects.toThrow(/default branch main is not in this clone/);
 });
 
 test("the local driver reads the committed pull request template, or none", async () => {
   const root = dataRoot();
   withRemote(root);
   const d = await localDriver(root, async () => null);
-  expect(await d.pullRequestTemplate?.()).toBeNull();
+  expect(await d.review!.pullRequestTemplate?.()).toBeNull();
   mkdirSync(join(root, ".github"), { recursive: true });
   writeFileSync(join(root, ".github/PULL_REQUEST_TEMPLATE.md"), "## Why\n");
-  expect(await d.pullRequestTemplate?.()).toBeNull();
+  expect(await d.review!.pullRequestTemplate?.()).toBeNull();
   commit(root, "template");
-  expect(await d.pullRequestTemplate?.()).toBe("## Why\n");
+  expect(await d.review!.pullRequestTemplate?.()).toBe("## Why\n");
 });

@@ -14,7 +14,7 @@ test("every replacement path browserAliases returns exists on disk", () => {
     expect(existsSync(replacement), `${find}: ${replacement}`).toBe(true);
 });
 
-test("core exports the helpers a host's GitDriver builds history entries with", async () => {
+test("core exports the helpers a host's WorkspaceDriver builds history entries with", async () => {
   const core = await import("../src/core.ts");
   const d = core.describeChange({ a: 1, b: "x" }, { a: 2, b: "x" });
   expect(d).toEqual({ changes: [{ path: "a", from: 1, to: 2 }], record: { a: 2, b: "x" } });

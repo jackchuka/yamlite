@@ -3,7 +3,7 @@ import { AgentHost, GIT_DONE, GIT_NOTE, type HostOptions } from "../agent/host.t
 import { ProposalStore } from "../agent/proposals.ts";
 import { agentTools } from "../agent/tools.ts";
 import { configPath, resolveConfig } from "../config.ts";
-import { type GitDriver, localDriver } from "../git/driver.ts";
+import { type WorkspaceDriver, localDriver } from "../git/driver.ts";
 import { ghReady } from "../git/repo.ts";
 import { open } from "../index.ts";
 import { Store } from "../store.ts";
@@ -32,7 +32,7 @@ export interface WorkspaceOptions {
   // Ask AI; absent or null turns it off
   ai?: AiOptions | null;
   // absent: the local repository (found once it exists) with the gh probe; null: no git
-  git?: GitDriver | null;
+  git?: WorkspaceDriver | null;
   // skips gh detection; null means no gh
   gh?: string | null;
   // a host's own source for page files missing from the working tree (one that fetches them lazily); path is

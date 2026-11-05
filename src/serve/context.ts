@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
 import type { AgentHost } from "../agent/host.ts";
 import type { ProposalStore } from "../agent/proposals.ts";
-import type { GitDriver } from "../git/driver.ts";
+import type { WorkspaceDriver } from "../git/driver.ts";
 import type { Yamlite } from "../index.ts";
 import { DENIED_FILES } from "../pages/access.ts";
 import type { Store } from "../store.ts";
@@ -28,7 +28,7 @@ export interface ApiContext {
   proposals: ProposalStore;
   agent: AgentHost | null;
   // reads and writes git for the root; null when there is no git
-  git: GitDriver | null;
+  git: WorkspaceDriver | null;
   // applies yamlite.yaml now, after a route wrote it
   reloadConfig: () => void;
   // a host's own source for page files, asked before the working tree

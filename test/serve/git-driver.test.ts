@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
-import type { GitDriver, GitStatus } from "../../src/git/driver.ts";
+import type { GitStatus, ReviewCapability, WorkspaceDriver } from "../../src/git/driver.ts";
 import { join } from "node:path";
 import { useGitEnv, withRemote } from "../gitrepo.ts";
 import { read, write } from "../helpers.ts";
@@ -7,16 +7,23 @@ import { tasksWorkspace } from "./helpers.ts";
 
 beforeEach(() => useGitEnv());
 
-function fakeDriver(files: Record<string, string>, changes: GitStatus): GitDriver {
+function fakeDriver(
+  files: Record<string, string>,
+  changes: GitStatus,
+  review: Partial<ReviewCapability> = {},
+): WorkspaceDriver {
   return {
-    hasRemote: async () => true,
     status: async () => changes,
-    defaultBranch: async () => "main",
     baseContent: async (p) => files[p] ?? null,
     baseFile: async (p) => (files[p] === undefined ? null : Buffer.from(files[p])),
     history: async () => ({ state: "ok", entries: [], next: null }),
     fileDiff: async () => ({ state: "missing" }),
-    review: async () => ({ branch: "b", steps: [], results: [], url: null, created: false }),
+    review: {
+      available: async () => true,
+      defaultBranch: async () => "main",
+      review: async () => ({ branch: "b", steps: [], results: [], url: null, created: false }),
+      ...review,
+    },
   };
 }
 
@@ -66,7 +73,7 @@ test("a branch name for a review goes only to a host that takes one", async () =
   expect(refused.status).toBe(400);
   expect(await refused.json()).toMatchObject({ field: "branch" });
   expect((await send(own)).status).toBe(200);
-  const { w: taking } = await tasksWorkspace({ git: { ...fakeDriver({}, status), namesBranch: true } });
+  const { w: taking } = await tasksWorkspace({ git: fakeDriver({}, status, { namesBranch: true }) });
   expect((await (await taking.router.dispatch(new Request("http://x/api/git"))).json()).git.namesBranch).toBe(true);
   expect((await send(taking, "fix/tasks")).status).toBe(200);
 });
@@ -87,13 +94,16 @@ test("a driver that cannot read the default branch offers no restore", async () 
 
 test("a host's default branch files are listed and written back", async () => {
   const defaults: Record<string, string> = { "tasks/a.yaml": "title: A\n" };
-  const git: GitDriver = {
-    ...fakeDriver({ "tasks/a.yaml": "title: B\n" }, { branch: "review", upstream: null, changes: [] }),
-    defaultBranchFiles: {
-      changes: async () => [{ path: "tasks/a.yaml", status: "modified" }],
-      file: async (p) => (defaults[p] === undefined ? null : Buffer.from(defaults[p])),
+  const git = fakeDriver(
+    { "tasks/a.yaml": "title: B\n" },
+    { branch: "review", upstream: null, changes: [] },
+    {
+      defaultBranchFiles: {
+        changes: async () => [{ path: "tasks/a.yaml", status: "modified" }],
+        file: async (p) => (defaults[p] === undefined ? null : Buffer.from(defaults[p])),
+      },
     },
-  };
+  );
   const { w, root } = await tasksWorkspace({ git });
   write(join(root, "tasks/a.yaml"), "title: B\n");
   const get = async (path: string, init?: RequestInit) => w.router.dispatch(new Request(`http://x${path}`, init));
@@ -108,4 +118,25 @@ test("a host's default branch files are listed and written back", async () => {
   });
   expect(r.status).toBe(200);
   expect(read(join(root, "tasks/a.yaml"))).toBe("title: A\n");
+});
+
+test("a driver without review answers no git footer", async () => {
+  const { review: _, ...git } = fakeDriver({}, { branch: "main", upstream: null, changes: [] });
+  const { w } = await tasksWorkspace({ git });
+  expect(await (await w.router.dispatch(new Request("http://x/api/git"))).json()).toEqual({ git: null });
+  const sent = await w.router.dispatch(
+    new Request("http://x/api/git/review", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: "T", paths: ["tasks/a.yaml"] }),
+    }),
+  );
+  expect(sent.status).toBe(404);
+});
+
+test("a driver without history answers nogit", async () => {
+  const { history: _h, fileDiff: _d, ...git } = fakeDriver({}, { branch: "main", upstream: null, changes: [] });
+  const { w } = await tasksWorkspace({ git });
+  const h = await (await w.router.dispatch(new Request("http://x/api/tables/tasks/rows/a/history"))).json();
+  expect(h.state).toBe("nogit");
 });
