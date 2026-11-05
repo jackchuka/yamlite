@@ -35,7 +35,10 @@ export function fieldKind(
   isRef: boolean,
   format?: ColumnFormat,
 ): FieldKind {
-  if (isRef) return "ref";
+  if (isRef && type !== "JSON") return "ref";
+  // a JSON column of references holds a list of keys, and a list format leaves no type to choose
+  if (type === "JSON" && (format === "list" || (isRef && format !== "map")))
+    return value == null || isChips(value) ? "chips" : "json";
   if (format === "date" && (value == null || isDate(value))) return "date";
   if (format === "datetime" && (value == null || (typeof value === "string" && toPicker(value) !== null)))
     return "datetime";

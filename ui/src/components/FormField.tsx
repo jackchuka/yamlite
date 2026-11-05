@@ -126,9 +126,8 @@ function ValuesField({ path, value, allowed, onChange, readOnly }: FieldProps & 
   );
 }
 
-function RefField({ path, value, type, reference, onChange }: FieldProps) {
-  // an app shows no way into the editor's tables
-  const app = useAppMode();
+// the target column's values, as suggestions for an input naming the datalist
+function RefKeys({ id, reference }: { id: string; reference: MetaReference | undefined }) {
   const target = reference?.table ?? "";
   const column = reference?.key;
   const { data } = useQuery({
@@ -136,6 +135,19 @@ function RefField({ path, value, type, reference, onChange }: FieldProps) {
     queryFn: () => api.rows(target, { limit: 500, offset: 0, filters: [] }),
     enabled: target !== "",
   });
+  return (
+    <datalist id={id}>
+      {column !== undefined &&
+        [...new Set(data?.rows.flatMap((r) => (r[column] == null ? [] : [String(r[column])])))].map((key) => (
+          <option key={key} value={key} />
+        ))}
+    </datalist>
+  );
+}
+
+function RefField({ path, value, type, reference, onChange }: FieldProps) {
+  // an app shows no way into the editor's tables
+  const app = useAppMode();
   const listId = `ref-${label(path)}`;
   const text = value == null ? "" : String(value);
   return (
@@ -163,12 +175,7 @@ function RefField({ path, value, type, reference, onChange }: FieldProps) {
           </RefLink>
         )}
       </div>
-      <datalist id={listId}>
-        {column !== undefined &&
-          [...new Set(data?.rows.flatMap((r) => (r[column] == null ? [] : [String(r[column])])))].map((key) => (
-            <option key={key} value={key} />
-          ))}
-      </datalist>
+      <RefKeys id={listId} reference={reference} />
     </>
   );
 }
@@ -386,8 +393,49 @@ function Widget(props: FieldProps) {
       );
     case "ref":
       return <RefField {...props} />;
-    case "chips":
-      return <ChipsInput label={label(path)} value={(value ?? []) as string[]} onChange={onChange} invalid={problem} />;
+    case "chips": {
+      const listId = reference ? `ref-${label(path)}` : undefined;
+      return (
+        <div className="flex items-start gap-1.5">
+          <div className="flex-1">
+            <ChipsInput
+              label={label(path)}
+              value={(value ?? []) as string[]}
+              onChange={onChange}
+              invalid={problem}
+              list={listId}
+              placeholder={Array.isArray(value) && value.length === 0 ? m.form_list_none() : undefined}
+            />
+          </div>
+          {value == null && !props.readOnly && (
+            <>
+              <button
+                type="button"
+                aria-label={m.form_set_empty_of({ field: label(path) })}
+                className="shrink-0 rounded border px-1.5 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+                onClick={() => onChange([])}
+              >
+                {m.form_set_empty()}
+              </button>
+              {type === "JSON" && (
+                <button
+                  type="button"
+                  aria-label={m.form_as({ field: label(path), kind: "JSON" })}
+                  className="shrink-0 rounded border px-1.5 py-1.5 font-mono text-[11.5px] text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setKind("json");
+                    onChange([]);
+                  }}
+                >
+                  JSON
+                </button>
+              )}
+            </>
+          )}
+          {listId && <RefKeys id={listId} reference={reference} />}
+        </div>
+      );
+    }
     case "map":
       return <MapField {...props} />;
     case "json":

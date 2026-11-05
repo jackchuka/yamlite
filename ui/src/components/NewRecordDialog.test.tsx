@@ -164,7 +164,7 @@ test("changing the type of a JSON field with values asks first, and declining ke
   confirm.mockRestore();
 });
 
-test("a map column starts with its editor; a list column offers list or JSON and can change between them", () => {
+test("a map column starts with its editor; a list column takes items at once and can change to JSON", () => {
   const shaped: TableMeta = {
     ...table,
     columns: { ...table.columns, tags: "JSON", meta: "JSON" },
@@ -179,7 +179,6 @@ test("a map column starts with its editor; a list column offers list or JSON and
   expect(screen.getByText("+ key")).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Change type of meta" })).toBeNull();
   expect(screen.queryByLabelText("tags as map")).toBeNull();
-  fireEvent.click(screen.getByLabelText("tags as list"));
   const input = screen.getByLabelText("tags");
   fireEvent.change(input, { target: { value: "a" } });
   fireEvent.keyDown(input, { key: "Enter" });
