@@ -53,7 +53,7 @@ export const historyRoutes: Routes = (router, ctx) => {
     const { spec, key, t } = target(ctx, params);
     const cursor = query.get("cursor") ?? undefined;
     if (cursor !== undefined && !CURSOR.test(cursor)) throw new HttpError(400, "invalid cursor");
-    if (!ctx.git) return { state: "nogit" };
+    if (!ctx.git?.history) return { state: "nogit" };
     const page = await ctx.git.history(t, extractor(spec, key), { cursor });
     if (page.state !== "ok") return page;
     return {
@@ -72,7 +72,7 @@ export const historyRoutes: Routes = (router, ctx) => {
     const rev = params.sha as string;
     if (!REV.test(rev)) throw new HttpError(400, "invalid commit");
     const { t } = target(ctx, params);
-    if (!ctx.git) throw new HttpError(404, "no git history (nogit)");
+    if (!ctx.git?.fileDiff) throw new HttpError(404, "no git history (nogit)");
     const res = await ctx.git.fileDiff(t, rev);
     if (res.state === "ok") return { text: res.text };
     if (res.state === "error") throw new HttpError(500, res.message);

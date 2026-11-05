@@ -16,7 +16,8 @@ export { HttpError } from "./serve/errors.ts";
 export {
   type DefaultBranchFiles,
   ReviewRefused,
-  type GitDriver,
+  type ReviewCapability,
+  type WorkspaceDriver,
   type GitStatus,
   type ReviewOutcome,
   type StepRunner,

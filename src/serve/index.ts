@@ -3,7 +3,7 @@ import { createServer, type Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { envKeys } from "../agent/providers.ts";
-import type { GitDriver } from "../git/driver.ts";
+import type { WorkspaceDriver } from "../git/driver.ts";
 import type { WatchOptions } from "../watch.ts";
 import type { ApiContext } from "./context.ts";
 import { createHandler } from "./http.ts";
@@ -25,7 +25,7 @@ export interface ServeOptions {
   // skips gh detection; null means no gh
   gh?: string | null;
   // absent: the local repository (found once it exists); null: no git
-  git?: GitDriver | null;
+  git?: WorkspaceDriver | null;
 }
 
 export interface Server {
