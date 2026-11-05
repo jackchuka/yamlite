@@ -50,10 +50,17 @@ export interface TableResult {
   decisions?: Decision[];
 }
 
+function mdExt(spec: TableSpec) {
+  return markdownExt(spec.glob) ?? ".md";
+}
+
+export function recordExt(spec: TableSpec): string {
+  return spec.codec === "markdown" ? mdExt(spec) : yamlCodec.ext;
+}
+
 export function makeSource(spec: TableSpec): Source {
   if (spec.mode === "list") return new ListSource(spec.path, spec.key);
-  const codec =
-    spec.codec === "markdown" ? markdownCodec(spec.body ?? "body", markdownExt(spec.glob) ?? ".md") : yamlCodec;
+  const codec = spec.codec === "markdown" ? markdownCodec(spec.body ?? "body", mdExt(spec)) : yamlCodec;
   return new FilesSource(spec.path, spec.glob ?? YAML_GLOB, spec.key, spec.exclude, codec, spec.captures);
 }
 

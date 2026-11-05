@@ -12,6 +12,7 @@ export function ChipsInput({
   accept = () => true,
   unique = false,
   invalid = false,
+  list,
 }: {
   label: string;
   value: string[];
@@ -23,6 +24,8 @@ export function ChipsInput({
   unique?: boolean;
   // drawn with a warning border
   invalid?: boolean;
+  // the id of a datalist to suggest from
+  list?: string;
 }) {
   const [text, setText] = useState("");
   const add = () => {
@@ -51,6 +54,7 @@ export function ChipsInput({
       ))}
       <input
         aria-label={label}
+        list={list}
         className="min-w-32 flex-1 bg-transparent px-1 text-base outline-none placeholder:text-muted-foreground md:text-sm"
         placeholder={placeholder}
         value={text}

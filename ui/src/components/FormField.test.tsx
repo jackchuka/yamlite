@@ -486,13 +486,30 @@ test("holding Backspace in an empty chip input removes only one chip", () => {
   expect(onChange).not.toHaveBeenCalled();
 });
 
-test("an unset list field offers only list and JSON, and emits nothing until one is chosen", () => {
+test("an unset list field takes items at once, or an explicit empty list, or JSON", () => {
   const onChange = vi.fn();
   render(wrap(<FormField path={["tags"]} label="tags" value={null} type="JSON" format="list" onChange={onChange} />));
   expect(screen.queryByLabelText("tags as map")).toBeNull();
-  expect(screen.getByLabelText("tags as list")).toBeTruthy();
-  expect(screen.getByLabelText("tags as JSON")).toBeTruthy();
   expect(onChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Set tags to an empty list" }));
+  expect(onChange).toHaveBeenLastCalledWith([]);
+  fireEvent.change(screen.getByLabelText("tags"), { target: { value: "a" } });
+  fireEvent.keyDown(screen.getByLabelText("tags"), { key: "Enter" });
+  expect(onChange).toHaveBeenLastCalledWith(["a"]);
+});
+
+test("an empty list says so, and no longer offers to be emptied", () => {
+  render(wrap(<FormField path={["tags"]} value={[]} type="JSON" format="list" onChange={() => {}} />));
+  expect(screen.getByLabelText("tags").getAttribute("placeholder")).toBe("none · + add");
+  expect(screen.queryByRole("button", { name: "Set tags to an empty list" })).toBeNull();
+});
+
+test("an unset list field can switch to JSON for a list of maps", () => {
+  const onChange = vi.fn();
+  render(wrap(<FormField path={["tags"]} value={null} type="JSON" format="list" onChange={onChange} />));
+  fireEvent.click(screen.getByLabelText("tags as JSON"));
+  expect(onChange).toHaveBeenLastCalledWith([]);
+  expect(screen.getByLabelText("tags").tagName).not.toBe("INPUT");
 });
 
 test("an unset map field shows the map editor at once", () => {
@@ -509,4 +526,35 @@ test("a value of the wrong shape is marked and explained", () => {
   render(wrap(<FormField path={["meta"]} value={["a"]} type="JSON" format="map" onChange={() => {}} />));
   expect(screen.getByText("not a map")).toBeTruthy();
   expect(document.querySelector("[data-problem]")?.querySelector(".border-warn")).toBeTruthy();
+});
+
+test("a JSON column of references is entered as a list, suggesting the target's keys", async () => {
+  vi.mocked(api.rows).mockResolvedValueOnce({
+    columns: [],
+    rows: [{ id: "ann" }, { id: "bob" }],
+    total: 2,
+  } as never);
+  const onChange = vi.fn();
+  const { container } = render(
+    wrap(
+      <FormField
+        path={["owners"]}
+        value={null}
+        type="JSON"
+        format="list"
+        reference={{ column: "owners", table: "people", key: "id" }}
+        onChange={onChange}
+      />,
+    ),
+  );
+  await waitFor(() =>
+    expect([...container.querySelectorAll("datalist option")].map((o) => o.getAttribute("value"))).toEqual([
+      "ann",
+      "bob",
+    ]),
+  );
+  const input = screen.getByLabelText("owners");
+  fireEvent.change(input, { target: { value: "ann" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(onChange).toHaveBeenLastCalledWith(["ann"]);
 });

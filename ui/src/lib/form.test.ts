@@ -10,6 +10,9 @@ test("field kinds follow the value and the column type", () => {
   expect(fieldKind("line\nline", "TEXT", false)).toBe("textarea");
   expect(fieldKind("x".repeat(81), "TEXT", false)).toBe("textarea");
   expect(fieldKind("p1", "TEXT", true)).toBe("ref");
+  expect(fieldKind(null, "JSON", true, "list")).toBe("chips");
+  expect(fieldKind(["p1"], "JSON", true)).toBe("chips");
+  expect(fieldKind([{ a: 1 }], "JSON", true)).toBe("json");
   expect(fieldKind(null, "TEXT", false)).toBe("unset");
   expect(fieldKind(["a", "b"], "JSON", false)).toBe("chips");
   expect(fieldKind([1, 2], "JSON", false)).toBe("json");

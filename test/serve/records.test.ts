@@ -49,3 +49,44 @@ test("authorize installs and removes an authorizer", async () => {
   store.authorize(null);
   expect(store.query("SELECT 1 AS n")).toEqual([{ n: 1n }]);
 });
+
+async function setupNotes() {
+  const root = dataRoot();
+  write(
+    join(root, "yamlite.yaml"),
+    [
+      "tables:",
+      "  notes:",
+      '    files: "notes/<team>/*.md"',
+      "    columns: { title: TEXT, tags: JSON }",
+      "    formats: { tags: list }",
+      "",
+    ].join("\n"),
+  );
+  write(join(root, "notes/core/a.md"), "---\ntitle: A\ntags: []\n---\n");
+  y = await open({ root });
+  await y.sync();
+  store = new Store(join(root, ".yamlite", "db.sqlite"));
+  return { spec: y.tables.find((t) => t.name === "notes")!, store };
+}
+
+test("a key that does not match the files pattern is refused, naming the folders it needs", async () => {
+  const { spec, store } = await setupNotes();
+  expect(() => writeTx(store, () => insertRecord(store, spec, "b", { title: "B" }))).toThrow(
+    'key must look like "<team>/<name>" to match files "*/*.md"',
+  );
+  writeTx(store, () => insertRecord(store, spec, "core/b", { title: "B" }));
+  expect(readRecord(store, spec, "core/b")).toMatchObject({ title: "B" });
+});
+
+test("a JSON column takes only a map or list", async () => {
+  const { spec, store } = await setupNotes();
+  expect(() => writeTx(store, () => insertRecord(store, spec, "core/b", { tags: "x" }))).toThrow(
+    '"tags" must be a JSON map or list',
+  );
+  expect(() => writeTx(store, () => updateRecord(store, spec, "core/a", { tags: "x" }))).toThrow(
+    '"tags" must be a JSON map or list',
+  );
+  writeTx(store, () => updateRecord(store, spec, "core/a", { tags: ["x"] }));
+  expect(readRecord(store, spec, "core/a")).toMatchObject({ tags: ["x"] });
+});
