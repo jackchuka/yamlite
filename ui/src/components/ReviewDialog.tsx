@@ -165,6 +165,8 @@ function ConfirmAction({
         autoFocus
         disabled={busy}
         onBlur={() => setArmed(false)}
+        // Safari on macOS does not focus a clicked button, so the focus would leave on mousedown and close it before the click
+        onMouseDown={(e) => e.preventDefault()}
         onClick={onConfirm}
       >
         {confirm}
