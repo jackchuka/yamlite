@@ -156,6 +156,12 @@ test("a file that holds no records goes back only after a second click, with no 
   expect(vi.mocked(toast.success).mock.calls[0]).toEqual(["Put 1 change back as committed", {}]);
 });
 
+test("pressing the second click keeps the focus on it", () => {
+  renderDialog();
+  fireEvent.click(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" }));
+  expect(fireEvent.mouseDown(screen.getByRole("button", { name: "Put back" }))).toBe(false);
+});
+
 test("a file's second click is asked for again once the focus moves away", () => {
   renderDialog();
   fireEvent.click(screen.getByRole("button", { name: "Put yamlite.yaml back as committed" }));
